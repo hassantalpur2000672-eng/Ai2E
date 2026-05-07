@@ -563,8 +563,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     try {
       // Verify token still valid & refresh user data
       me = await api('/api/me');
-      // If server says mining in progress but claimed=1 locally, fix the mismatch
-      // mining_claimed=0 means actively mining on server
       localStorage.setItem('adz_user', JSON.stringify(me));
       await finishLogin();
       return;
@@ -860,21 +858,7 @@ function updateMineUI() {
     an.classList.remove('mactive'); setText('mrated', 'IDLE');
     return;
   }
-  // If mining is active but no start time recorded, show idle state
-  if (!me.last_mining_start) {
-    btn.className = 'start'; btn.textContent = '⛏️ Start Mining'; btn.disabled = false;
-    pw.style.display = 'none'; pe.style.display = 'none';
-    an.classList.remove('mactive'); setText('mrated', 'IDLE');
-    return;
-  }
   const st = new Date(me.last_mining_start).getTime();
-  // Guard against invalid date
-  if (isNaN(st)) {
-    btn.className = 'start'; btn.textContent = '⛏️ Start Mining'; btn.disabled = false;
-    pw.style.display = 'none'; pe.style.display = 'none';
-    an.classList.remove('mactive'); setText('mrated', 'IDLE');
-    return;
-  }
   const el = Math.min(Date.now() - st, dur);
   const earn = Math.floor(getCPMS() * el);
   const canClaim = earn >= MIN_CLAIM || el >= dur;
@@ -940,29 +924,11 @@ async function handleMineBtn() {
 async function startMining() {
   try {
     await api('/api/mine/start', 'POST');
-    // Refresh user data from server to get accurate last_mining_start
-    try {
-      me = await api('/api/me');
-    } catch(_) {
-      // Fallback: set locally if server refresh fails
-      me.last_mining_start = new Date().toISOString();
-      me.mining_claimed = 0;
-    }
+    me.last_mining_start = new Date().toISOString();
+    me.mining_claimed = 0;
     localStorage.setItem('adz_user', JSON.stringify(me));
-    updateMineUI(); startTicker(); toast('⛏️ Mining started! Come back in 24h.'); spawnCoin();
-  } catch(e) {
-    // If server says already mining, refresh state so UI shows correct status
-    if (e.message && e.message.toLowerCase().includes('already mining')) {
-      try {
-        me = await api('/api/me');
-        localStorage.setItem('adz_user', JSON.stringify(me));
-        updateMineUI();
-        toast('⛏️ Mining already in progress!');
-      } catch(_) { toast('❌ ' + (e.message || 'Failed to start')); }
-    } else {
-      toast('❌ ' + (e.message || 'Failed to start'));
-    }
-  }
+    updateMineUI(); toast('⛏️ Mining started! Come back in 24h.'); spawnCoin();
+  } catch(e) { toast('❌ ' + (e.message || 'Failed to start')); }
 }
 
 async function claimMining() {
