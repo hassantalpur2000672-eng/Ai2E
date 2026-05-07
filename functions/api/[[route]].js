@@ -325,6 +325,13 @@ export async function onRequest({ request, env }) {
       return json({ users: parseInt(uc?.c || 0), total_mined: parseInt(tm?.s || 0) });
     }
 
+
+    // ── ADS ───────────────────────────────────────
+    if (path === '/api/ads' && request.method === 'GET') {
+      const results = await dbAll(env, 'SELECT * FROM ads WHERE is_active = 1 ORDER BY created_at DESC');
+      return json(results.map(a => ({...a, pages: a.pages ? a.pages.split(',') : ['index','blog','policies','vision']})));
+    }
+
     // ── ADMIN ─────────────────────────────────────
     if (path.startsWith('/api/admin/')) {
       const adminPass = request.headers.get('X-Admin-Key');
@@ -391,6 +398,27 @@ export async function onRequest({ request, env }) {
         ]);
         const recent = await dbAll(env, 'SELECT username,points,total_mined,mining_power,created_at,login_method FROM users ORDER BY created_at DESC LIMIT 10');
         return json({ users: parseInt(uc?.c||0), total_mined: parseInt(tm?.s||0), tasks: parseInt(tc?.c||0), sessions: parseInt(mc?.c||0), recent });
+      }
+
+      if (path === '/api/admin/ads' && request.method === 'GET') {
+        return json(await dbAll(env, 'SELECT * FROM ads ORDER BY created_at DESC'));
+      }
+      if (path === '/api/admin/ads/save' && request.method === 'POST') {
+        const { id, name, network, position, code, url, pages, is_active, type } = body;
+        const pg = Array.isArray(pages) ? pages.join(',') : (pages || 'index,blog,policies,vision');
+        const net = network || type || 'script';
+        if (id) {
+          await dbRun(env, 'UPDATE ads SET name=?,network=?,position=?,code=?,url=?,pages=?,is_active=? WHERE id=?',
+            [name, net, position||'bottom', code||'', url||'', pg, is_active!=null?is_active:1, id]);
+        } else {
+          await dbRun(env, "INSERT INTO ads (id,name,network,position,code,url,pages,is_active,created_at) VALUES (?,?,?,?,?,?,?,?,datetime('now'))",
+            [crypto.randomUUID(), name, net, position||'bottom', code||'', url||'', pg, is_active!=null?is_active:1]);
+        }
+        return json({ success: true });
+      }
+      if (path === '/api/admin/ads/delete' && request.method === 'POST') {
+        await dbRun(env, 'DELETE FROM ads WHERE id=?', [body.id]);
+        return json({ success: true });
       }
       if (path === '/api/admin/transactions' && request.method === 'GET') {
         return json(await dbAll(env, 'SELECT t.*,u.username FROM transactions t LEFT JOIN users u ON t.user_id=u.id ORDER BY t.created_at DESC LIMIT 100'));
