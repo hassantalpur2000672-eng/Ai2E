@@ -8,7 +8,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 
-<!-- WalletConnect / Web3Modal -->
 <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
 
 <style>
@@ -139,15 +138,82 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 #mine-btn.start{background:linear-gradient(135deg,var(--accent),#00ccff);color:#030712}
 #mine-btn.claim{background:linear-gradient(135deg,var(--accent3),#f97316);color:#030712;animation:claimPulse 2s ease-in-out infinite}
 #mine-btn.mining{background:var(--surface2);color:var(--muted);cursor:default;border:1px solid var(--border)}
-/* Already mining button style */
-#mine-btn.already-mining{background:var(--surface2)!important;color:var(--muted)!important;border:1px solid var(--border)!important;cursor:not-allowed}
+
+/* Mining progress button (replaces the button while mining) */
+#mine-btn.mining-progress-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  cursor: default;
+  pointer-events: none;
+}
+.mining-progress-btn .progress-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mining-progress-btn .progress-bar-wrap {
+  height: 6px;
+  background: var(--surface2);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.mining-progress-btn .progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), #00ccff);
+  border-radius: 99px;
+  transition: width 0.8s linear;
+}
+.mining-progress-btn .progress-text {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  font-family: 'Outfit', sans-serif;
+}
+.mining-progress-btn .progress-text .earned {
+  color: var(--accent);
+  font-family: 'Space Mono', monospace;
+}
+.mining-progress-btn .progress-text .time-left {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 /* Mining status box */
-.mining-status-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px;text-align:center}
-.mining-status-box .status-idle{color:var(--muted);font-size:14px}
-.mining-status-box .status-mining{display:none}
-.mining-status-box .status-mining .mining-rate{color:var(--accent);font-family:'Space Mono',monospace;font-size:14px;margin-bottom:6px}
-.mining-status-box .status-mining .mining-detail{color:var(--muted);font-size:12px;margin-bottom:4px}
-.mining-status-box .status-mining .mining-progress-text{color:var(--accent3);font-size:12px}
+.mining-status-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+.mining-status-box .status-idle {
+  color: var(--muted);
+  font-size: 14px;
+}
+.mining-status-box .status-mining {
+  display: none;
+}
+.mining-status-box .status-mining .mining-rate {
+  color: var(--accent);
+  font-family: 'Space Mono', monospace;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+.mining-status-box .status-mining .mining-detail {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+.mining-status-box .status-mining .mining-progress-text {
+  color: var(--accent3);
+  font-size: 12px;
+}
 
 .sgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
 .scard{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px}
@@ -706,7 +772,6 @@ async function connectWallet(type) {
 }
 
 async function connectEVM(type) {
-  // Try specific wallet providers first
   let provider = null;
 
   if (type === 'metamask' && window.ethereum?.isMetaMask) {
@@ -718,12 +783,10 @@ async function connectEVM(type) {
   } else if (type === 'okx' && window.okxwallet) {
     provider = window.okxwallet;
   } else if (window.ethereum) {
-    // Fallback: use whatever ethereum provider is available
     provider = window.ethereum;
   }
 
   if (!provider) {
-    // No wallet detected on desktop -> open mobile deep link or store
     const links = {
       metamask: 'https://metamask.app.link/dapp/' + window.location.host,
       trust: 'https://link.trustwallet.com/open_url?coin_id=60&url=' + encodeURIComponent(window.location.href),
@@ -733,10 +796,9 @@ async function connectEVM(type) {
     };
     const link = links[type] || links.evm;
 
-    // On mobile, try deep link; on desktop, show install prompt
     if (/Android|iPhone|iPad/i.test(navigator.userAgent)) {
       window.location.href = link;
-      return null; // Will reload via deeplink
+      return null;
     } else {
       toast('🦊 Install ' + type.charAt(0).toUpperCase() + type.slice(1) + ' wallet first!');
       setTimeout(() => window.open('https://metamask.io', '_blank'), 500);
@@ -744,7 +806,6 @@ async function connectEVM(type) {
     }
   }
 
-  // Request accounts
   const accounts = await provider.request({ method: 'eth_requestAccounts' });
   return accounts[0] || null;
 }
@@ -754,7 +815,6 @@ async function connectPhantom() {
     const resp = await window.solana.connect();
     return resp.publicKey.toString();
   }
-  // Mobile deep link
   if (/Android|iPhone|iPad/i.test(navigator.userAgent)) {
     window.location.href = 'https://phantom.app/ul/browse/' + encodeURIComponent(window.location.href);
     return null;
@@ -788,7 +848,6 @@ async function finishLogin() {
       document.body.innerHTML = '<div style="height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;background:#030712;color:#e6edf3;font-family:Outfit,sans-serif"><div style="font-size:64px">🔧</div><div style="font-size:24px;font-weight:800">Under Maintenance</div><div style="color:#7d8590">Back soon!</div></div>';
       return;
     }
-    // Render tasks
     doneTasks = new Set(taskData.done || []);
     renderTasks(taskData.tasks || []);
     await loadRoadmap();
@@ -844,7 +903,6 @@ function renderUser() {
   const al = document.getElementById('avltr');
   if (al) al.textContent = name[0]?.toUpperCase() || '👤';
 
-  // Wallet badge in profile
   const wb = document.getElementById('pwallet-badge');
   if (wb && me.wallet_address) {
     const addr = me.wallet_address;
@@ -881,6 +939,7 @@ function updateMineUI() {
 
   // Idle state
   if (me.mining_claimed) {
+    // Restore to start button
     btn.className = 'start';
     btn.textContent = '⛏️ Start Mining';
     btn.disabled = false;
@@ -888,7 +947,6 @@ function updateMineUI() {
     miningDiv.style.display = 'none';
     an.classList.remove('mactive');
     setText('mrated', 'IDLE');
-    // Ensure old elements stay hidden
     document.getElementById('mpwrap').style.display = 'none';
     document.getElementById('pendwrap').style.display = 'none';
     return;
@@ -903,7 +961,7 @@ function updateMineUI() {
   const h = Math.floor(rem / 3600000), m = Math.floor((rem % 3600000) / 60000);
   const rate = (getCPMS() * 3600000).toFixed(1);
 
-  // Show mining status box
+  // Status box always visible
   idleDiv.style.display = 'none';
   miningDiv.style.display = 'block';
   setText('statusRate', '+' + rate + '/hr');
@@ -911,7 +969,7 @@ function updateMineUI() {
   setText('statusProgress', '⚠️ Mining... need ' + MIN_CLAIM + ' pts (' + earn + ' so far)');
 
   if (el >= dur) {
-    // Session complete -> claim button
+    // Claim button
     btn.className = 'claim';
     btn.textContent = '🏆 Claim ' + earn.toLocaleString() + ' ADZ';
     btn.disabled = false;
@@ -922,17 +980,28 @@ function updateMineUI() {
     btn.textContent = '🏆 Claim ' + earn.toLocaleString() + ' ADZ (Early)';
     btn.disabled = false;
   } else {
-    // Mining in progress -> show "Already mining"
-    btn.className = 'already-mining';
-    btn.textContent = 'Already mining';
+    // Mining in progress -> transform button into progress bar
+    btn.className = 'mining-progress-btn';
     btn.disabled = true;
+    const pct = Math.min(100, (el / dur) * 100).toFixed(1);
+    btn.innerHTML = `
+      <div class="progress-inner">
+        <div class="progress-bar-wrap">
+          <div class="progress-bar-fill" style="width:${pct}%"></div>
+        </div>
+        <div class="progress-text">
+          <span>⛏️ Mining...</span>
+          <span class="earned">${earn} pts</span>
+          <span class="time-left">${h}h ${m}m</span>
+        </div>
+      </div>
+    `;
   }
 
-  // Animation active
   an.classList.add('mactive');
   setText('mrated', '+' + rate + '/hr');
 
-  // Hide old progress elements
+  // Hide old elements
   document.getElementById('mpwrap').style.display = 'none';
   document.getElementById('pendwrap').style.display = 'none';
 }
@@ -999,17 +1068,6 @@ async function claimMining() {
   }
 }
 
-// ============================================
-// Rest of the code remains completely unchanged
-// (tasks, leaderboard, referrals, transactions, roadmap, navigation, helpers...)
-// ============================================
-
-// ... [Keep all remaining functions below exactly as they were] ...
-
-// I will continue with the rest of the script to ensure nothing is broken
-// But due to length, I'll append the remaining code from the original file here
-
-// (Copying the rest of the original script, unchanged)
 // ============================================
 // TASKS
 // ============================================
