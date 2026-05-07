@@ -139,6 +139,16 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 #mine-btn.start{background:linear-gradient(135deg,var(--accent),#00ccff);color:#030712}
 #mine-btn.claim{background:linear-gradient(135deg,var(--accent3),#f97316);color:#030712;animation:claimPulse 2s ease-in-out infinite}
 #mine-btn.mining{background:var(--surface2);color:var(--muted);cursor:default;border:1px solid var(--border)}
+/* Already mining button style */
+#mine-btn.already-mining{background:var(--surface2)!important;color:var(--muted)!important;border:1px solid var(--border)!important;cursor:not-allowed}
+/* Mining status box */
+.mining-status-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px;text-align:center}
+.mining-status-box .status-idle{color:var(--muted);font-size:14px}
+.mining-status-box .status-mining{display:none}
+.mining-status-box .status-mining .mining-rate{color:var(--accent);font-family:'Space Mono',monospace;font-size:14px;margin-bottom:6px}
+.mining-status-box .status-mining .mining-detail{color:var(--muted);font-size:12px;margin-bottom:4px}
+.mining-status-box .status-mining .mining-progress-text{color:var(--accent3);font-size:12px}
+
 .sgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
 .scard{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px}
 .scl{font-size:11px;color:var(--muted);margin-bottom:6px}
@@ -402,6 +412,21 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
           <div class="mring r1"></div><div class="mring r2"></div><div class="mring r3"></div>
           <div class="mcore"><div class="memoji" id="memoji">🐹</div><div class="mrate" id="mrated">IDLE</div></div>
         </div>
+
+        <!-- Mining Status Box (always visible) -->
+        <div class="mining-status-box" id="miningStatusBox">
+          <div class="status-idle" id="statusIdle">
+            <span style="font-size:11px;color:var(--muted);letter-spacing:2px;text-transform:uppercase">IDLE</span>
+          </div>
+          <div class="status-mining" id="statusMining">
+            <div class="mining-rate" id="statusRate">+10.0/hr</div>
+            <div class="mining-detail" style="color:var(--success);margin-bottom:6px;">Mining in progress</div>
+            <div class="mining-detail" id="statusTimeLeft">23h 59m left</div>
+            <div class="mining-progress-text" id="statusProgress">⚠️ Mining... need 100 pts (0 so far)</div>
+          </div>
+        </div>
+
+        <!-- Old progress elements (kept hidden, not used anymore) -->
         <div class="mprog" id="mpwrap" style="display:none">
           <div class="mprogh"><span id="mplbl">Mining...</span><span id="mptime">0h 0m</span></div>
           <div class="mprogbar"><div class="mprogfill" id="mpfill" style="width:0%"></div></div>
@@ -409,6 +434,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
         <div id="pendwrap" style="text-align:center;font-family:'Space Mono',monospace;font-size:12px;color:var(--accent);margin-bottom:12px;display:none">
           +<span id="pendamt">0</span> Points mined this session
         </div>
+
         <button id="mine-btn" class="start" onclick="handleMineBtn()">⛏️ Start Mining</button>
       </div>
       <div class="sgrid">
@@ -847,45 +873,68 @@ const MIN_CLAIM = 100;
 
 function updateMineUI() {
   const btn = document.getElementById('mine-btn');
-  const pw = document.getElementById('mpwrap');
-  const pe = document.getElementById('pendwrap');
   const an = document.getElementById('manim');
+  const idleDiv = document.getElementById('statusIdle');
+  const miningDiv = document.getElementById('statusMining');
   if (!me || !btn) return;
   const dur = getDur();
+
+  // Idle state
   if (me.mining_claimed) {
-    btn.className = 'start'; btn.textContent = '⛏️ Start Mining'; btn.disabled = false;
-    pw.style.display = 'none'; pe.style.display = 'none';
-    an.classList.remove('mactive'); setText('mrated', 'IDLE');
+    btn.className = 'start';
+    btn.textContent = '⛏️ Start Mining';
+    btn.disabled = false;
+    idleDiv.style.display = 'block';
+    miningDiv.style.display = 'none';
+    an.classList.remove('mactive');
+    setText('mrated', 'IDLE');
+    // Ensure old elements stay hidden
+    document.getElementById('mpwrap').style.display = 'none';
+    document.getElementById('pendwrap').style.display = 'none';
     return;
   }
+
+  // Mining active
   const st = new Date(me.last_mining_start).getTime();
   const el = Math.min(Date.now() - st, dur);
   const earn = Math.floor(getCPMS() * el);
   const canClaim = earn >= MIN_CLAIM || el >= dur;
-  const pct = (el / dur * 100).toFixed(1);
   const rem = dur - el;
   const h = Math.floor(rem / 3600000), m = Math.floor((rem % 3600000) / 60000);
+  const rate = (getCPMS() * 3600000).toFixed(1);
+
+  // Show mining status box
+  idleDiv.style.display = 'none';
+  miningDiv.style.display = 'block';
+  setText('statusRate', '+' + rate + '/hr');
+  setText('statusTimeLeft', (el >= dur) ? 'Ready!' : h + 'h ' + m + 'm left');
+  setText('statusProgress', '⚠️ Mining... need ' + MIN_CLAIM + ' pts (' + earn + ' so far)');
 
   if (el >= dur) {
-    btn.className = 'claim'; btn.textContent = '🏆 Claim ' + earn.toLocaleString() + ' ADZ'; btn.disabled = false;
-    pw.style.display = 'block';
-    document.getElementById('mpfill').style.width = '100%';
-    setText('mplbl', 'Mining complete!'); setText('mptime', 'Ready!');
-    setText('pendamt', earn.toLocaleString()); pe.style.display = 'block';
-    an.classList.add('mactive'); setText('mrated', 'DONE!');
-    return;
-  }
-  if (canClaim) {
-    btn.className = 'claim'; btn.textContent = '🏆 Claim ' + earn.toLocaleString() + ' ADZ (Early)'; btn.disabled = false;
+    // Session complete -> claim button
+    btn.className = 'claim';
+    btn.textContent = '🏆 Claim ' + earn.toLocaleString() + ' ADZ';
+    btn.disabled = false;
+    setText('statusTimeLeft', 'Ready!');
+    setText('statusProgress', 'Mining complete! Claim now.');
+  } else if (canClaim) {
+    btn.className = 'claim';
+    btn.textContent = '🏆 Claim ' + earn.toLocaleString() + ' ADZ (Early)';
+    btn.disabled = false;
   } else {
-    btn.className = 'mining'; btn.textContent = '⏳ Mining... need ' + MIN_CLAIM + ' pts (' + earn + ' so far)'; btn.disabled = false;
+    // Mining in progress -> show "Already mining"
+    btn.className = 'already-mining';
+    btn.textContent = 'Already mining';
+    btn.disabled = true;
   }
-  pw.style.display = 'block';
-  document.getElementById('mpfill').style.width = pct + '%';
-  setText('mplbl', 'Mining in progress'); setText('mptime', h + 'h ' + m + 'm left');
-  setText('pendamt', earn.toLocaleString()); pe.style.display = 'block';
+
+  // Animation active
   an.classList.add('mactive');
-  setText('mrated', '+' + (getCPMS() * 3600000).toFixed(1) + '/hr');
+  setText('mrated', '+' + rate + '/hr');
+
+  // Hide old progress elements
+  document.getElementById('mpwrap').style.display = 'none';
+  document.getElementById('pendwrap').style.display = 'none';
 }
 
 function startTicker() {
@@ -950,6 +999,17 @@ async function claimMining() {
   }
 }
 
+// ============================================
+// Rest of the code remains completely unchanged
+// (tasks, leaderboard, referrals, transactions, roadmap, navigation, helpers...)
+// ============================================
+
+// ... [Keep all remaining functions below exactly as they were] ...
+
+// I will continue with the rest of the script to ensure nothing is broken
+// But due to length, I'll append the remaining code from the original file here
+
+// (Copying the rest of the original script, unchanged)
 // ============================================
 // TASKS
 // ============================================
@@ -1091,11 +1151,8 @@ async function loadTxH() {
 async function loadRoadmap() {
   try {
     const data = await api('/api/admin/blog', 'GET');
-    // Use public roadmap from settings (blog_posts visible to all)
     renderRoadmap(data);
-  } catch(e) {
-    // Try without admin (public endpoint not needed, roadmap loaded at login)
-  }
+  } catch(e) {}
 }
 
 function renderRoadmap(data) {
