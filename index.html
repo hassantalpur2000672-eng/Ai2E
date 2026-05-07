@@ -118,25 +118,19 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 .balsec{text-align:center;margin-bottom:20px}
 .ballbl{font-size:11px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:4px}
 .balamt{font-family:'Space Mono',monospace;font-size:40px;font-weight:700;background:linear-gradient(135deg,var(--accent),#00ccff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1}
-.manim{position:relative;width:200px;height:200px;margin:0 auto 20px}
-.manim-svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
-.mring-track{fill:none;stroke:var(--border);stroke-width:4}
-.mring-prog{fill:none;stroke-width:4;stroke-linecap:round;transition:stroke-dashoffset 1s linear}
-.mring-prog.r1{stroke:var(--accent)}
-.mring-prog.r2{stroke:var(--accent2)}
-.mring-prog.r3{stroke:var(--accent3)}
-.mring-idle{fill:none;stroke-width:3;stroke-linecap:round;stroke-dasharray:20 200}
-.mring-idle.r1{stroke:rgba(0,255,136,.3);animation:spin 4s linear infinite}
-.mring-idle.r2{stroke:rgba(124,58,237,.3);animation:spin 3s linear infinite reverse}
-.mring-idle.r3{stroke:rgba(245,158,11,.25);animation:spin 5s linear infinite}
-.mcore{position:absolute;inset:52px;border-radius:50%;background:radial-gradient(circle,rgba(0,255,136,.12),transparent);border:1px solid rgba(0,255,136,.15);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:2px;transition:all .4s}
-.memoji{font-size:24px;animation:float 2s ease-in-out infinite}
+.manim{position:relative;width:180px;height:180px;margin:0 auto 20px}
+.mring{position:absolute;inset:0;border-radius:50%;border:2px solid var(--border)}
+.mring.r1{border-top-color:var(--accent);animation:spin 3s linear infinite}
+.mring.r2{inset:16px;border-top-color:var(--accent2);animation:spin 2s linear infinite reverse}
+.mring.r3{inset:32px;border-top-color:var(--accent3);animation:spin 4s linear infinite}
+.mcore{position:absolute;inset:48px;border-radius:50%;background:radial-gradient(circle,rgba(0,255,136,.15),transparent);border:1px solid rgba(0,255,136,.2);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:2px}
+.memoji{font-size:22px;animation:float 2s ease-in-out infinite}
 .mrate{font-family:'Space Mono',monospace;font-size:9px;color:var(--accent);text-align:center}
 .bfloat{position:absolute;font-size:14px;animation:floatBlock 3s ease-in-out infinite;pointer-events:none}
 .bfloat:nth-child(1){top:10px;left:10px}.bfloat:nth-child(2){top:10px;right:10px;animation-delay:.5s}
 .bfloat:nth-child(3){bottom:10px;left:10px;animation-delay:1s}.bfloat:nth-child(4){bottom:10px;right:10px;animation-delay:1.5s}
 .bfloat:nth-child(5){top:50%;left:0;transform:translateY(-50%);animation-delay:2s}
-.mactive .mcore{background:radial-gradient(circle,rgba(0,255,136,.28),transparent);border-color:rgba(0,255,136,.6);box-shadow:0 0 32px rgba(0,255,136,.25)}
+.mactive .mcore{background:radial-gradient(circle,rgba(0,255,136,.25),transparent);border-color:rgba(0,255,136,.5);box-shadow:0 0 30px rgba(0,255,136,.2)}
 .mprog{margin-bottom:16px}
 .mprogh{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:8px}
 .mprogbar{height:6px;background:var(--surface2);border-radius:99px;overflow:hidden}
@@ -405,14 +399,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
         </div>
         <div class="manim" id="manim">
           <div class="bfloat">⬡</div><div class="bfloat">⬢</div><div class="bfloat">⬡</div><div class="bfloat">⬢</div><div class="bfloat">⬡</div>
-          <svg class="manim-svg" id="manim-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-            <circle class="mring-track" cx="100" cy="100" r="88"/>
-            <circle class="mring-prog r1" id="ring1" cx="100" cy="100" r="88" stroke-dasharray="552.9" stroke-dashoffset="552.9"/>
-            <circle class="mring-track" cx="100" cy="100" r="72"/>
-            <circle class="mring-prog r2" id="ring2" cx="100" cy="100" r="72" stroke-dasharray="452.4" stroke-dashoffset="452.4"/>
-            <circle class="mring-track" cx="100" cy="100" r="56"/>
-            <circle class="mring-prog r3" id="ring3" cx="100" cy="100" r="56" stroke-dasharray="351.9" stroke-dashoffset="351.9"/>
-          </svg>
+          <div class="mring r1"></div><div class="mring r2"></div><div class="mring r3"></div>
           <div class="mcore"><div class="memoji" id="memoji">🐹</div><div class="mrate" id="mrated">IDLE</div></div>
         </div>
         <div class="mprog" id="mpwrap" style="display:none">
@@ -858,51 +845,6 @@ function getDur() { return parseInt(cfg.mining_duration_hours || '24') * 3600000
 function getCPMS() { return (parseFloat(cfg.mining_coins_per_hour || '10') * (me?.mining_power || 1)) / 3600000; }
 const MIN_CLAIM = 100;
 
-function setRingProgress(pct) {
-  // pct: 0-100
-  const rings = [
-    {id:'ring1', circ:552.9},
-    {id:'ring2', circ:452.4},
-    {id:'ring3', circ:351.9}
-  ];
-  // ring1 = full progress, ring2 = 70% of that, ring3 = 40% (layered cage look)
-  const factors = [1, 0.72, 0.42];
-  rings.forEach((r,i) => {
-    const el = document.getElementById(r.id);
-    if (!el) return;
-    const p = Math.min((pct / 100) * factors[i], 1);
-    el.style.strokeDashoffset = r.circ * (1 - p);
-  });
-}
-
-function setRingIdle() {
-  // Idle: small spinning dashes
-  const rings = ['ring1','ring2','ring3'];
-  const circs = [552.9, 452.4, 351.9];
-  const speeds = ['4s','3s','5s'];
-  const dirs = ['normal','reverse','normal'];
-  rings.forEach((id,i) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.style.strokeDasharray = '40 ' + (circs[i] - 40);
-    el.style.strokeDashoffset = '0';
-    el.style.animation = 'spin ' + speeds[i] + ' linear infinite ' + dirs[i];
-    el.style.transition = 'none';
-  });
-}
-
-function setRingFull() {
-  const circs = [552.9, 452.4, 351.9];
-  ['ring1','ring2','ring3'].forEach((id,i) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.style.strokeDasharray = circs[i] + '';
-    el.style.strokeDashoffset = '0';
-    el.style.animation = 'none';
-    el.style.transition = 'stroke-dashoffset 1s linear';
-  });
-}
-
 function updateMineUI() {
   const btn = document.getElementById('mine-btn');
   const pw = document.getElementById('mpwrap');
@@ -914,38 +856,15 @@ function updateMineUI() {
     btn.className = 'start'; btn.textContent = '⛏️ Start Mining'; btn.disabled = false;
     pw.style.display = 'none'; pe.style.display = 'none';
     an.classList.remove('mactive'); setText('mrated', 'IDLE');
-    // Reset rings to idle spinner
-    ['ring1','ring2','ring3'].forEach((id,i) => {
-      const el = document.getElementById(id);
-      const circs = [552.9,452.4,351.9];
-      if (!el) return;
-      el.style.strokeDasharray = '30 ' + (circs[i]-30);
-      el.style.strokeDashoffset = '0';
-      el.style.animation = ['spin 5s linear infinite','spin 3.5s linear infinite reverse','spin 6s linear infinite'][i];
-      el.style.transition = 'none';
-    });
     return;
   }
   const st = new Date(me.last_mining_start).getTime();
   const el = Math.min(Date.now() - st, dur);
   const earn = Math.floor(getCPMS() * el);
   const canClaim = earn >= MIN_CLAIM || el >= dur;
-  const pct = parseFloat((el / dur * 100).toFixed(2));
+  const pct = (el / dur * 100).toFixed(1);
   const rem = dur - el;
   const h = Math.floor(rem / 3600000), m = Math.floor((rem % 3600000) / 60000);
-
-  // Update rings with actual progress
-  const circs = [552.9, 452.4, 351.9];
-  const factors = [1, 0.72, 0.42];
-  ['ring1','ring2','ring3'].forEach((id,i) => {
-    const ringEl = document.getElementById(id);
-    if (!ringEl) return;
-    ringEl.style.animation = 'none';
-    ringEl.style.transition = 'stroke-dashoffset 1s linear';
-    ringEl.style.strokeDasharray = circs[i] + '';
-    const p = Math.min((pct / 100) * factors[i], 1);
-    ringEl.style.strokeDashoffset = circs[i] * (1 - p);
-  });
 
   if (el >= dur) {
     btn.className = 'claim'; btn.textContent = '🏆 Claim ' + earn.toLocaleString() + ' ADZ'; btn.disabled = false;
@@ -959,7 +878,7 @@ function updateMineUI() {
   if (canClaim) {
     btn.className = 'claim'; btn.textContent = '🏆 Claim ' + earn.toLocaleString() + ' ADZ (Early)'; btn.disabled = false;
   } else {
-    btn.className = 'mining'; btn.textContent = '⏳ Mining... ' + earn + '/' + MIN_CLAIM + ' pts'; btn.disabled = false;
+    btn.className = 'mining'; btn.textContent = '⏳ Mining... need ' + MIN_CLAIM + ' pts (' + earn + ' so far)'; btn.disabled = false;
   }
   pw.style.display = 'block';
   document.getElementById('mpfill').style.width = pct + '%';
@@ -979,7 +898,7 @@ function startTicker() {
       setText('mbal', Math.floor((me.points || 0) + earn).toLocaleString());
       setText('hbal', Math.floor((me.points || 0) + earn).toLocaleString());
     }
-  }, 3000);
+  }, 5000);
 }
 
 function startAnimalLoop() {
