@@ -90,7 +90,17 @@
     .ad-type-badge.native{background:rgba(0,204,255,.1);color:#00ccff;}
     .ad-type-badge.social{background:rgba(248,81,73,.1);color:var(--danger);}
     .ad-type-badge.smartlink{background:rgba(124,58,237,.15);color:var(--accent2);}
-    @media(max-width:768px){.stats-row{grid-template-columns:1fr 1fr;}.sidebar{display:none;}.admin-body{flex-direction:column;}}
+    @media(max-width:900px){
+      .stats-row{grid-template-columns:1fr 1fr;}
+      .sidebar{width:100%;min-height:auto;display:flex;flex-wrap:wrap;gap:4px;padding:8px;border-right:none;border-bottom:1px solid var(--border);}
+      .sidebar-btn{padding:6px 10px;font-size:11px;flex:1;min-width:80px;text-align:center;}
+      .sidebar-section{display:none;}
+      .admin-body{flex-direction:column;}
+      .main-content{padding:12px;}
+      .panel-head{flex-direction:column;gap:8px;align-items:flex-start;}
+      .table-wrap{overflow-x:auto;}
+      table{min-width:500px;}
+    }
   </style>
 </head>
 <body>
@@ -790,9 +800,13 @@ async function loadAds() {
     const data = await adm('/api/admin/ads');
     adsList = Array.isArray(data) ? data.map(a => ({
       ...a,
+      type: a.network || a.type || 'script',
+      network: a.network || a.type || 'script',
       active: a.is_active == 1,
       pages: a.pages ? a.pages.split(',') : ['index','blog','policies','vision'],
-      scriptCode: a.code || ''
+      scriptCode: a.code || '',
+      url: a.url || '',
+      position: a.position || 'bottom'
     })) : [];
   } catch(e) { 
     console.log('Ads load error:', e);
@@ -832,7 +846,7 @@ function renderAdsTable() {
   tbody.innerHTML = adsList.map((ad, i) => `
     <tr>
       <td><strong>${esc(ad.name)}</strong></td>
-      <td><span class="ad-type-badge ${tc[ad.type]||''}">${ad.type.toUpperCase()}</span></td>
+      <td><span class="ad-type-badge ${tc[ad.type]||''}">${(ad.type||ad.network||"script").toUpperCase()}</span></td>
       <td style="font-size:12px;color:var(--muted);">${(ad.pages||[]).join(', ')||'None'}</td>
       <td style="font-size:12px;">${ad.position||'bottom'}</td>
       <td><span class="badge ${ad.active?'badge-green':'badge-red'}">${ad.active?'✅ Active':'⏸ Off'}</span></td>
