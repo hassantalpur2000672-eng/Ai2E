@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Our Vision — AirDrop Zone AI Ecosystem</title>
+<meta name="description" content="AirDrop Zone is building the world's most powerful AI-driven crypto ecosystem. AI Marketplace, AI Assistant, DeFi, Web3 — all in one place."/>
+<meta property="og:title" content="AirDrop Zone Vision — AI Crypto Ecosystem"/>
+<meta property="og:description" content="We are building the future of AI and crypto — one block at a time."/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<style>
+:root{--bg:#030712;--surface:#0d1117;--surface2:#161b22;--border:#21262d;--accent:#00ff88;--accent2:#7c3aed;--accent3:#f59e0b;--text:#e6edf3;--muted:#7d8590}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,255,136,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,136,.02) 1px,transparent 1px);background-size:60px 60px;pointer-events:none;z-index:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+@keyframes glow{0%,100%{box-shadow:0 0 20px rgba(0,255,136,.2)}50%{box-shadow:0 0 40px rgba(0,255,136,.4)}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+
+/* NAV */
+nav{position:sticky;top:0;z-index:100;background:rgba(3,7,18,.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;justify-content:space-between}
+.nav-logo{font-family:'Space Mono',monospace;font-size:14px;color:var(--accent);font-weight:700;text-decoration:none}
+.nav-back{background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.2);border-radius:99px;padding:6px 16px;color:var(--accent);font-size:13px;font-weight:600;text-decoration:none;transition:all .2s}
+.nav-back:hover{background:rgba(0,255,136,.15)}
+
+/* HERO */
+.hero{position:relative;z-index:1;padding:80px 20px 60px;text-align:center;max-width:900px;margin:0 auto}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.3);border-radius:99px;padding:6px 16px;font-size:12px;color:var(--accent2);font-weight:600;margin-bottom:24px;animation:fadeUp .6s ease forwards}
+.hero-title{font-size:clamp(36px,8vw,72px);font-weight:900;line-height:1.05;margin-bottom:20px;animation:fadeUp .7s ease forwards}
+.hero-title span{background:linear-gradient(135deg,var(--accent),#00ccff,var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero-sub{font-size:clamp(16px,3vw,20px);color:var(--muted);line-height:1.6;max-width:600px;margin:0 auto 40px;animation:fadeUp .8s ease forwards}
+.hero-img{width:100%;max-width:700px;height:300px;margin:0 auto 60px;border-radius:20px;overflow:hidden;position:relative;animation:fadeUp .9s ease forwards}
+.hero-img-inner{width:100%;height:100%;background:linear-gradient(135deg,#0d1117,#1a0a2e,#0a1a2e);display:flex;align-items:center;justify-content:center;position:relative;border:1px solid var(--border)}
+.hero-grid{position:absolute;inset:0;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(4,1fr);gap:2px;padding:20px;opacity:.3}
+.hg-cell{background:linear-gradient(135deg,var(--accent2),var(--accent));border-radius:4px;animation:glow 3s ease-in-out infinite}
+.hg-cell:nth-child(odd){animation-delay:1s}
+.hero-icon{font-size:80px;animation:float 3s ease-in-out infinite;z-index:1}
+
+/* SECTIONS */
+.section{padding:60px 20px;max-width:1000px;margin:0 auto;position:relative;z-index:1}
+.sec-label{font-family:'Space Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:3px;text-transform:uppercase;margin-bottom:12px}
+.sec-title{font-size:clamp(28px,5vw,44px);font-weight:800;margin-bottom:16px;line-height:1.1}
+.sec-desc{font-size:16px;color:var(--muted);line-height:1.7;margin-bottom:48px;max-width:700px}
+
+/* CARDS GRID */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:60px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;transition:all .3s;position:relative;overflow:hidden}
+.card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,transparent,rgba(0,255,136,.03));opacity:0;transition:opacity .3s}
+.card:hover{border-color:rgba(0,255,136,.3);transform:translateY(-4px)}
+.card:hover::before{opacity:1}
+.card-icon{font-size:36px;margin-bottom:16px;display:block}
+.card-title{font-size:18px;font-weight:700;margin-bottom:8px}
+.card-desc{font-size:13px;color:var(--muted);line-height:1.6}
+.card-badge{display:inline-block;padding:3px 10px;border-radius:99px;font-size:10px;font-weight:700;margin-top:12px}
+.badge-live{background:rgba(0,255,136,.1);color:var(--accent);border:1px solid rgba(0,255,136,.2)}
+.badge-soon{background:rgba(245,158,11,.1);color:var(--accent3);border:1px solid rgba(245,158,11,.2)}
+.badge-future{background:rgba(124,58,237,.1);color:var(--accent2);border:1px solid rgba(124,58,237,.2)}
+
+/* TIMELINE */
+.timeline{position:relative;padding-left:32px}
+.timeline::before{content:'';position:absolute;left:8px;top:0;bottom:0;width:2px;background:linear-gradient(to bottom,var(--accent),var(--accent2),transparent)}
+.tl-item{position:relative;padding:0 0 40px 24px}
+.tl-dot{position:absolute;left:-28px;top:4px;width:16px;height:16px;border-radius:50%;background:var(--accent);box-shadow:0 0 12px rgba(0,255,136,.5)}
+.tl-dot.purple{background:var(--accent2);box-shadow:0 0 12px rgba(124,58,237,.5)}
+.tl-dot.gold{background:var(--accent3);box-shadow:0 0 12px rgba(245,158,11,.5)}
+.tl-dot.dim{background:var(--surface2);border:2px solid var(--border)}
+.tl-phase{font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:2px;margin-bottom:4px}
+.tl-title{font-size:18px;font-weight:700;margin-bottom:8px}
+.tl-desc{font-size:13px;color:var(--muted);line-height:1.6}
+
+/* STATS */
+.stats-band{background:linear-gradient(135deg,rgba(0,255,136,.04),rgba(124,58,237,.04));border:1px solid var(--border);border-radius:20px;padding:40px 24px;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:24px;text-align:center;margin-bottom:60px}
+.stat-n{font-family:'Space Mono',monospace;font-size:36px;font-weight:700;color:var(--accent);line-height:1}
+.stat-l{font-size:12px;color:var(--muted);margin-top:6px}
+
+/* AI ECOSYSTEM VISUAL */
+.eco-wrap{position:relative;height:400px;margin-bottom:60px;border-radius:20px;overflow:hidden;background:linear-gradient(135deg,#030712,#0d0520,#020c18);border:1px solid var(--border)}
+.eco-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:100px;height:100px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#00ccff);display:flex;align-items:center;justify-content:center;font-size:36px;z-index:10;box-shadow:0 0 60px rgba(0,255,136,.4);animation:glow 2s ease-in-out infinite}
+.eco-node{position:absolute;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:10px;font-weight:600;color:var(--text);cursor:default;transition:transform .3s}
+.eco-node:hover{transform:scale(1.1)}
+.eco-node-icon{font-size:20px}
+.eco-node-lbl{font-size:9px;color:var(--muted);white-space:nowrap}
+.eco-line{position:absolute;top:50%;left:50%;height:1px;background:linear-gradient(90deg,rgba(0,255,136,.4),transparent);transform-origin:left center;z-index:1}
+.eco-ring{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);border-radius:50%;border:1px solid rgba(0,255,136,.1);animation:spin 20s linear infinite}
+
+/* CTA */
+.cta{text-align:center;padding:80px 20px;position:relative;z-index:1}
+.cta-title{font-size:clamp(28px,5vw,48px);font-weight:800;margin-bottom:16px}
+.cta-sub{font-size:16px;color:var(--muted);margin-bottom:32px}
+.cta-btn{display:inline-block;padding:16px 40px;background:linear-gradient(135deg,var(--accent),#00ccff);color:#030712;font-family:'Outfit',sans-serif;font-size:16px;font-weight:700;border-radius:12px;text-decoration:none;transition:all .2s}
+.cta-btn:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(0,255,136,.3)}
+
+/* FOOTER */
+footer{border-top:1px solid var(--border);padding:32px 20px;text-align:center;color:var(--muted);font-size:13px;position:relative;z-index:1}
+footer a{color:var(--accent);text-decoration:none}
+
+@media(max-width:600px){.hero{padding:60px 16px 40px}.section{padding:40px 16px}.eco-wrap{height:300px}}
+</style>
+</head>
+<body>
+<nav>
+  <a href="/" class="nav-logo">⛏️ ADZ</a>
+  <a href="/" class="nav-back">← Back to App</a>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-badge">🌐 The Future of AI + Crypto</div>
+  <h1 class="hero-title">We Are Building the<br/><span>World's AI Ecosystem</span></h1>
+  <p class="hero-sub">AirDrop Zone is not just a mining app. It is the foundation of a complete AI-powered crypto economy — where intelligence meets decentralization.</p>
+  <div class="hero-img">
+    <div class="hero-img-inner">
+      <div class="hero-grid">
+        <div class="hg-cell"></div><div class="hg-cell"></div><div class="hg-cell"></div><div class="hg-cell"></div>
+        <div class="hg-cell"></div><div class="hg-cell"></div><div class="hg-cell"></div><div class="hg-cell"></div>
+        <div class="hg-cell"></div><div class="hg-cell"></div><div class="hg-cell"></div><div class="hg-cell"></div>
+        <div class="hg-cell"></div><div class="hg-cell"></div><div class="hg-cell"></div><div class="hg-cell"></div>
+      </div>
+      <div class="hero-icon">🌐</div>
+    </div>
+  </div>
+</div>
+
+<!-- STATS -->
+<div class="section">
+  <div class="stats-band">
+    <div><div class="stat-n">10M+</div><div class="stat-l">Target Users</div></div>
+    <div><div class="stat-n">7</div><div class="stat-l">AI Products Planned</div></div>
+    <div><div class="stat-n">∞</div><div class="stat-l">Possibilities</div></div>
+    <div><div class="stat-n">ADZ</div><div class="stat-l">The Fuel Token</div></div>
+  </div>
+</div>
+
+<!-- AI ECOSYSTEM -->
+<div class="section">
+  <div class="sec-label">The Big Picture</div>
+  <h2 class="sec-title">One Ecosystem.<br/>Infinite AI Power.</h2>
+  <p class="sec-desc">Every product we build connects to one shared economy powered by ADZ tokens. Mine coins today — use them across our entire AI ecosystem tomorrow.</p>
+
+  <!-- Visual -->
+  <div class="eco-wrap">
+    <div class="eco-ring" style="width:120px;height:120px;animation-duration:8s"></div>
+    <div class="eco-ring" style="width:220px;height:220px;animation-duration:15s;animation-direction:reverse"></div>
+    <div class="eco-ring" style="width:320px;height:320px;animation-duration:25s"></div>
+    <div class="eco-center">🧠</div>
+    <!-- Nodes around center -->
+    <div class="eco-node" style="top:18%;left:20%"><div class="eco-node-icon">🤖</div><div class="eco-node-lbl">AI Assistant</div></div>
+    <div class="eco-node" style="top:18%;right:20%"><div class="eco-node-icon">🏪</div><div class="eco-node-lbl">AI Marketplace</div></div>
+    <div class="eco-node" style="bottom:18%;left:20%"><div class="eco-node-icon">⛏️</div><div class="eco-node-lbl">Mining</div></div>
+    <div class="eco-node" style="bottom:18%;right:20%"><div class="eco-node-icon">💎</div><div class="eco-node-lbl">DeFi</div></div>
+    <div class="eco-node" style="top:50%;left:5%;transform:translateY(-50%)"><div class="eco-node-icon">📜</div><div class="eco-node-lbl">AI Scripts</div></div>
+    <div class="eco-node" style="top:50%;right:5%;transform:translateY(-50%)"><div class="eco-node-icon">🔗</div><div class="eco-node-lbl">Web3</div></div>
+  </div>
+</div>
+
+<!-- PRODUCTS -->
+<div class="section">
+  <div class="sec-label">Our Products</div>
+  <h2 class="sec-title">7 AI Products.<br/>One Token to Rule Them All.</h2>
+  <p class="sec-desc">Each product is designed to be powerful alone — but unstoppable together. ADZ token powers every single one.</p>
+
+  <div class="cards">
+    <div class="card">
+      <span class="card-icon">⛏️</span>
+      <div class="card-title">ADZ Mining Platform</div>
+      <div class="card-desc">Browser-based free crypto mining. Earn ADZ coins daily. Boost your mining power through referrals — up to 10x. The gateway to our entire ecosystem.</div>
+      <span class="card-badge badge-live">🟢 LIVE NOW</span>
+    </div>
+    <div class="card">
+      <span class="card-icon">🤖</span>
+      <div class="card-title">ADZ AI Assistant</div>
+      <div class="card-desc">A powerful AI assistant trained on crypto, DeFi, and blockchain data. Ask anything, get smart answers. Pay with ADZ tokens — no subscriptions needed.</div>
+      <span class="card-badge badge-soon">🟡 COMING SOON</span>
+    </div>
+    <div class="card">
+      <span class="card-icon">🏪</span>
+      <div class="card-title">AI Script Marketplace</div>
+      <div class="card-desc">Buy, sell, and trade AI-generated scripts, tools, and automation bots. Creators earn ADZ. Buyers save time. The world's first AI script economy.</div>
+      <span class="card-badge badge-soon">🟡 COMING SOON</span>
+    </div>
+    <div class="card">
+      <span class="card-icon">📜</span>
+      <div class="card-title">ADZ Script Engine</div>
+      <div class="card-desc">Generate custom AI scripts for any task — trading bots, data scrapers, automation tools, smart contracts. Powered by cutting-edge language models.</div>
+      <span class="card-badge badge-future">🔵 PLANNED</span>
+    </div>
+    <div class="card">
+      <span class="card-icon">💎</span>
+      <div class="card-title">ADZ DeFi Protocol</div>
+      <div class="card-desc">Stake ADZ. Earn yield. Provide liquidity. Our DeFi protocol on Solana will offer some of the best APY in the ecosystem — powered by real utility.</div>
+      <span class="card-badge badge-future">🔵 PLANNED</span>
+    </div>
+    <div class="card">
+      <span class="card-icon">🔮</span>
+      <div class="card-title">AI Prediction Engine</div>
+      <div class="card-desc">AI-powered market predictions, trend analysis, and signal generation. Get insights before the market moves. Powered by on-chain data and ML models.</div>
+      <span class="card-badge badge-future">🔵 PLANNED</span>
+    </div>
+    <div class="card">
+      <span class="card-icon">🌐</span>
+      <div class="card-title">ADZ Web3 Hub</div>
+      <div class="card-desc">A complete Web3 portal — wallet, NFTs, DAOs, governance. One place for all your on-chain activity. ADZ holders get priority access and lower fees.</div>
+      <span class="card-badge badge-future">🔵 PLANNED</span>
+    </div>
+  </div>
+</div>
+
+<!-- TIMELINE -->
+<div class="section">
+  <div class="sec-label">Our Journey</div>
+  <h2 class="sec-title">From Mining to<br/>Full AI Empire</h2>
+  <p class="sec-desc">We are executing step by step. Every phase builds on the last. Every user who mines today becomes a founding member of what we build tomorrow.</p>
+
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-dot"></div>
+      <div class="tl-phase">PHASE 1 — 2026 Q2 ✅</div>
+      <div class="tl-title">Platform Launch & Mining</div>
+      <div class="tl-desc">ADZ mining platform goes live. Users earn coins daily, complete tasks, refer friends for mining power boosts. Building our community foundation.</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot purple"></div>
+      <div class="tl-phase">PHASE 2 — 2026 Q3</div>
+      <div class="tl-title">Token Generation & Solana Launch</div>
+      <div class="tl-desc">ADZ deploys as real SPL token on Solana. All mined coins convert 1:1. DEX listing on Raydium and Jupiter. Community gets real value for time invested.</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot gold"></div>
+      <div class="tl-phase">PHASE 3 — 2026 Q4</div>
+      <div class="tl-title">AI Assistant & Script Marketplace</div>
+      <div class="tl-desc">Our AI-powered assistant launches. Script marketplace opens for creators. ADZ becomes the fuel currency for all AI services across the platform.</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot dim"></div>
+      <div class="tl-phase">PHASE 4 — 2027</div>
+      <div class="tl-title">DeFi Protocol & Web3 Hub</div>
+      <div class="tl-desc">Full DeFi suite launches on Solana. Staking, yield farming, liquidity pools. Web3 hub connects all products into one unified experience.</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot dim"></div>
+      <div class="tl-phase">PHASE 5 — 2027+</div>
+      <div class="tl-title">AI Prediction Engine & Full Ecosystem</div>
+      <div class="tl-desc">AI market prediction engine goes live. Full ecosystem operational. ADZ becomes a leading AI-crypto token with real utility across 7+ products.</div>
+    </div>
+  </div>
+</div>
+
+<!-- WHY ADZ -->
+<div class="section">
+  <div class="sec-label">Why ADZ</div>
+  <h2 class="sec-title">What Makes Us Different</h2>
+  <div class="cards">
+    <div class="card">
+      <span class="card-icon">🎯</span>
+      <div class="card-title">Real Utility</div>
+      <div class="card-desc">ADZ is not just another meme coin. Every product in our ecosystem uses ADZ as payment — giving the token real, growing demand.</div>
+    </div>
+    <div class="card">
+      <span class="card-icon">🆓</span>
+      <div class="card-title">Free to Start</div>
+      <div class="card-desc">No investment needed. Mine for free. Refer friends. Build your stack before the token even launches. Early miners get the best advantage.</div>
+    </div>
+    <div class="card">
+      <span class="card-icon">⚡</span>
+      <div class="card-title">Solana Speed</div>
+      <div class="card-desc">Built on Solana for near-zero fees and lightning transactions. No gas wars. No waiting. Just fast, cheap, powerful blockchain infrastructure.</div>
+    </div>
+    <div class="card">
+      <span class="card-icon">🧠</span>
+      <div class="card-title">AI at the Core</div>
+      <div class="card-desc">Artificial intelligence is not an add-on for us — it is the foundation. Every product we build has AI deeply integrated into its core functionality.</div>
+    </div>
+  </div>
+</div>
+
+<!-- CTA -->
+<div class="cta">
+  <h2 class="cta-title">Start Mining.<br/>Own the Future.</h2>
+  <p class="cta-sub">Join thousands of miners building their ADZ stack before the token launches. The earlier you start, the more you earn.</p>
+  <a href="/" class="cta-btn">⛏️ Start Mining Free →</a>
+</div>
+
+<footer>
+  <p>© 2026 AirDrop Zone — Building the AI Crypto Ecosystem</p>
+  <p style="margin-top:8px"><a href="/policies.html">Privacy Policy</a> · <a href="/vision.html">Vision</a> · <a href="/">App</a></p>
+</footer>
+
+
+
+<!-- Ads -->
+<script src="ads.js"></script>
+</body>
+</html>

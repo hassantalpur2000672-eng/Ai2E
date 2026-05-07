@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Blog & News — AirDrop Zone | ADZ Crypto Updates</title>
+<meta name="description" content="Latest news, updates, and guides from AirDrop Zone. Learn how to maximize your ADZ mining, referrals, and prepare for the Solana token launch."/>
+<meta name="keywords" content="AirDrop Zone, ADZ coin, free crypto mining, Solana airdrop, crypto referral, ADZ token"/>
+<meta property="og:title" content="AirDrop Zone Blog — ADZ News & Updates"/>
+<meta property="og:description" content="Mining guides, token updates, and ecosystem news from the AirDrop Zone team."/>
+<link rel="canonical" href="https://ai2egithub.vercel.app/blog.html"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+:root{--bg:#030712;--surface:#0d1117;--surface2:#161b22;--border:#21262d;--accent:#00ff88;--accent2:#7c3aed;--accent3:#f59e0b;--text:#e6edf3;--muted:#7d8590}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;min-height:100vh}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,255,136,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,136,.02) 1px,transparent 1px);background-size:60px 60px;pointer-events:none;z-index:0}
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+
+nav{position:sticky;top:0;z-index:100;background:rgba(3,7,18,.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;justify-content:space-between}
+.nav-logo{font-family:'Space Mono',monospace;font-size:14px;color:var(--accent);font-weight:700;text-decoration:none}
+.nav-back{background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.2);border-radius:99px;padding:6px 16px;color:var(--accent);font-size:13px;font-weight:600;text-decoration:none;transition:all .2s}
+.nav-back:hover{background:rgba(0,255,136,.15)}
+
+.hero{padding:60px 20px 40px;text-align:center;position:relative;z-index:1}
+.hero-badge{display:inline-block;background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.2);border-radius:99px;padding:6px 16px;font-size:12px;color:var(--accent);font-weight:600;margin-bottom:20px}
+.hero h1{font-size:clamp(28px,6vw,52px);font-weight:800;margin-bottom:12px}
+.hero p{color:var(--muted);font-size:15px;line-height:1.6;max-width:500px;margin:0 auto}
+
+/* FILTER TABS */
+.filters{display:flex;gap:8px;padding:24px 20px;max-width:1000px;margin:0 auto;flex-wrap:wrap;position:relative;z-index:1}
+.filter-btn{padding:8px 18px;border-radius:99px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s}
+.filter-btn.active,.filter-btn:hover{background:var(--accent);color:#030712;border-color:var(--accent)}
+
+/* FEATURED POST */
+.featured{max-width:1000px;margin:0 auto 40px;padding:0 20px;position:relative;z-index:1}
+.feat-card{background:linear-gradient(135deg,rgba(0,255,136,.04),rgba(124,58,237,.04));border:1px solid rgba(0,255,136,.15);border-radius:20px;overflow:hidden;display:grid;grid-template-columns:1fr 1fr;gap:0;animation:fadeUp .5s ease}
+.feat-img{background:linear-gradient(135deg,#0d1117,#1a0a2e);min-height:280px;display:flex;align-items:center;justify-content:center;font-size:80px;position:relative;overflow:hidden}
+.feat-img::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 50% 50%,rgba(0,255,136,.15),transparent 70%)}
+.feat-body{padding:32px}
+.feat-cat{display:inline-block;padding:3px 12px;border-radius:99px;font-size:10px;font-weight:700;margin-bottom:12px}
+.cat-guide{background:rgba(0,255,136,.1);color:var(--accent);border:1px solid rgba(0,255,136,.2)}
+.cat-news{background:rgba(124,58,237,.1);color:var(--accent2);border:1px solid rgba(124,58,237,.2)}
+.cat-update{background:rgba(245,158,11,.1);color:var(--accent3);border:1px solid rgba(245,158,11,.2)}
+.feat-title{font-size:24px;font-weight:800;line-height:1.2;margin-bottom:12px}
+.feat-excerpt{font-size:14px;color:var(--muted);line-height:1.7;margin-bottom:20px}
+.feat-meta{display:flex;align-items:center;gap:12px;font-size:12px;color:var(--muted);margin-bottom:20px}
+.read-btn{display:inline-block;padding:10px 24px;background:var(--accent);color:#030712;border-radius:8px;font-weight:700;font-size:13px;text-decoration:none;transition:all .2s}
+.read-btn:hover{opacity:.85;transform:translateY(-1px)}
+
+/* POSTS GRID */
+.posts{max-width:1000px;margin:0 auto;padding:0 20px 80px;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;position:relative;z-index:1}
+.post-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;transition:all .3s;animation:fadeUp .5s ease;text-decoration:none;color:var(--text);display:block}
+.post-card:hover{border-color:rgba(0,255,136,.3);transform:translateY(-4px);box-shadow:0 12px 32px rgba(0,0,0,.3)}
+.post-img{height:160px;display:flex;align-items:center;justify-content:center;font-size:56px;background:var(--surface2);position:relative;overflow:hidden}
+.post-img::after{content:'';position:absolute;bottom:0;left:0;right:0;height:40px;background:linear-gradient(transparent,var(--surface))}
+.post-body{padding:20px}
+.post-title{font-size:16px;font-weight:700;line-height:1.3;margin-bottom:8px}
+.post-excerpt{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:12px}
+.post-footer{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--muted)}
+.post-read{color:var(--accent);font-weight:600}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(10px);z-index:9000;display:none;overflow-y:auto;padding:20px}
+.modal-overlay.open{display:block}
+.modal-box{background:var(--surface);border:1px solid var(--border);border-radius:20px;max-width:700px;margin:40px auto;overflow:hidden}
+.modal-header{position:relative;height:200px;display:flex;align-items:center;justify-content:center;font-size:80px;background:var(--surface2)}
+.modal-close{position:absolute;top:16px;right:16px;background:rgba(0,0,0,.5);border:1px solid var(--border);border-radius:50%;width:36px;height:36px;cursor:pointer;color:var(--text);font-size:16px;display:flex;align-items:center;justify-content:center}
+.modal-body{padding:32px}
+.modal-cat{margin-bottom:12px}
+.modal-title{font-size:28px;font-weight:800;line-height:1.2;margin-bottom:12px}
+.modal-meta{font-size:12px;color:var(--muted);margin-bottom:24px}
+.modal-content{font-size:15px;color:#c9d1d9;line-height:1.8}
+.modal-content h2{font-size:20px;font-weight:700;color:var(--text);margin:24px 0 12px}
+.modal-content h3{font-size:16px;font-weight:600;color:var(--accent);margin:16px 0 8px}
+.modal-content p{margin-bottom:12px}
+.modal-content ul{padding-left:20px;margin-bottom:12px}
+.modal-content ul li{margin-bottom:6px}
+.modal-content strong{color:var(--text)}
+.modal-cta{margin-top:32px;padding:24px;background:rgba(0,255,136,.04);border-top:1px solid var(--border);text-align:center}
+.modal-cta-btn{display:inline-block;padding:12px 32px;background:var(--accent);color:#030712;border-radius:10px;font-weight:700;font-size:14px;text-decoration:none}
+
+footer{border-top:1px solid var(--border);padding:32px 20px;text-align:center;color:var(--muted);font-size:13px;position:relative;z-index:1}
+footer a{color:var(--accent);text-decoration:none}
+
+@media(max-width:640px){.feat-card{grid-template-columns:1fr}.feat-img{min-height:160px;font-size:60px}}
+</style>
+</head>
+<body>
+<nav>
+  <a href="/" class="nav-logo">⛏️ ADZ</a>
+  <a href="/" class="nav-back">← Back to App</a>
+</nav>
+
+<div class="hero">
+  <div class="hero-badge">📰 ADZ Blog</div>
+  <h1>News & Guides</h1>
+  <p>Everything you need to know about mining ADZ, maximizing your earnings, and preparing for the token launch.</p>
+</div>
+
+<div class="filters">
+  <button class="filter-btn active" onclick="filterPosts('all',this)">All Posts</button>
+  <button class="filter-btn" onclick="filterPosts('guide',this)">Guides</button>
+  <button class="filter-btn" onclick="filterPosts('news',this)">News</button>
+  <button class="filter-btn" onclick="filterPosts('update',this)">Updates</button>
+</div>
+
+<!-- FEATURED -->
+<div class="featured">
+  <div class="feat-card" data-cat="guide" onclick="openPost(0)">
+    <div class="feat-img">⛏️</div>
+    <div class="feat-body">
+      <span class="feat-cat cat-guide">📖 GUIDE</span>
+      <div class="feat-title">How to Maximize Your ADZ Mining — Complete 2026 Guide</div>
+      <div class="feat-excerpt">Learn every strategy to boost your mining power, leverage the referral system for up to 10x gains, and position yourself perfectly for the Solana token launch.</div>
+      <div class="feat-meta">
+        <span>⏱ 8 min read</span>
+        <span>•</span>
+        <span>May 2026</span>
+        <span>•</span>
+        <span>👁 2.4K views</span>
+      </div>
+      <a class="read-btn" onclick="openPost(0);event.stopPropagation()">Read Guide →</a>
+    </div>
+  </div>
+</div>
+
+<!-- POSTS GRID -->
+<div class="posts" id="posts-grid">
+
+  <div class="post-card" data-cat="news" onclick="openPost(1)">
+    <div class="post-img" style="background:linear-gradient(135deg,#0d1117,#1a0a2e)">🚀</div>
+    <div class="post-body">
+      <span class="feat-cat cat-news" style="font-size:10px">📢 NEWS</span>
+      <div class="post-title">ADZ Token Launch: Everything You Need to Know About Phase 2</div>
+      <div class="post-excerpt">The token generation event on Solana is our most anticipated milestone. Here is a complete breakdown of what happens, when, and how to prepare.</div>
+      <div class="post-footer"><span>May 2026 · 6 min read</span><span class="post-read">Read →</span></div>
+    </div>
+  </div>
+
+  <div class="post-card" data-cat="guide" onclick="openPost(2)">
+    <div class="post-img" style="background:linear-gradient(135deg,#0a1a0a,#0d2a0d)">👥</div>
+    <div class="post-body">
+      <span class="feat-cat cat-guide" style="font-size:10px">📖 GUIDE</span>
+      <div class="post-title">Referral Mastery: How 10 Active Referrals Gives You 2x Mining Power</div>
+      <div class="post-excerpt">Our referral system is the most powerful feature on the platform. Learn how active referrals multiply your mining rate and compound your earnings exponentially.</div>
+      <div class="post-footer"><span>May 2026 · 5 min read</span><span class="post-read">Read →</span></div>
+    </div>
+  </div>
+
+  <div class="post-card" data-cat="update" onclick="openPost(3)">
+    <div class="post-img" style="background:linear-gradient(135deg,#1a0a2e,#0a0a2e)">🤖</div>
+    <div class="post-body">
+      <span class="feat-cat cat-update" style="font-size:10px">🔄 UPDATE</span>
+      <div class="post-title">AI Products Reveal: What We Are Building After the Token Launch</div>
+      <div class="post-excerpt">A first look at our AI Assistant, Script Marketplace, and Prediction Engine. These products will use ADZ tokens as their fuel — driving real demand and utility.</div>
+      <div class="post-footer"><span>May 2026 · 7 min read</span><span class="post-read">Read →</span></div>
+    </div>
+  </div>
+
+  <div class="post-card" data-cat="guide" onclick="openPost(4)">
+    <div class="post-img" style="background:linear-gradient(135deg,#1a1a0a,#2a2a0a)">💡</div>
+    <div class="post-body">
+      <span class="feat-cat cat-guide" style="font-size:10px">📖 GUIDE</span>
+      <div class="post-title">Phantom Wallet Setup: Connect to AirDrop Zone in 3 Minutes</div>
+      <div class="post-excerpt">Your Phantom wallet is your gateway to the Solana ecosystem and future ADZ token claims. This step-by-step guide will get you set up in minutes.</div>
+      <div class="post-footer"><span>May 2026 · 3 min read</span><span class="post-read">Read →</span></div>
+    </div>
+  </div>
+
+  <div class="post-card" data-cat="news" onclick="openPost(5)">
+    <div class="post-img" style="background:linear-gradient(135deg,#0a1a2e,#0a2a3e)">💎</div>
+    <div class="post-body">
+      <span class="feat-cat cat-news" style="font-size:10px">📢 NEWS</span>
+      <div class="post-title">Why Solana? Our Decision to Build ADZ on the Fastest Blockchain</div>
+      <div class="post-excerpt">We chose Solana for speed, cost, and ecosystem. Near-zero fees, 65,000 TPS, and a thriving DeFi scene make it the perfect home for ADZ token.</div>
+      <div class="post-footer"><span>Apr 2026 · 4 min read</span><span class="post-read">Read →</span></div>
+    </div>
+  </div>
+
+  <div class="post-card" data-cat="guide" onclick="openPost(6)">
+    <div class="post-img" style="background:linear-gradient(135deg,#1a0a0a,#2a0a0a)">🔐</div>
+    <div class="post-body">
+      <span class="feat-cat cat-guide" style="font-size:10px">📖 GUIDE</span>
+      <div class="post-title">Security First: How to Protect Your ADZ Account and Future Tokens</div>
+      <div class="post-excerpt">Your mined ADZ coins are valuable. Learn the best practices for account security, wallet safety, and how to avoid common crypto scams targeting our community.</div>
+      <div class="post-footer"><span>Apr 2026 · 5 min read</span><span class="post-read">Read →</span></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal" onclick="closePost(event)">
+  <div class="modal-box" id="modal-box">
+    <div class="modal-header" id="modal-img">⛏️</div>
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="modal-body">
+      <div class="modal-cat" id="modal-cat"></div>
+      <div class="modal-title" id="modal-title"></div>
+      <div class="modal-meta" id="modal-meta"></div>
+      <div class="modal-content" id="modal-content"></div>
+    </div>
+    <div class="modal-cta">
+      <div style="font-size:16px;font-weight:700;margin-bottom:8px">Ready to start mining?</div>
+      <a href="/" class="modal-cta-btn">⛏️ Mine ADZ Free →</a>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <p>© 2026 AirDrop Zone · <a href="/">App</a> · <a href="/vision.html">Vision</a> · <a href="/policies.html">Policies</a></p>
+</footer>
+
+<script>
+const POSTS = [
+  {
+    icon:'⛏️', cat:'guide', catLabel:'📖 GUIDE', catClass:'cat-guide',
+    title:'How to Maximize Your ADZ Mining — Complete 2026 Guide',
+    meta:'May 2026 · 8 min read · 2,400 views',
+    content:`
+      <h2>The Complete ADZ Mining Strategy</h2>
+      <p>AirDrop Zone mining is free and browser-based — but that does not mean all miners earn equally. The difference between a casual miner and a power miner comes down to strategy. This guide covers everything.</p>
+      <h3>1. Start Your Mining Cycle Every 24 Hours</h3>
+      <p>The most important habit is consistency. Your mining cycle runs for 24 hours and then stops. <strong>You must manually claim and restart</strong> your cycle. Miners who do this daily earn up to 5x more than those who check in weekly.</p>
+      <p>Set a daily reminder on your phone for the same time each day. This single habit alone will put you ahead of 60% of all miners.</p>
+      <h3>2. Complete All Available Tasks</h3>
+      <p>Tasks give you instant ADZ coin bonuses without waiting for mining. New tasks appear regularly. Each task you complete gives you coins immediately — there is no reason to skip them. They take less than a minute each.</p>
+      <h3>3. The Referral System Is Your Superpower</h3>
+      <p>This is where serious miners separate from casual ones. <strong>Each active referral adds +10% to your mining power.</strong> Here is how it compounds:</p>
+      <ul>
+        <li>1 active referral = 1.1x power = 11 ADZ/hour</li>
+        <li>5 active referrals = 1.5x power = 15 ADZ/hour</li>
+        <li>10 active referrals = 2.0x power = 20 ADZ/hour</li>
+        <li>50 active referrals = 6.0x power = 60 ADZ/hour</li>
+        <li>90 active referrals = 10x power = 100 ADZ/hour (MAX)</li>
+      </ul>
+      <h3>4. Active vs Passive Referrals</h3>
+      <p>Only <strong>active referrals</strong> count for mining power boosts. An active referral is someone who has completed at least one full 24-hour mining session. Just signing up does not count — they must actually mine. So when you refer people, encourage them to start mining immediately.</p>
+      <h3>5. Connect Your Phantom Wallet Now</h3>
+      <p>Even if you prefer email login, connect a Phantom wallet now. When Phase 2 launches and tokens go live on Solana, you will need a wallet to receive your ADZ tokens. Setting this up early means you will never miss out.</p>
+      <h2>Summary: Your Daily Mining Checklist</h2>
+      <ul>
+        <li>✅ Claim previous cycle and start new mining session</li>
+        <li>✅ Complete any new tasks that appeared</li>
+        <li>✅ Share your referral link with 2 new people</li>
+        <li>✅ Check leaderboard to track your progress</li>
+      </ul>
+      <p>Miners who follow this routine consistently will enter the token launch with the largest possible ADZ stack.</p>
+    `
+  },
+  {
+    icon:'🚀', cat:'news', catLabel:'📢 NEWS', catClass:'cat-news',
+    title:'ADZ Token Launch: Everything You Need to Know About Phase 2',
+    meta:'May 2026 · 6 min read',
+    content:`
+      <h2>Phase 2: The Token Generation Event</h2>
+      <p>Phase 2 is the most important milestone in AirDrop Zone's journey. This is when everything we have been building becomes real — mined coins convert to actual Solana tokens you can hold, trade, and use across our ecosystem.</p>
+      <h3>What Exactly Happens in Phase 2?</h3>
+      <ul>
+        <li><strong>Snapshot:</strong> We take a snapshot of every user's mined ADZ balance on a specific date</li>
+        <li><strong>Token Deployment:</strong> ADZ deploys as a real SPL token on the Solana blockchain</li>
+        <li><strong>1:1 Conversion:</strong> Every ADZ coin in your balance converts to exactly 1 ADZ token</li>
+        <li><strong>Distribution:</strong> Tokens are sent to your connected Phantom wallet</li>
+        <li><strong>DEX Listing:</strong> ADZ lists on Raydium and Jupiter for trading</li>
+      </ul>
+      <h3>When Does Phase 2 Launch?</h3>
+      <p>Our target is <strong>Q3 2026</strong>. The exact date depends on completing technical development, security audits, and regulatory review. We will announce the official date at least 30 days in advance through our Telegram channel and on this blog.</p>
+      <h3>How Do I Prepare?</h3>
+      <ul>
+        <li>Connect your Phantom wallet to your AirDrop Zone account now</li>
+        <li>Keep mining daily to maximize your balance before the snapshot</li>
+        <li>Refer active miners — more referrals = more mining power = bigger snapshot balance</li>
+        <li>Join our Telegram for real-time announcements</li>
+      </ul>
+      <h3>What Will ADZ Be Worth?</h3>
+      <p>We do not make price predictions. The market determines value. What we can say is that ADZ will have real utility — it powers our AI products, DeFi protocol, and marketplace. Real utility drives real demand.</p>
+    `
+  },
+  {
+    icon:'👥', cat:'guide', catLabel:'📖 GUIDE', catClass:'cat-guide',
+    title:'Referral Mastery: How 10 Active Referrals Gives You 2x Mining Power',
+    meta:'May 2026 · 5 min read',
+    content:`
+      <h2>The Referral System Explained</h2>
+      <p>AirDrop Zone's referral system is not just a bonus — it is the primary way to dramatically multiply your earnings. Understanding it deeply is the single biggest advantage a miner can have.</p>
+      <h3>How the Power Multiplier Works</h3>
+      <p>Every <strong>active referral</strong> adds 0.1 (10%) to your mining power multiplier. Your base power is 1.0x. The formula is simple:</p>
+      <p><strong>Mining Power = 1.0 + (Active Referrals × 0.1)</strong></p>
+      <p>The maximum is 10x, which means 90 active referrals maxes you out at 100 ADZ per hour instead of the base 10.</p>
+      <h3>Active vs Inactive Referrals</h3>
+      <p>This is crucial. Someone who signs up with your code is a <strong>passive referral</strong> — they give you the 500 ADZ signup bonus, but they do NOT boost your mining power yet.</p>
+      <p>Once they complete their first full 24-hour mining session, they become an <strong>active referral</strong> — and your mining power increases immediately.</p>
+      <h3>Best Strategies for Getting Active Referrals</h3>
+      <ul>
+        <li><strong>Share in crypto communities:</strong> Telegram groups, Discord servers, Reddit communities</li>
+        <li><strong>Explain the benefit:</strong> Tell your referrals exactly why they should mine daily</li>
+        <li><strong>Follow up:</strong> Check if your referrals have started mining and remind them</li>
+        <li><strong>Create content:</strong> YouTube shorts, TikTok, or Instagram posts explaining ADZ</li>
+      </ul>
+      <h3>Referral Earnings Calculator</h3>
+      <ul>
+        <li>0 active referrals: 10 ADZ/hr × 24hr = 240 ADZ/day</li>
+        <li>5 active referrals: 15 ADZ/hr × 24hr = 360 ADZ/day</li>
+        <li>10 active referrals: 20 ADZ/hr × 24hr = 480 ADZ/day</li>
+        <li>25 active referrals: 35 ADZ/hr × 24hr = 840 ADZ/day</li>
+        <li>50 active referrals: 60 ADZ/hr × 24hr = 1,440 ADZ/day</li>
+      </ul>
+      <p>Over 90 days before token launch, 50 active referrals would net you <strong>129,600 ADZ</strong> compared to just 21,600 ADZ with no referrals. That is a 6x difference.</p>
+    `
+  },
+  {
+    icon:'🤖', cat:'update', catLabel:'🔄 UPDATE', catClass:'cat-update',
+    title:'AI Products Reveal: What We Are Building After the Token Launch',
+    meta:'May 2026 · 7 min read',
+    content:`
+      <h2>The AI Ecosystem: Our Full Vision</h2>
+      <p>AirDrop Zone began as a mining platform — but it was always designed to be the foundation of something much larger. Today we are revealing our complete AI product roadmap.</p>
+      <h3>Product 1: ADZ AI Assistant</h3>
+      <p>A powerful AI assistant specialized in crypto, DeFi, and blockchain. Ask it anything — market analysis, smart contract explanations, trading strategies, news summaries. Pay per query using ADZ tokens. No monthly subscriptions. Use as much or as little as you need.</p>
+      <h3>Product 2: AI Script Marketplace</h3>
+      <p>The world's first marketplace for AI-generated scripts and tools. Creators build and sell automation bots, trading scripts, data tools, and smart contracts. Buyers purchase with ADZ tokens. Creators earn ADZ. The entire economy runs on our token.</p>
+      <h3>Product 3: ADZ Script Engine</h3>
+      <p>Generate custom AI scripts on demand. Need a Solana trading bot? A Twitter scraper? A DeFi yield calculator? Describe what you need and our AI engine builds it. Pay with ADZ tokens for generation credits.</p>
+      <h3>Product 4: AI Prediction Engine</h3>
+      <p>Machine learning models trained on on-chain data, social sentiment, and market patterns. Get buy/sell signals, trend predictions, and risk assessments. This is institutional-grade AI analysis available to every ADZ holder.</p>
+      <h3>Why This Makes ADZ Valuable</h3>
+      <p>Every one of these products uses ADZ as the payment currency. As our user base grows and products launch, demand for ADZ tokens increases constantly. This is what separates ADZ from meme coins — real utility creating real demand.</p>
+    `
+  },
+  {
+    icon:'💡', cat:'guide', catLabel:'📖 GUIDE', catClass:'cat-guide',
+    title:'Phantom Wallet Setup: Connect to AirDrop Zone in 3 Minutes',
+    meta:'May 2026 · 3 min read',
+    content:`
+      <h2>Why You Need a Phantom Wallet</h2>
+      <p>When Phase 2 launches and ADZ becomes a real Solana token, you will need a Solana wallet to receive your tokens. Phantom is the most popular and trusted Solana wallet. Setting it up takes 3 minutes.</p>
+      <h3>Step 1: Install Phantom</h3>
+      <p>Visit <strong>phantom.app</strong> and download the browser extension (Chrome, Firefox, Brave) or mobile app (iOS, Android). It is completely free.</p>
+      <h3>Step 2: Create Your Wallet</h3>
+      <p>Open Phantom and click "Create New Wallet". You will be given a <strong>12-word seed phrase</strong> — write this down on paper and store it somewhere safe offline. This is the only way to recover your wallet. Never share it with anyone.</p>
+      <h3>Step 3: Connect to AirDrop Zone</h3>
+      <p>On the AirDrop Zone login page, click "Connect Phantom Wallet". Phantom will ask you to approve the connection. Click "Connect" and you are done. Your wallet address will be saved to your account automatically.</p>
+      <h3>Security Tips</h3>
+      <ul>
+        <li>Never share your seed phrase — not even with us</li>
+        <li>Use a unique password for Phantom</li>
+        <li>Enable biometric lock on mobile</li>
+        <li>Download Phantom only from the official website phantom.app</li>
+        <li>Beware of phishing sites that copy Phantom's design</li>
+      </ul>
+      <p>Once connected, your ADZ tokens will be sent automatically to this wallet when Phase 2 launches.</p>
+    `
+  },
+  {
+    icon:'💎', cat:'news', catLabel:'📢 NEWS', catClass:'cat-news',
+    title:'Why Solana? Our Decision to Build ADZ on the Fastest Blockchain',
+    meta:'Apr 2026 · 4 min read',
+    content:`
+      <h2>Why We Chose Solana</h2>
+      <p>When it came time to choose the blockchain for ADZ token, we evaluated Ethereum, BNB Chain, Polygon, and Solana extensively. The decision was clear: Solana.</p>
+      <h3>Speed: 65,000 Transactions Per Second</h3>
+      <p>Solana processes up to 65,000 transactions per second with near-instant finality. Compare this to Ethereum's 15 TPS. When thousands of users claim tokens simultaneously, Solana handles it effortlessly.</p>
+      <h3>Cost: Near-Zero Fees</h3>
+      <p>Transaction fees on Solana average $0.00025. On Ethereum, a simple token transfer can cost $5-50 during busy periods. For our users — many of whom are new to crypto — Solana's low fees remove a major barrier to entry.</p>
+      <h3>Ecosystem: DeFi Is Thriving</h3>
+      <p>Solana has a rich DeFi ecosystem. Jupiter, Raydium, Orca, and Serum provide deep liquidity. NFT marketplaces like Tensor are active. Developer tooling is excellent. ADZ will launch into a thriving ecosystem, not a ghost town.</p>
+      <h3>Developer Experience</h3>
+      <p>Building on Solana with modern tooling like Anchor is significantly faster than EVM development. This means we can ship products faster and iterate quickly — which is critical for a startup ecosystem like ours.</p>
+    `
+  },
+  {
+    icon:'🔐', cat:'guide', catLabel:'📖 GUIDE', catClass:'cat-guide',
+    title:'Security First: How to Protect Your ADZ Account and Future Tokens',
+    meta:'Apr 2026 · 5 min read',
+    content:`
+      <h2>Security Is Your Responsibility</h2>
+      <p>Your ADZ coins represent real future value. Protecting your account is not optional — it is essential. Here is everything you need to know.</p>
+      <h3>Account Security</h3>
+      <ul>
+        <li>Use a strong, unique password (at least 12 characters, mix of letters, numbers, symbols)</li>
+        <li>Never use the same password you use for other websites</li>
+        <li>Use a password manager like Bitwarden (free) to generate and store strong passwords</li>
+        <li>If you use Google Sign-In, enable 2FA on your Google account</li>
+      </ul>
+      <h3>Wallet Security</h3>
+      <ul>
+        <li>Write your Phantom seed phrase on paper — never store it digitally</li>
+        <li>Never enter your seed phrase on any website — legitimate services never ask for it</li>
+        <li>Store your seed phrase backup in a fireproof location</li>
+        <li>Consider a hardware wallet (Ledger) for large token holdings after Phase 2</li>
+      </ul>
+      <h3>Scam Awareness</h3>
+      <p>As ADZ grows in value, scammers will target our community. Common scams to watch for:</p>
+      <ul>
+        <li><strong>Fake airdrops:</strong> Accounts claiming to double your ADZ — they will steal your wallet</li>
+        <li><strong>Impersonators:</strong> Fake "admin" accounts on Telegram — we never DM first</li>
+        <li><strong>Phishing sites:</strong> Fake copies of our website — always check the URL carefully</li>
+        <li><strong>Seed phrase requests:</strong> Anyone asking for your seed phrase is a scammer, always</li>
+      </ul>
+      <h3>Official Channels Only</h3>
+      <p>AirDrop Zone communications happen only through our official website and verified Telegram channel. If you are unsure whether something is legitimate, do not act on it until you verify through official channels.</p>
+    `
+  }
+];
+
+let currentFilter = 'all';
+
+function openPost(idx) {
+  const p = POSTS[idx];
+  document.getElementById('modal-img').textContent = p.icon;
+  document.getElementById('modal-cat').innerHTML = `<span class="feat-cat ${p.catClass}">${p.catLabel}</span>`;
+  document.getElementById('modal-title').textContent = p.title;
+  document.getElementById('modal-meta').textContent = p.meta;
+  document.getElementById('modal-content').innerHTML = p.content;
+  document.getElementById('modal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function closePost(e) {
+  if (e.target === document.getElementById('modal')) closeModal();
+}
+
+function filterPosts(cat, btn) {
+  currentFilter = cat;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.post-card').forEach(card => {
+    if (cat === 'all' || card.dataset.cat === cat) {
+      card.style.display = 'block';
+    } else {
+      card.style.display = 'none';
+    }
+  });
+  const featured = document.querySelector('.feat-card');
+  if (featured) {
+    featured.style.display = (cat === 'all' || featured.dataset.cat === cat) ? 'grid' : 'none';
+  }
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+</script>
+
+
+
+<!-- Ads -->
+<script src="ads.js"></script>
+</body>
+</html>

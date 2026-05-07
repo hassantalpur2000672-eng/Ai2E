@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AirDrop Zone — Admin Panel</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg:#030712;--surface:#0d1117;--surface2:#161b22;
+      --border:#21262d;--accent:#00ff88;--accent2:#7c3aed;
+      --accent3:#f59e0b;--text:#e6edf3;--muted:#7d8590;
+      --danger:#f85149;--success:#3fb950;
+    }
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;min-height:100vh;}
+    #admin-login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+    .login-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px 28px;width:100%;max-width:360px;}
+    .login-box h2{font-size:20px;font-weight:800;margin-bottom:4px;}
+    .login-box p{font-size:13px;color:var(--muted);margin-bottom:24px;}
+    .field{margin-bottom:14px;}
+    .field label{display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
+    .field input,.field select,.field textarea{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:'Outfit',sans-serif;font-size:14px;outline:none;transition:border-color .2s;}
+    .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);}
+    .field textarea{resize:vertical;min-height:80px;}
+    .field select option{background:var(--surface2);}
+    .btn{padding:10px 18px;border:none;border-radius:8px;font-family:'Outfit',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;}
+    .btn-primary{background:var(--accent);color:#030712;}
+    .btn-primary:hover{opacity:.85;}
+    .btn-danger{background:rgba(248,81,73,.12);color:var(--danger);border:1px solid rgba(248,81,73,.2);}
+    .btn-danger:hover{background:rgba(248,81,73,.2);}
+    .btn-sm{padding:6px 12px;font-size:12px;}
+    .btn-full{width:100%;padding:12px;}
+    #login-err{color:var(--danger);font-size:13px;margin-top:8px;display:none;}
+    #admin-app{display:none;}
+    .admin-header{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+    .admin-logo{font-family:'Space Mono',monospace;font-size:14px;color:var(--accent);font-weight:700;}
+    .admin-body{display:flex;min-height:calc(100vh - 53px);}
+    .sidebar{width:200px;flex-shrink:0;border-right:1px solid var(--border);padding:16px 0;background:var(--surface);position:sticky;top:53px;height:calc(100vh - 53px);overflow-y:auto;}
+    .sidebar-btn{display:flex;align-items:center;gap:10px;padding:10px 16px;font-size:13px;font-weight:500;cursor:pointer;color:var(--muted);transition:all .2s;border:none;background:none;width:100%;text-align:left;font-family:'Outfit',sans-serif;}
+    .sidebar-btn:hover{color:var(--text);background:var(--surface2);}
+    .sidebar-btn.active{color:var(--accent);background:rgba(0,255,136,.06);border-right:2px solid var(--accent);}
+    .sidebar-sep{height:1px;background:var(--border);margin:8px 16px;}
+    .main-panel{flex:1;padding:24px;overflow-y:auto;}
+    .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;}
+    .stat-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;}
+    .stat-box-val{font-family:'Space Mono',monospace;font-size:22px;color:var(--accent);font-weight:700;}
+    .stat-box-lbl{font-size:11px;color:var(--muted);margin-top:4px;}
+    .panel{display:none;}
+    .panel.active{display:block;}
+    .panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+    .panel-title{font-size:18px;font-weight:800;}
+    .tbl-wrap{overflow-x:auto;}
+    table{width:100%;border-collapse:collapse;font-size:13px;}
+    thead th{text-align:left;padding:10px 12px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);}
+    tbody td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle;}
+    tbody tr:hover{background:var(--surface2);}
+    .badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;}
+    .badge-green{background:rgba(63,185,80,.1);color:var(--success);}
+    .badge-red{background:rgba(248,81,73,.1);color:var(--danger);}
+    .badge-yellow{background:rgba(245,158,11,.1);color:var(--accent3);}
+    .badge-purple{background:rgba(124,58,237,.1);color:var(--accent2);}
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;z-index:9000;padding:20px;}
+    .modal-overlay.show{display:flex;}
+    .modal-box{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;}
+    .modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+    .modal-title{font-size:16px;font-weight:700;}
+    .modal-close{background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;}
+    .modal-actions{display:flex;gap:8px;margin-top:16px;justify-content:flex-end;}
+    #a-toast{position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid var(--border);padding:10px 18px;border-radius:10px;font-size:13px;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;}
+    #a-toast.show{opacity:1;}
+    .settings-list{display:flex;flex-direction:column;gap:8px;}
+    .setting-row{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 16px;display:flex;align-items:center;gap:12px;}
+    .setting-key{font-family:'Space Mono',monospace;font-size:12px;color:var(--accent2);width:220px;flex-shrink:0;}
+    .setting-val{flex:1;}
+    .setting-val input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;outline:none;}
+    .setting-val input:focus{border-color:var(--accent);}
+    .setting-desc{font-size:10px;color:var(--muted);margin-top:2px;}
+    .page-toggle-card{display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;cursor:pointer;transition:all .2s;font-size:13px;font-weight:500;}
+    .page-toggle-card:has(input:checked){border-color:var(--accent);background:rgba(0,255,136,.04);}
+    .page-toggle-card input{display:none;}
+    .toggle-dot{width:32px;height:18px;border-radius:99px;background:var(--border);position:relative;flex-shrink:0;transition:background .2s;}
+    .toggle-dot::after{content:'';position:absolute;width:14px;height:14px;border-radius:50%;background:#fff;top:2px;left:2px;transition:left .2s;}
+    .page-toggle-card:has(input:checked) .toggle-dot{background:var(--accent);}
+    .page-toggle-card:has(input:checked) .toggle-dot::after{left:16px;}
+    .ad-type-badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;background:rgba(0,255,136,.1);color:var(--accent);white-space:nowrap;}
+    .ad-type-badge.popunder{background:rgba(245,158,11,.1);color:var(--accent3);}
+    .ad-type-badge.banner{background:rgba(124,58,237,.1);color:var(--accent2);}
+    .ad-type-badge.iframe{background:rgba(63,185,80,.1);color:var(--success);}
+    .ad-type-badge.native{background:rgba(0,204,255,.1);color:#00ccff;}
+    .ad-type-badge.social{background:rgba(248,81,73,.1);color:var(--danger);}
+    .ad-type-badge.smartlink{background:rgba(124,58,237,.15);color:var(--accent2);}
+    @media(max-width:768px){.stats-row{grid-template-columns:1fr 1fr;}.sidebar{display:none;}.admin-body{flex-direction:column;}}
+  </style>
+</head>
+<body>
+
+<div id="admin-login">
+  <div class="login-box">
+    <div style="font-size:32px;margin-bottom:12px;">🔐</div>
+    <h2>Admin Panel</h2>
+    <p>AirDrop Zone — Restricted Access</p>
+    <div class="field"><label>Admin Key</label><input type="password" id="a-pass" placeholder="Enter admin key"/></div>
+    <button class="btn btn-primary btn-full" onclick="adminLogin()">Access Panel →</button>
+    <div id="login-err">Wrong admin key.</div>
+  </div>
+</div>
+
+<div id="admin-app">
+  <div class="admin-header">
+    <div class="admin-logo">⛏️ ADZ Admin</div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span style="font-size:12px;color:var(--muted);" id="a-live-time"></span>
+      <button class="btn btn-sm btn-danger" onclick="adminLogout()">Logout</button>
+    </div>
+  </div>
+
+  <div class="admin-body">
+    <div class="sidebar">
+      <button class="sidebar-btn active" onclick="showPanel('dashboard',this)">📊 Dashboard</button>
+      <button class="sidebar-btn" onclick="showPanel('tasks',this)">🎯 Tasks</button>
+      <button class="sidebar-btn" onclick="showPanel('users',this)">👥 Users</button>
+      <button class="sidebar-btn" onclick="showPanel('mining',this)">⛏️ Mining</button>
+      <button class="sidebar-btn" onclick="showPanel('transactions',this)">💰 Transactions</button>
+      <div class="sidebar-sep"></div>
+      <button class="sidebar-btn" onclick="showPanel('blog',this)">📍 Roadmap/Blog</button>
+      <button class="sidebar-btn" onclick="showPanel('ads',this)">📢 Ad Manager</button>
+      <button class="sidebar-btn" onclick="showPanel('settings',this)">⚙️ Settings</button>
+    </div>
+
+    <div class="main-panel">
+
+      <!-- DASHBOARD -->
+      <div id="panel-dashboard" class="panel active">
+        <div class="panel-head"><div class="panel-title">📊 Dashboard</div><button class="btn btn-sm btn-primary" onclick="loadDashboard()">↻ Refresh</button></div>
+        <div class="stats-row">
+          <div class="stat-box"><div class="stat-box-val" id="d-users">—</div><div class="stat-box-lbl">Total Users</div></div>
+          <div class="stat-box"><div class="stat-box-val" id="d-mined">—</div><div class="stat-box-lbl">ADZ Mined</div></div>
+          <div class="stat-box"><div class="stat-box-val" id="d-tasks">—</div><div class="stat-box-lbl">Active Tasks</div></div>
+          <div class="stat-box"><div class="stat-box-val" id="d-sessions">—</div><div class="stat-box-lbl">Mining Sessions</div></div>
+        </div>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:12px;font-family:'Space Mono',monospace;">RECENT USERS</div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Username</th><th>Balance</th><th>Power</th><th>Refs</th><th>Joined</th><th>Login</th></tr></thead>
+          <tbody id="d-recent-users"></tbody>
+        </table></div>
+      </div>
+
+      <!-- TASKS -->
+      <div id="panel-tasks" class="panel">
+        <div class="panel-head">
+          <div class="panel-title">🎯 Tasks</div>
+          <button class="btn btn-sm btn-primary" onclick="openTaskModal()">+ Add Task</button>
+        </div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Icon</th><th>Title</th><th>Type</th><th>Points</th><th>Timer</th><th>Status</th><th>Order</th><th>Actions</th></tr></thead>
+          <tbody id="tasks-tbody"></tbody>
+        </table></div>
+      </div>
+
+      <!-- USERS -->
+      <div id="panel-users" class="panel">
+        <div class="panel-head">
+          <div class="panel-title">👥 Users</div>
+          <div style="display:flex;gap:8px;">
+            <input type="text" id="user-search" placeholder="Search username..." style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 12px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;outline:none;width:200px;" oninput="searchUsers()"/>
+            <button class="btn btn-sm btn-primary" onclick="loadUsers()">↻</button>
+          </div>
+        </div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Username</th><th>Balance</th><th>Mined</th><th>Power</th><th>Refs</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="users-tbody"></tbody>
+        </table></div>
+      </div>
+
+      <!-- MINING -->
+      <div id="panel-mining" class="panel">
+        <div class="panel-head"><div class="panel-title">⛏️ Mining Sessions</div><button class="btn btn-sm btn-primary" onclick="loadMining()">↻ Refresh</button></div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>User</th><th>Started</th><th>Claimed</th><th>Coins</th><th>Power</th><th>Status</th></tr></thead>
+          <tbody id="mining-tbody"></tbody>
+        </table></div>
+      </div>
+
+      <!-- TRANSACTIONS -->
+      <div id="panel-transactions" class="panel">
+        <div class="panel-head"><div class="panel-title">💰 Transactions</div><button class="btn btn-sm btn-primary" onclick="loadTx()">↻ Refresh</button></div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>User</th><th>Type</th><th>Amount</th><th>Description</th><th>Time</th></tr></thead>
+          <tbody id="tx-tbody"></tbody>
+        </table></div>
+      </div>
+
+      <!-- BLOG -->
+      <div id="panel-blog" class="panel">
+        <div class="panel-head">
+          <div class="panel-title">📍 Roadmap & Blog</div>
+          <button class="btn btn-sm btn-primary" onclick="openBlogModal()">+ Add Post</button>
+        </div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Title</th><th>Category</th><th>Phase</th><th>Status</th><th>Order</th><th>Actions</th></tr></thead>
+          <tbody id="blog-tbody"></tbody>
+        </table></div>
+      </div>
+
+      <!-- AD MANAGER -->
+      <div id="panel-ads" class="panel">
+        <div class="panel-head">
+          <div class="panel-title">📢 Ad Manager</div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-sm btn-primary" onclick="openAdModal()">➕ New Ad</button>
+            <button class="btn btn-sm" style="background:rgba(124,58,237,.12);color:var(--accent2);border:1px solid rgba(124,58,237,.3);" onclick="generateAllCode()">📋 Generate Code</button>
+          </div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px;">
+          <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+            <div style="font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:1px;">All Ad Units</div>
+            <div style="font-size:11px;color:var(--muted);" id="ads-count-lbl">0 ads</div>
+          </div>
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>Name</th><th>Type</th><th>Pages</th><th>Position</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="ads-tbody"></tbody>
+          </table></div>
+        </div>
+        <!-- Page Toggles -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
+          <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">📄 Page Ad Controls</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;">
+            <label class="page-toggle-card"><input type="checkbox" id="pg-index" checked onchange="savePageToggle('index',this.checked)"><span class="toggle-dot"></span><span>🏠 Main App</span></label>
+            <label class="page-toggle-card"><input type="checkbox" id="pg-blog" checked onchange="savePageToggle('blog',this.checked)"><span class="toggle-dot"></span><span>📝 Blog</span></label>
+            <label class="page-toggle-card"><input type="checkbox" id="pg-policies" checked onchange="savePageToggle('policies',this.checked)"><span class="toggle-dot"></span><span>📋 Policies</span></label>
+            <label class="page-toggle-card"><input type="checkbox" id="pg-vision" checked onchange="savePageToggle('vision',this.checked)"><span class="toggle-dot"></span><span>🔭 Vision</span></label>
+          </div>
+        </div>
+        <!-- Generated Code -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;">📋 Generated Code</div>
+            <div style="display:flex;gap:8px;">
+              <select id="code-page-select" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:var(--text);font-size:12px;" onchange="showPageCode(this.value)">
+                <option value="all">📄 Sare Pages</option>
+                <option value="index">🏠 index.html</option>
+                <option value="blog">📝 blog.html</option>
+                <option value="policies">📋 policies.html</option>
+                <option value="vision">🔭 vision.html</option>
+              </select>
+              <button class="btn btn-sm" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);" onclick="copyAdCode()">📋 Copy</button>
+            </div>
+          </div>
+          <textarea id="ads-generated-code" readonly style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;color:var(--accent);font-family:'Space Mono',monospace;font-size:11px;min-height:180px;resize:vertical;" placeholder="Pehle '📋 Generate Code' dabayein..."></textarea>
+        </div>
+      </div>
+
+      <!-- SETTINGS -->
+      <div id="panel-settings" class="panel">
+        <div class="panel-head">
+          <div class="panel-title">⚙️ Settings</div>
+          <button class="btn btn-sm btn-primary" onclick="saveAllSettings()">💾 Save All</button>
+        </div>
+        <div class="settings-list" id="settings-list"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- TASK MODAL -->
+<div class="modal-overlay" id="task-modal">
+  <div class="modal-box">
+    <div class="modal-head"><div class="modal-title" id="task-modal-title">Add Task</div><button class="modal-close" onclick="closeModal('task-modal')">✕</button></div>
+    <input type="hidden" id="t-id"/>
+    <div class="field"><label>Title</label><input type="text" id="t-title" placeholder="Subscribe YouTube"/></div>
+    <div class="field"><label>Description</label><input type="text" id="t-desc" placeholder="Short description"/></div>
+    <div class="field"><label>Icon (emoji)</label><input type="text" id="t-icon" placeholder="▶️" maxlength="4"/></div>
+    <div class="field"><label>Type</label>
+      <select id="t-type" onchange="onTaskTypeChange()">
+        <option value="link">Link (external URL)</option>
+        <option value="youtube">YouTube Subscribe</option>
+        <option value="twitter">Twitter/X Follow</option>
+        <option value="telegram">Telegram Join</option>
+        <option value="ad">Ad Watch (timer)</option>
+      </select>
+    </div>
+    <div class="field" id="t-url-field"><label>URL</label><input type="url" id="t-url" placeholder="https://..."/></div>
+    <div class="field" id="t-adurl-field" style="display:none;"><label>Ad URL</label><input type="url" id="t-adurl" placeholder="https://ad-network.com/ad-id"/></div>
+    <div class="field"><label>Points Reward</label><input type="number" id="t-pts" placeholder="100" min="1"/></div>
+    <div class="field"><label>Timer (seconds, 0 = none)</label><input type="number" id="t-timer" placeholder="15" min="0"/></div>
+    <div class="field"><label>Display Order</label><input type="number" id="t-order" placeholder="1" min="0"/></div>
+    <div class="field"><label>Status</label><select id="t-active"><option value="true">✅ Active</option><option value="false">⏸ Inactive</option></select></div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" onclick="closeModal('task-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTask()">💾 Save Task</button>
+    </div>
+  </div>
+</div>
+
+<!-- BLOG MODAL -->
+<div class="modal-overlay" id="blog-modal">
+  <div class="modal-box">
+    <div class="modal-head"><div class="modal-title" id="blog-modal-title">Add Post</div><button class="modal-close" onclick="closeModal('blog-modal')">✕</button></div>
+    <input type="hidden" id="b-id"/>
+    <div class="field"><label>Title</label><input type="text" id="b-title" placeholder="Phase 1: Launch"/></div>
+    <div class="field"><label>Slug</label><input type="text" id="b-slug" placeholder="phase-1-launch"/></div>
+    <div class="field"><label>Category</label><select id="b-cat"><option value="roadmap">Roadmap</option><option value="news">News</option><option value="update">Update</option></select></div>
+    <div class="field"><label>Phase</label><input type="text" id="b-phase" placeholder="Phase 1 — ACTIVE"/></div>
+    <div class="field"><label>Excerpt</label><input type="text" id="b-excerpt" placeholder="Brief summary"/></div>
+    <div class="field"><label>Content (HTML supported)</label><textarea id="b-content" style="min-height:160px;" placeholder="<p>Content...</p>"></textarea></div>
+    <div class="field"><label>Display Order</label><input type="number" id="b-order" placeholder="1"/></div>
+    <div class="field"><label>Status</label><select id="b-status"><option value="published">Published</option><option value="draft">Draft</option></select></div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" onclick="closeModal('blog-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveBlogPost()">💾 Save Post</button>
+    </div>
+  </div>
+</div>
+
+<!-- USER MODAL -->
+<div class="modal-overlay" id="user-modal">
+  <div class="modal-box">
+    <div class="modal-head"><div class="modal-title">Edit User</div><button class="modal-close" onclick="closeModal('user-modal')">✕</button></div>
+    <input type="hidden" id="u-id"/>
+    <div class="field"><label>Username</label><input type="text" id="u-username"/></div>
+    <div class="field"><label>Points / Balance</label><input type="number" id="u-points"/></div>
+    <div class="field"><label>Mining Power (1.0 = default)</label><input type="number" id="u-power" step="0.1" min="1"/></div>
+    <div class="field"><label>Status</label><select id="u-banned"><option value="false">✅ Active</option><option value="true">🚫 Banned</option></select></div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" onclick="closeModal('user-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveUser()">💾 Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- AD MODAL -->
+<div class="modal-overlay" id="ad-modal">
+  <div class="modal-box" style="max-width:520px;">
+    <div class="modal-head"><div class="modal-title" id="am-modal-title">New Ad Unit</div><button class="modal-close" onclick="closeModal('ad-modal')">✕</button></div>
+    <div class="field"><label>Ad Name</label><input type="text" id="am-name" placeholder="e.g. Adsterra Popunder Main"/></div>
+    <div class="field"><label>Ad Type</label>
+      <select id="am-type" onchange="onAdTypeChange()">
+        <option value="script">⚡ Script/JS (Adsterra, PropellerAds)</option>
+        <option value="popunder">💥 Popunder Script</option>
+        <option value="native">📰 Native Banner Script</option>
+        <option value="social">📱 Social Bar Script</option>
+        <option value="banner">🖼️ Banner / Image Ad</option>
+        <option value="iframe">📦 iframe Ad</option>
+        <option value="smartlink">🔗 Smartlink</option>
+      </select>
+    </div>
+    <div class="field" id="am-field-script"><label>Script / Ad Code</label><textarea id="am-script" style="min-height:120px;font-family:monospace;font-size:12px;" placeholder="Paste ad script here..."></textarea></div>
+    <div class="field" id="am-field-url" style="display:none;"><label>Ad URL</label><input type="url" id="am-url" placeholder="https://adnetwork.com/ad?id=123"/></div>
+    <div class="field" id="am-field-img" style="display:none;"><label>Image URL</label><input type="url" id="am-img" placeholder="https://example.com/banner.jpg"/></div>
+    <div id="am-field-size" style="display:none;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="field"><label>Width (px)</label><input type="number" id="am-width" placeholder="300"/></div>
+        <div class="field"><label>Height (px)</label><input type="number" id="am-height" placeholder="250"/></div>
+      </div>
+    </div>
+    <div class="field"><label>Position</label>
+      <select id="am-position">
+        <option value="top">⬆️ Top</option>
+        <option value="bottom" selected>⬇️ Bottom</option>
+        <option value="middle">↕️ Middle</option>
+        <option value="floating">📌 Floating</option>
+      </select>
+    </div>
+    <div class="field"><label>Pages</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;"><input type="checkbox" id="ampage-index" checked> 🏠 index.html</label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;"><input type="checkbox" id="ampage-blog" checked> 📝 blog.html</label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;"><input type="checkbox" id="ampage-policies" checked> 📋 Policies</label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;"><input type="checkbox" id="ampage-vision" checked> 🔭 Vision</label>
+      </div>
+    </div>
+    <div class="field"><label>Status</label><select id="am-active"><option value="true">✅ Active</option><option value="false">⏸ Inactive</option></select></div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" onclick="closeModal('ad-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveAdUnit()">💾 Save Ad</button>
+    </div>
+  </div>
+</div>
+
+<div id="a-toast"></div>
+
+<script>
+// ============================================
+// CONFIG — APNA WORKER URL YAHAN LIKHO
+// ============================================
+const API = 'https://WORKER_URL_YAHAN_LIKHO';
+const ADMIN_KEY = 'Admin@786'; // ← same jo Worker mein set kiya
+
+// ============================================
+// API HELPER
+// ============================================
+async function adm(path, method = 'GET', body = null) {
+  const opts = {
+    method,
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Key': ADMIN_KEY }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(API + path, opts);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed');
+  return data;
+}
+
+// ============================================
+// AUTH
+// ============================================
+let isLoggedIn = false;
+let allUsers = [];
+
+function adminLogin() {
+  const p = document.getElementById('a-pass').value;
+  if (p === ADMIN_KEY) {
+    isLoggedIn = true;
+    document.getElementById('admin-login').style.display = 'none';
+    document.getElementById('admin-app').style.display = 'block';
+    startClock();
+    loadDashboard();
+  } else {
+    document.getElementById('login-err').style.display = 'block';
+  }
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && !isLoggedIn) adminLogin(); });
+
+function adminLogout() {
+  isLoggedIn = false;
+  document.getElementById('admin-login').style.display = 'flex';
+  document.getElementById('admin-app').style.display = 'none';
+}
+
+function startClock() {
+  const el = document.getElementById('a-live-time');
+  setInterval(() => { el.textContent = new Date().toLocaleTimeString(); }, 1000);
+}
+
+// ============================================
+// NAVIGATION
+// ============================================
+function showPanel(name, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.sidebar-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  if (btn) btn.classList.add('active');
+  const loaders = { tasks:loadTasks, users:loadUsers, mining:loadMining, transactions:loadTx, blog:loadBlog, settings:loadSettings, dashboard:loadDashboard, ads:loadAds };
+  if (loaders[name]) loaders[name]();
+}
+
+// ============================================
+// DASHBOARD
+// ============================================
+async function loadDashboard() {
+  try {
+    const data = await adm('/api/admin/dashboard');
+    setText('d-users', (data.users||0).toLocaleString());
+    setText('d-mined', fNum(data.total_mined||0));
+    setText('d-tasks', data.tasks||0);
+    setText('d-sessions', (data.sessions||0).toLocaleString());
+    const tbody = document.getElementById('d-recent-users');
+    if (tbody && data.recent) {
+      tbody.innerHTML = data.recent.map(u => `
+        <tr>
+          <td>@${esc(u.username||'—')}<br/><span style="font-size:10px;color:var(--muted);">${u.wallet_address ? u.wallet_address.slice(0,10)+'...' : (u.email||'')}</span></td>
+          <td style="font-family:'Space Mono',monospace;">${fNum(u.points)}</td>
+          <td>${(u.mining_power||1).toFixed(1)}x</td>
+          <td>${u.active_referral_count||0}</td>
+          <td>${new Date(u.created_at).toLocaleDateString()}</td>
+          <td><span class="badge ${u.is_banned?'badge-red':'badge-green'}">${u.is_banned?'Banned':u.login_method||'email'}</span></td>
+        </tr>`).join('');
+    }
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+// ============================================
+// TASKS
+// ============================================
+async function loadTasks() {
+  try {
+    const data = await adm('/api/admin/tasks');
+    const tbody = document.getElementById('tasks-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = data.map(t => `
+      <tr>
+        <td style="font-size:20px;">${t.icon||'🎯'}</td>
+        <td>${esc(t.title)}</td>
+        <td><span class="badge badge-purple">${t.task_type}</span></td>
+        <td style="font-family:'Space Mono',monospace;">${t.points_reward}</td>
+        <td>${t.timer_seconds||0}s</td>
+        <td><span class="badge ${t.is_active?'badge-green':'badge-red'}">${t.is_active?'Active':'Off'}</span></td>
+        <td>${t.display_order}</td>
+        <td>
+          <button class="btn btn-sm btn-primary" onclick="editTask('${t.id}')" style="margin-right:4px;">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteTask('${t.id}')">Del</button>
+        </td>
+      </tr>`).join('');
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+let tasksCache = [];
+function onTaskTypeChange() {
+  const type = document.getElementById('t-type').value;
+  document.getElementById('t-url-field').style.display = type !== 'ad' ? 'block' : 'none';
+  document.getElementById('t-adurl-field').style.display = type === 'ad' ? 'block' : 'none';
+}
+
+async function openTaskModal(id = null) {
+  document.getElementById('task-modal-title').textContent = id ? 'Edit Task' : 'Add Task';
+  if (id) {
+    const tasks = await adm('/api/admin/tasks');
+    const t = tasks.find(x => x.id === id);
+    if (t) {
+      setVal('t-id', t.id); setVal('t-title', t.title); setVal('t-desc', t.description||'');
+      setVal('t-icon', t.icon||''); setVal('t-type', t.task_type);
+      setVal('t-url', t.url||''); setVal('t-adurl', t.ad_url||'');
+      setVal('t-pts', t.points_reward); setVal('t-timer', t.timer_seconds||0);
+      setVal('t-order', t.display_order||0); setVal('t-active', t.is_active?'true':'false');
+      onTaskTypeChange();
+    }
+  } else {
+    ['t-id','t-title','t-desc','t-url','t-adurl'].forEach(id => setVal(id,''));
+    setVal('t-icon','🎯'); setVal('t-pts','100'); setVal('t-timer','0');
+    setVal('t-order','99'); setVal('t-type','link'); setVal('t-active','true'); onTaskTypeChange();
+  }
+  document.getElementById('task-modal').classList.add('show');
+}
+
+async function editTask(id) { await openTaskModal(id); }
+
+async function saveTask() {
+  const id = document.getElementById('t-id').value;
+  const payload = {
+    id: id || null,
+    title: document.getElementById('t-title').value.trim(),
+    description: document.getElementById('t-desc').value.trim(),
+    icon: document.getElementById('t-icon').value.trim() || '🎯',
+    task_type: document.getElementById('t-type').value,
+    url: document.getElementById('t-url').value.trim() || null,
+    ad_url: document.getElementById('t-adurl').value.trim() || null,
+    points_reward: parseInt(document.getElementById('t-pts').value) || 100,
+    timer_seconds: parseInt(document.getElementById('t-timer').value) || 0,
+    display_order: parseInt(document.getElementById('t-order').value) || 99,
+    is_active: document.getElementById('t-active').value === 'true'
+  };
+  if (!payload.title) { toast('Title required'); return; }
+  try {
+    await adm('/api/admin/tasks/save', 'POST', payload);
+    toast(id ? '✅ Task updated' : '✅ Task created');
+    closeModal('task-modal'); loadTasks();
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+async function deleteTask(id) {
+  if (!confirm('Delete this task?')) return;
+  try {
+    await adm('/api/admin/tasks/delete', 'POST', { id });
+    toast('🗑️ Deleted'); loadTasks();
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+// ============================================
+// USERS
+// ============================================
+async function loadUsers() {
+  try {
+    const data = await adm('/api/admin/users');
+    allUsers = data || [];
+    renderUsers(allUsers);
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+function searchUsers() {
+  const q = document.getElementById('user-search').value.toLowerCase();
+  renderUsers(allUsers.filter(u => (u.username||'').toLowerCase().includes(q) || (u.email||'').toLowerCase().includes(q) || (u.wallet_address||'').toLowerCase().includes(q)));
+}
+
+function renderUsers(users) {
+  const tbody = document.getElementById('users-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = users.map(u => `
+    <tr>
+      <td>@${esc(u.username||'—')}<br/><span style="font-size:10px;color:var(--muted);">${u.wallet_address ? '👛 '+u.wallet_address.slice(0,10)+'...' : (u.email||'')}</span></td>
+      <td style="font-family:'Space Mono',monospace;">${fNum(u.points)}</td>
+      <td style="font-family:'Space Mono',monospace;">${fNum(u.total_mined||0)}</td>
+      <td>${(u.mining_power||1).toFixed(1)}x</td>
+      <td>${u.referral_count||0} (${u.active_referral_count||0})</td>
+      <td><span class="badge ${u.is_banned?'badge-red':'badge-green'}">${u.is_banned?'Banned':'Active'}</span></td>
+      <td>
+        <button class="btn btn-sm btn-primary" onclick="editUser('${u.id}')" style="margin-right:4px;">Edit</button>
+        <button class="btn btn-sm btn-danger" onclick="toggleBan('${u.id}',${u.is_banned})">${u.is_banned?'Unban':'Ban'}</button>
+      </td>
+    </tr>`).join('');
+}
+
+function editUser(id) {
+  const u = allUsers.find(x => x.id === id);
+  if (!u) return;
+  setVal('u-id', u.id); setVal('u-username', u.username||'');
+  setVal('u-points', u.points||0); setVal('u-power', u.mining_power||1.0);
+  setVal('u-banned', u.is_banned?'true':'false');
+  document.getElementById('user-modal').classList.add('show');
+}
+
+async function saveUser() {
+  const id = document.getElementById('u-id').value;
+  const payload = {
+    id,
+    username: document.getElementById('u-username').value.trim(),
+    points: parseInt(document.getElementById('u-points').value)||0,
+    mining_power: parseFloat(document.getElementById('u-power').value)||1.0,
+    is_banned: document.getElementById('u-banned').value === 'true'
+  };
+  try {
+    await adm('/api/admin/users/update', 'POST', payload);
+    toast('✅ User updated'); closeModal('user-modal'); loadUsers();
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+async function toggleBan(id, isBanned) {
+  if (!confirm(`${isBanned?'Unban':'Ban'} this user?`)) return;
+  try {
+    const u = allUsers.find(x => x.id === id);
+    await adm('/api/admin/users/update', 'POST', { id, username: u.username, points: u.points, mining_power: u.mining_power, is_banned: !isBanned });
+    toast(isBanned?'✅ Unbanned':'🚫 Banned'); loadUsers();
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+// ============================================
+// MINING
+// ============================================
+async function loadMining() {
+  try {
+    const data = await adm('/api/admin/mining');
+    const tbody = document.getElementById('mining-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = data.map(s => `
+      <tr>
+        <td>@${esc(s.username||s.user_id?.slice(0,10)||'—')}</td>
+        <td>${new Date(s.started_at).toLocaleString()}</td>
+        <td>${s.claimed_at ? new Date(s.claimed_at).toLocaleString() : '—'}</td>
+        <td style="font-family:'Space Mono',monospace;">${fNum(s.coins_earned||0)}</td>
+        <td>${(s.mining_power||1).toFixed(1)}x</td>
+        <td><span class="badge ${s.is_claimed?'badge-green':'badge-yellow'}">${s.is_claimed?'Claimed':'Mining'}</span></td>
+      </tr>`).join('');
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+// ============================================
+// TRANSACTIONS
+// ============================================
+async function loadTx() {
+  try {
+    const data = await adm('/api/admin/transactions');
+    const tbody = document.getElementById('tx-tbody');
+    if (!tbody) return;
+    const icons = { mining_claim:'⛏️', task_complete:'✅', ad_watch:'📺', welcome_bonus:'🎉', referral_bonus:'👥', active_referral_bonus:'🔥' };
+    tbody.innerHTML = data.map(t => `
+      <tr>
+        <td>@${esc(t.username||'—')}</td>
+        <td><span class="badge badge-purple">${t.type}</span></td>
+        <td style="font-family:'Space Mono',monospace;color:var(--success);">+${fNum(t.amount)}</td>
+        <td style="font-size:12px;color:var(--muted);">${esc(t.description||'')}</td>
+        <td style="font-size:11px;">${new Date(t.created_at).toLocaleString()}</td>
+      </tr>`).join('');
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+// ============================================
+// BLOG
+// ============================================
+async function loadBlog() {
+  try {
+    const data = await adm('/api/admin/blog');
+    const tbody = document.getElementById('blog-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = data.map(p => `
+      <tr>
+        <td>${esc(p.title)}</td>
+        <td><span class="badge badge-purple">${p.category}</span></td>
+        <td>${p.phase||'—'}</td>
+        <td><span class="badge ${p.status==='published'?'badge-green':'badge-yellow'}">${p.status}</span></td>
+        <td>${p.display_order}</td>
+        <td>
+          <button class="btn btn-sm btn-primary" onclick="editBlog('${p.id}')" style="margin-right:4px;">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteBlog('${p.id}')">Del</button>
+        </td>
+      </tr>`).join('');
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+function openBlogModal() {
+  document.getElementById('blog-modal-title').textContent = 'Add Post';
+  ['b-id','b-title','b-slug','b-phase','b-excerpt','b-content'].forEach(id => setVal(id,''));
+  setVal('b-cat','roadmap'); setVal('b-status','published'); setVal('b-order','99');
+  document.getElementById('blog-modal').classList.add('show');
+}
+
+async function editBlog(id) {
+  const data = await adm('/api/admin/blog');
+  const p = data.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('blog-modal-title').textContent = 'Edit Post';
+  setVal('b-id',p.id); setVal('b-title',p.title); setVal('b-slug',p.slug||'');
+  setVal('b-cat',p.category); setVal('b-phase',p.phase||'');
+  setVal('b-excerpt',p.excerpt||''); setVal('b-content',p.content||'');
+  setVal('b-order',p.display_order); setVal('b-status',p.status);
+  document.getElementById('blog-modal').classList.add('show');
+}
+
+async function saveBlogPost() {
+  const id = document.getElementById('b-id').value;
+  const title = document.getElementById('b-title').value.trim();
+  if (!title) { toast('Title required'); return; }
+  const payload = {
+    id: id || null, title,
+    slug: document.getElementById('b-slug').value.trim(),
+    category: document.getElementById('b-cat').value,
+    phase: document.getElementById('b-phase').value.trim()||null,
+    excerpt: document.getElementById('b-excerpt').value.trim()||null,
+    content: document.getElementById('b-content').value.trim()||null,
+    display_order: parseInt(document.getElementById('b-order').value)||99,
+    status: document.getElementById('b-status').value
+  };
+  try {
+    await adm('/api/admin/blog/save', 'POST', payload);
+    toast(id?'✅ Post updated':'✅ Post created'); closeModal('blog-modal'); loadBlog();
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+async function deleteBlog(id) {
+  if (!confirm('Delete this post?')) return;
+  try {
+    await adm('/api/admin/blog/delete', 'POST', { id });
+    toast('🗑️ Deleted'); loadBlog();
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+// ============================================
+// SETTINGS
+// ============================================
+const SETTING_LABELS = {
+  welcome_bonus:'Welcome Bonus (ADZ)', referral_bonus:'Referral Bonus (ADZ)',
+  active_referral_bonus:'Active Referral Bonus', mining_coins_per_hour:'Mining Rate (coins/hr at 1x)',
+  mining_duration_hours:'Mining Cycle (hours)', referral_power_per_ref:'Power per active referral (0.1=+10%)',
+  max_mining_power:'Max Mining Power', maintenance_mode:'Maintenance Mode (true/false)',
+  announcement:'Announcement Bar Text', coin_symbol:'Coin Symbol', coin_name:'Coin Full Name'
+};
+let settingsData = [];
+
+async function loadSettings() {
+  try {
+    const data = await adm('/api/admin/dashboard'); // reuse settings via separate call
+    const res = await fetch(API + '/api/settings');
+    const map = await res.json();
+    settingsData = Object.entries(map).map(([key,value]) => ({key,value}));
+    const container = document.getElementById('settings-list');
+    if (!container) return;
+    container.innerHTML = settingsData.map(s => `
+      <div class="setting-row">
+        <div class="setting-key">${s.key}</div>
+        <div class="setting-val">
+          <input type="text" id="setting-${s.key}" value="${esc(s.value)}"/>
+          <div class="setting-desc">${SETTING_LABELS[s.key]||''}</div>
+        </div>
+      </div>`).join('');
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+async function saveAllSettings() {
+  const payload = {};
+  settingsData.forEach(s => {
+    const el = document.getElementById('setting-' + s.key);
+    if (el) payload[s.key] = el.value.trim();
+  });
+  try {
+    await adm('/api/admin/settings', 'POST', payload);
+    toast('✅ Settings saved!');
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+// ============================================
+// AD MANAGER (localStorage — same as before)
+// ============================================
+let adsList = [];
+let editingAdId = null;
+let generatedCodeCache = {};
+
+function loadAds() {
+  const stored = localStorage.getItem('site_ads');
+  adsList = stored ? JSON.parse(stored) : [];
+  loadPageToggles();
+  renderAdsTable();
+}
+
+function saveAds() { localStorage.setItem('site_ads', JSON.stringify(adsList)); renderAdsTable(); }
+
+function loadPageToggles() {
+  const stored = JSON.parse(localStorage.getItem('page_toggles') || '{}');
+  ['index','blog','policies','vision'].forEach(pg => {
+    const el = document.getElementById('pg-' + pg);
+    if (el) el.checked = stored[pg] !== false;
+  });
+}
+
+function savePageToggle(page, val) {
+  const stored = JSON.parse(localStorage.getItem('page_toggles') || '{}');
+  stored[page] = val;
+  localStorage.setItem('page_toggles', JSON.stringify(stored));
+  toast('✅ ' + page + ' ads ' + (val ? 'ON' : 'OFF'));
+}
+
+function renderAdsTable() {
+  const tbody = document.getElementById('ads-tbody');
+  const countLbl = document.getElementById('ads-count-lbl');
+  if (!tbody) return;
+  if (countLbl) countLbl.textContent = adsList.length + ' ad' + (adsList.length !== 1 ? 's' : '');
+  if (!adsList.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:32px;"><div style="font-size:32px;margin-bottom:8px;">📭</div>Koi ad nahi — "➕ New Ad" se shuru karein</td></tr>';
+    return;
+  }
+  const tc = { script:'',popunder:'popunder',banner:'banner',iframe:'iframe',native:'native',social:'social',smartlink:'smartlink' };
+  tbody.innerHTML = adsList.map((ad, i) => `
+    <tr>
+      <td><strong>${esc(ad.name)}</strong></td>
+      <td><span class="ad-type-badge ${tc[ad.type]||''}">${ad.type.toUpperCase()}</span></td>
+      <td style="font-size:12px;color:var(--muted);">${(ad.pages||[]).join(', ')||'None'}</td>
+      <td style="font-size:12px;">${ad.position||'bottom'}</td>
+      <td><span class="badge ${ad.active?'badge-green':'badge-red'}">${ad.active?'✅ Active':'⏸ Off'}</span></td>
+      <td>
+        <button class="btn btn-sm" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);margin-right:4px;" onclick="editAd(${i})">✏️</button>
+        <button class="btn btn-sm" style="background:rgba(0,255,136,.1);color:var(--accent);border:1px solid rgba(0,255,136,.2);margin-right:4px;" onclick="toggleAd(${i})">${ad.active?'⏸':'▶️'}</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteAd(${i})">🗑️</button>
+      </td>
+    </tr>`).join('');
+}
+
+function toggleAd(i) { adsList[i].active = !adsList[i].active; saveAds(); toast((adsList[i].active?'✅ ON':'⏸ OFF')+': '+adsList[i].name); }
+function deleteAd(i) { if(!confirm('Delete?'))return; adsList.splice(i,1); saveAds(); toast('🗑️ Deleted'); }
+
+function editAd(i) {
+  editingAdId = i;
+  const ad = adsList[i];
+  setVal('am-name',ad.name||''); setVal('am-type',ad.type||'script');
+  setVal('am-position',ad.position||'bottom'); setVal('am-active',ad.active?'true':'false');
+  setVal('am-script',ad.scriptCode||''); setVal('am-url',ad.url||'');
+  setVal('am-img',ad.imgUrl||''); setVal('am-width',ad.width||''); setVal('am-height',ad.height||'');
+  const pages = ad.pages||[];
+  ['index','blog','policies','vision'].forEach(pg => { const el=document.getElementById('ampage-'+pg); if(el) el.checked=pages.includes(pg); });
+  document.getElementById('am-modal-title').textContent='Edit Ad';
+  onAdTypeChange();
+  document.getElementById('ad-modal').classList.add('show');
+}
+
+function openAdModal() {
+  editingAdId = null;
+  ['am-name','am-script','am-url','am-img','am-width','am-height'].forEach(id=>setVal(id,''));
+  setVal('am-type','script'); setVal('am-position','bottom'); setVal('am-active','true');
+  ['index','blog','policies','vision'].forEach(pg=>{const el=document.getElementById('ampage-'+pg);if(el)el.checked=true;});
+  document.getElementById('am-modal-title').textContent='New Ad Unit';
+  onAdTypeChange();
+  document.getElementById('ad-modal').classList.add('show');
+}
+
+function onAdTypeChange() {
+  const t = document.getElementById('am-type').value;
+  document.getElementById('am-field-script').style.display = ['script','native','social','popunder'].includes(t)?'block':'none';
+  document.getElementById('am-field-url').style.display = ['iframe','smartlink','banner'].includes(t)?'block':'none';
+  document.getElementById('am-field-img').style.display = t==='banner'?'block':'none';
+  document.getElementById('am-field-size').style.display = ['banner','iframe'].includes(t)?'block':'none';
+}
+
+function saveAdUnit() {
+  const name = document.getElementById('am-name').value.trim();
+  if (!name) { toast('❌ Name zaruri hai'); return; }
+  const type = document.getElementById('am-type').value;
+  const scriptCode = document.getElementById('am-script').value.trim();
+  const url = document.getElementById('am-url').value.trim();
+  const imgUrl = document.getElementById('am-img').value.trim();
+  if (['script','native','social','popunder'].includes(type) && !scriptCode) { toast('❌ Script paste karein'); return; }
+  if (['iframe','smartlink'].includes(type) && !url) { toast('❌ URL darj karein'); return; }
+  const pages = ['index','blog','policies','vision'].filter(pg=>{const el=document.getElementById('ampage-'+pg);return el&&el.checked;});
+  const ad = { name, type, position:document.getElementById('am-position').value, active:document.getElementById('am-active').value==='true', scriptCode, url, imgUrl, width:document.getElementById('am-width').value, height:document.getElementById('am-height').value, pages };
+  if (editingAdId !== null) { adsList[editingAdId]=ad; toast('✅ Ad updated: '+name); }
+  else { adsList.push(ad); toast('✅ Ad added: '+name); }
+  saveAds(); closeModal('ad-modal'); generateAllCode();
+}
+
+function generateAllCode() {
+  const pageToggles = JSON.parse(localStorage.getItem('page_toggles')||'{}');
+  const pages = ['index','blog','policies','vision'];
+  generatedCodeCache = {};
+  pages.forEach(page => {
+    const isOn = pageToggles[page]!==false;
+    const pageAds = adsList.filter(a=>a.active&&a.pages&&a.pages.includes(page));
+    let out = '';
+    if (!pageAds.length) { out=`<!-- ${page.toUpperCase()}.HTML — Koi active ad nahi -->`; }
+    else {
+      out+=`<!-- ${page.toUpperCase()}.HTML AD CODES (${isOn?'ON':'OFF'}) -->\n\n`;
+      pageAds.forEach(ad=>{
+        out+=`<!-- ${ad.name} | ${ad.type} | ${ad.position} -->\n`;
+        if(!isOn){out+=`<!-- (Ads band hain is page pe) -->\n\n`;return;}
+        out+=buildAdCode(ad)+'\n\n';
+      });
+    }
+    generatedCodeCache[page]=out;
+  });
+  generatedCodeCache['all']=pages.map(p=>generatedCodeCache[p]).join('\n\n');
+  const sel=document.getElementById('code-page-select');
+  showPageCode(sel?sel.value:'all');
+  toast('📋 Code ready — Copy karein!');
+}
+
+function showPageCode(page) {
+  const ta=document.getElementById('ads-generated-code');
+  if(!ta)return;
+  if(!Object.keys(generatedCodeCache).length){ta.value='<!-- Pehle Generate Code dabayein -->';return;}
+  ta.value=generatedCodeCache[page]||generatedCodeCache['all']||'';
+}
+
+function buildAdCode(ad) {
+  const wrap=inner=>`<div style="text-align:center;margin:16px 0;">\n${inner}\n</div>`;
+  switch(ad.type){
+    case 'script':case 'native':case 'social':case 'popunder':return wrap(ad.scriptCode);
+    case 'banner':
+      const w=ad.width||'300',h=ad.height||'250';
+      const img=ad.imgUrl?`<img src="${ad.imgUrl}" width="${w}" height="${h}" style="max-width:100%;border-radius:8px;" alt="Ad"/>`:'';
+      return wrap(ad.url?`<a href="${ad.url}" target="_blank" rel="noopener">${img}</a>`:img);
+    case 'iframe':return wrap(`<iframe src="${ad.url}" width="${ad.width||'300'}" height="${ad.height||'250'}" style="border:none;max-width:100%;" scrolling="no"></iframe>`);
+    case 'smartlink':return wrap(`<a href="${ad.url}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 24px;background:#00ff88;color:#030712;border-radius:8px;font-weight:700;text-decoration:none;">Visit Now →</a>`);
+    default:return '';
+  }
+}
+
+function copyAdCode() { const el=document.getElementById('ads-generated-code');el.select();document.execCommand('copy');toast('📋 Code copy ho gaya!'); }
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+function setVal(id,val) { const el=document.getElementById(id);if(el)el.value=val; }
+function setText(id,val) { const el=document.getElementById(id);if(el)el.textContent=val; }
+function esc(s) { if(!s)return'';return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fNum(n) { n=parseInt(n)||0;if(n>=1000000)return(n/1000000).toFixed(1)+'M';if(n>=1000)return(n/1000).toFixed(1)+'K';return n.toLocaleString(); }
+function toast(msg) { const el=document.getElementById('a-toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),3000); }
+</script>
+</body>
+</html>

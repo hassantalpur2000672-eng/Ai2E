@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Privacy Policy & Terms — AirDrop Zone</title>
+<meta name="description" content="AirDrop Zone Privacy Policy, Terms of Service, and Cookie Policy. Read our commitment to your data and privacy."/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+:root{--bg:#030712;--surface:#0d1117;--surface2:#161b22;--border:#21262d;--accent:#00ff88;--accent2:#7c3aed;--text:#e6edf3;--muted:#7d8590}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;min-height:100vh}
+nav{position:sticky;top:0;z-index:100;background:rgba(3,7,18,.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;justify-content:space-between}
+.nav-logo{font-family:'Space Mono',monospace;font-size:14px;color:var(--accent);font-weight:700;text-decoration:none}
+.nav-back{background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.2);border-radius:99px;padding:6px 16px;color:var(--accent);font-size:13px;font-weight:600;text-decoration:none}
+
+.hero{padding:60px 20px 40px;text-align:center;max-width:800px;margin:0 auto}
+.hero-badge{display:inline-block;background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.3);border-radius:99px;padding:6px 16px;font-size:12px;color:var(--accent2);font-weight:600;margin-bottom:20px}
+.hero h1{font-size:clamp(28px,6vw,52px);font-weight:800;margin-bottom:12px}
+.hero p{color:var(--muted);font-size:15px;line-height:1.6}
+.updated{font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);margin-top:12px}
+
+.tabs{display:flex;gap:8px;padding:24px 20px 0;max-width:800px;margin:0 auto;flex-wrap:wrap}
+.tab-btn{padding:10px 20px;border-radius:99px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s}
+.tab-btn.active{background:var(--accent);color:#030712;border-color:var(--accent)}
+
+.content{max-width:800px;margin:0 auto;padding:32px 20px 80px}
+.tab-content{display:none}.tab-content.active{display:block}
+
+.policy-section{margin-bottom:40px}
+.ps-num{font-family:'Space Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:2px;margin-bottom:8px}
+.ps-title{font-size:22px;font-weight:700;margin-bottom:12px}
+.ps-body{font-size:15px;color:#c9d1d9;line-height:1.8}
+.ps-body p{margin-bottom:12px}
+.ps-body ul{padding-left:20px;margin-bottom:12px}
+.ps-body ul li{margin-bottom:6px}
+.ps-body strong{color:var(--text)}
+
+.highlight-box{background:rgba(0,255,136,.04);border:1px solid rgba(0,255,136,.15);border-radius:12px;padding:20px;margin:24px 0}
+.highlight-box .hb-title{font-size:14px;font-weight:700;color:var(--accent);margin-bottom:8px}
+.highlight-box p{font-size:13px;color:var(--muted);line-height:1.6}
+
+.divider{height:1px;background:var(--border);margin:32px 0}
+
+footer{border-top:1px solid var(--border);padding:32px 20px;text-align:center;color:var(--muted);font-size:13px}
+footer a{color:var(--accent);text-decoration:none}
+</style>
+</head>
+<body>
+<nav>
+  <a href="/" class="nav-logo">⛏️ ADZ</a>
+  <a href="/" class="nav-back">← Back to App</a>
+</nav>
+
+<div class="hero">
+  <div class="hero-badge">📋 Legal Documents</div>
+  <h1>Policies & Terms</h1>
+  <p>We believe in full transparency. Read how we handle your data, what you can expect from us, and what we expect from you.</p>
+  <div class="updated">Last Updated: May 2026</div>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="showTab('privacy',this)">Privacy Policy</button>
+  <button class="tab-btn" onclick="showTab('terms',this)">Terms of Service</button>
+  <button class="tab-btn" onclick="showTab('tokens',this)">Token Policy</button>
+  <button class="tab-btn" onclick="showTab('cookies',this)">Cookie Policy</button>
+</div>
+
+<div class="content">
+
+  <!-- PRIVACY -->
+  <div id="tab-privacy" class="tab-content active">
+    <div class="highlight-box">
+      <div class="hb-title">🔒 Our Privacy Promise</div>
+      <p>We collect only what we need, we never sell your data, and we give you full control over your information. AirDrop Zone is built on trust.</p>
+    </div>
+
+    <div class="policy-section">
+      <div class="ps-num">01</div>
+      <div class="ps-title">Information We Collect</div>
+      <div class="ps-body">
+        <p>When you use AirDrop Zone, we collect the following information to provide our services:</p>
+        <ul>
+          <li><strong>Account Information:</strong> Email address, display name, and authentication data when you register</li>
+          <li><strong>Wallet Address:</strong> If you connect a Solana wallet (Phantom), we store your public wallet address only — never your private key</li>
+          <li><strong>Activity Data:</strong> Mining sessions, tasks completed, referrals made, and coin balances</li>
+          <li><strong>Technical Data:</strong> IP address, browser type, device type for security and analytics purposes</li>
+          <li><strong>Google OAuth Data:</strong> If you sign in with Google, we receive your name, email, and profile picture from Google</li>
+        </ul>
+      </div>
+    </div>
+    <div class="divider"></div>
+
+    <div class="policy-section">
+      <div class="ps-num">02</div>
+      <div class="ps-title">How We Use Your Information</div>
+      <div class="ps-body">
+        <p>We use your information exclusively for:</p>
+        <ul>
+          <li>Providing and improving the AirDrop Zone platform and services</li>
+          <li>Processing your mining sessions and coin balances accurately</li>
+          <li>Managing the referral system and distributing referral bonuses</li>
+          <li>Sending important service notifications (we do not send marketing spam)</li>
+          <li>Detecting and preventing fraud, abuse, and unauthorized access</li>
+          <li>Preparing for the token generation event on Solana blockchain</li>
+        </ul>
+      </div>
+    </div>
+    <div class="divider"></div>
+
+    <div class="policy-section">
+      <div class="ps-num">03</div>
+      <div class="ps-title">Data Storage & Security</div>
+      <div class="ps-body">
+        <p>Your data is stored securely on <strong>Supabase</strong>, a trusted enterprise-grade database provider with SOC 2 Type II certification. We implement:</p>
+        <ul>
+          <li>End-to-end encryption for all data in transit (HTTPS/TLS)</li>
+          <li>Row Level Security (RLS) policies on all database tables</li>
+          <li>Secure authentication via Supabase Auth with bcrypt password hashing</li>
+          <li>No storage of private keys, seed phrases, or wallet passwords</li>
+        </ul>
+      </div>
+    </div>
+    <div class="divider"></div>
+
+    <div class="policy-section">
+      <div class="ps-num">04</div>
+      <div class="ps-title">Data Sharing</div>
+      <div class="ps-body">
+        <p><strong>We do not sell, rent, or trade your personal information.</strong></p>
+        <p>We share data only with:</p>
+        <ul>
+          <li><strong>Supabase:</strong> Our database infrastructure provider</li>
+          <li><strong>Google:</strong> Only when you use Google Sign-In (governed by Google's privacy policy)</li>
+          <li><strong>Vercel:</strong> Our hosting provider (no personal data stored)</li>
+          <li><strong>Law Enforcement:</strong> Only if legally required by valid court order</li>
+        </ul>
+      </div>
+    </div>
+    <div class="divider"></div>
+
+    <div class="policy-section">
+      <div class="ps-num">05</div>
+      <div class="ps-title">Your Rights</div>
+      <div class="ps-body">
+        <p>You have the following rights regarding your data:</p>
+        <ul>
+          <li><strong>Access:</strong> Request a copy of all data we hold about you</li>
+          <li><strong>Correction:</strong> Update your profile information at any time</li>
+          <li><strong>Deletion:</strong> Request deletion of your account and all associated data</li>
+          <li><strong>Portability:</strong> Export your transaction history and coin balance data</li>
+        </ul>
+        <p>To exercise any of these rights, contact us through our official Telegram channel.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- TERMS -->
+  <div id="tab-terms" class="tab-content">
+    <div class="highlight-box">
+      <div class="hb-title">📖 Please Read Carefully</div>
+      <p>By using AirDrop Zone, you agree to these terms. They are designed to protect both you and our platform. If you disagree, please do not use our services.</p>
+    </div>
+
+    <div class="policy-section">
+      <div class="ps-num">01</div>
+      <div class="ps-title">Eligibility</div>
+      <div class="ps-body">
+        <p>To use AirDrop Zone you must:</p>
+        <ul>
+          <li>Be at least 18 years of age (or legal age in your jurisdiction)</li>
+          <li>Have the legal capacity to enter into a binding agreement</li>
+          <li>Not be located in a jurisdiction where crypto activities are prohibited</li>
+          <li>Create only one account per person (multi-accounting is prohibited)</li>
+        </ul>
+      </div>
+    </div>
+    <div class="divider"></div>
+
+    <div class="policy-section">
+      <div class="ps-num">02</div>
+      <div class="ps-title">ADZ Coins & Token</div>
+      <div class="ps-body">
+        <p>Important disclosures about ADZ coins:</p>
+        <ul>
+          <li><strong>Mining Phase:</strong> ADZ coins mined during the platform phase are points tracked in our database — they are not yet blockchain tokens</li>
+          <li><strong>Token Conversion:</strong> We plan to convert mined coins to real Solana SPL tokens during Phase 2. This is our intention but not a guaranteed commitment</li>
+          <li><strong>No Financial Advice:</strong> Nothing on AirDrop Zone constitutes financial, investment, or legal advice</li>
+          <li><strong>Risk Acknowledgment:</strong> Cryptocurrency involves risk. Past performance is not indicative of future results</li>
+          <li><strong>No Guaranteed Value:</strong> ADZ tokens may have little or no monetary value at launch or in the future</li>
+        </ul>
+      </div>
+    </div>
+    <div class="divider"></div>
+
+    <div class="policy-section">
+      <div class="ps-num">03</div>
+      <div class="ps-title">Prohibited Activities</div>
+      <div class="ps-body">
+        <p>The following are strictly prohibited and will result in immediate account termination:</p>
+        <ul>
+          <li>Creating multiple accounts to abuse the referral or mining system</li>
+          <li>Using bots, scripts, or automated tools to farm coins</li>
+          <li>Manipulating or attempting to hack the mining or referral system</li>
+          <li>Using the platform for money laundering or illegal financial activities</li>
+          <li>Sharing false referral information or misleading other users</li>
+          <li>Any activity that disrupts or damages the platform's infrastructure</li>
+        </ul>
+      </div>
+    </div>
+    <div class="divider"></div>
+
+    <div class="policy-section">
+      <div class="ps-num">04</div>
+      <div class="ps-title">Termination</div>
+      <div class="ps-body">
+        <p>We reserve the right to suspend or terminate any account that violates these terms, without prior notice and without refund of any coins or tokens. Users who are banned forfeit their accumulated coin balances.</p>
+      </div>
+    </div>
+    <div class="divider"></div>
+
+    <div class="policy-section">
+      <div class="ps-num">05</div>
+      <div class="ps-title">Limitation of Liability</div>
+      <div class="ps-body">
+        <p>AirDrop Zone and its developers are not liable for any direct, indirect, incidental, or consequential damages arising from use of our platform, including but not limited to lost coins, token value changes, or service interruptions.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOKEN POLICY -->
+  <div id="tab-tokens" class="tab-content">
+    <div class="highlight-box">
+      <div class="hb-title">🪙 ADZ Token Disclosure</div>
+      <p>Transparency is core to our mission. This policy explains everything about ADZ coins, how they work today, and our plans for the future.</p>
+    </div>
+
+    <div class="policy-section">
+      <div class="ps-num">01</div>
+      <div class="ps-title">Current Status of ADZ Coins</div>
+      <div class="ps-body">
+        <p>During the current mining phase, ADZ coins are <strong>loyalty points</strong> tracked in our secure database. They are not yet blockchain-based tokens and cannot be transferred, sold, or traded.</p>
+        <p>Think of them as reserved allocation for when the real token launches.</p>
+      </div>
+    </div>
+    <div class="divider"></div>
+
+    <div class="policy-section">
+      <div class="ps-num">02</div>
+      <div class="ps-title">Planned Token Launch</div>
+      <div class="ps-body">
+        <p>We plan to launch ADZ as a real <strong>Solana SPL token</strong> in Phase 2 (Q3 2026). At launch:</p>
+        <ul>
+          <li>All mined coins will be converted to real ADZ tokens at a 1:1 ratio</li>
+          <li>A snapshot of all balances will be taken before the conversion</li>
+          <li>Tokens will be distributed directly to your connected wallet or a new wallet we provide</li>
+          <li>ADZ will be listed on Solana DEXes (Raydium, Jupiter)</li>
+        </ul>
+      </div>
+    </div>
+    <div class="divider"></div>
+
+    <div class="policy-section">
+      <div class="ps-num">03</div>
+      <div class="ps-title">Risk Disclosures</div>
+      <div class="ps-body">
+        <ul>
+          <li>Token launch dates may change due to technical or regulatory factors</li>
+          <li>The exchange rate or conversion ratio may be adjusted before launch</li>
+          <li>Cryptocurrency markets are highly volatile — token value is not guaranteed</li>
+          <li>Regulatory changes in your country may affect your ability to receive or trade ADZ</li>
+          <li>AirDrop Zone is not responsible for losses due to market conditions</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- COOKIES -->
+  <div id="tab-cookies" class="tab-content">
+    <div class="highlight-box">
+      <div class="hb-title">🍪 Simple Cookie Policy</div>
+      <p>We use minimal cookies — only what is necessary for the app to function. We do not track you for advertising purposes.</p>
+    </div>
+
+    <div class="policy-section">
+      <div class="ps-num">01</div>
+      <div class="ps-title">Cookies We Use</div>
+      <div class="ps-body">
+        <ul>
+          <li><strong>Authentication Cookie:</strong> Keeps you logged in securely. Set by Supabase Auth. Expires after 1 week of inactivity.</li>
+          <li><strong>Session Cookie:</strong> Stores your current session token. Required for the app to function. Deleted when you log out.</li>
+          <li><strong>Preference Storage:</strong> We use localStorage to remember minor UI preferences like last visited page. Not a cookie but similar purpose.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="divider"></div>
+
+    <div class="policy-section">
+      <div class="ps-num">02</div>
+      <div class="ps-title">What We Do NOT Use</div>
+      <div class="ps-body">
+        <ul>
+          <li>No advertising trackers or pixels</li>
+          <li>No third-party analytics (no Google Analytics, no Facebook Pixel)</li>
+          <li>No cross-site tracking cookies</li>
+          <li>No fingerprinting or behavioral tracking</li>
+        </ul>
+        <p>Our cookie usage is strictly functional — nothing more.</p>
+      </div>
+    </div>
+    <div class="divider"></div>
+
+    <div class="policy-section">
+      <div class="ps-num">03</div>
+      <div class="ps-title">Managing Cookies</div>
+      <div class="ps-body">
+        <p>You can clear cookies and localStorage at any time through your browser settings. Note that clearing authentication cookies will log you out of the app. Your account data will remain safe in our database.</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <p>© 2026 AirDrop Zone · <a href="/">Back to App</a> · <a href="/vision.html">Our Vision</a></p>
+  <p style="margin-top:8px;font-size:11px">Questions? Contact us on Telegram</p>
+</footer>
+
+<script>
+function showTab(name, btn) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+</script>
+
+
+
+<!-- Ads -->
+<script src="ads.js"></script>
+</body>
+</html>
