@@ -130,90 +130,50 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 .bfloat:nth-child(3){bottom:10px;left:10px;animation-delay:1s}.bfloat:nth-child(4){bottom:10px;right:10px;animation-delay:1.5s}
 .bfloat:nth-child(5){top:50%;left:0;transform:translateY(-50%);animation-delay:2s}
 .mactive .mcore{background:radial-gradient(circle,rgba(0,255,136,.25),transparent);border-color:rgba(0,255,136,.5);box-shadow:0 0 30px rgba(0,255,136,.2)}
-.mprog{margin-bottom:16px}
-.mprogh{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:8px}
-.mprogbar{height:6px;background:var(--surface2);border-radius:99px;overflow:hidden}
-.mprogfill{height:100%;background:linear-gradient(90deg,var(--accent),#00ccff);border-radius:99px;transition:width 1s linear}
+
+/* Mining status box – exactly like the screenshot */
+.mining-status-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  text-align: center;
+  font-family: 'Outfit', sans-serif;
+}
+.mining-status-box .rate {
+  font-family: 'Space Mono', monospace;
+  font-size: 18px;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+.mining-status-box .progress-label {
+  color: var(--success);
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+.mining-status-box .time-left {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.mining-status-box .session-points {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.mining-status-box .need-points {
+  color: var(--accent3);
+  font-size: 12px;
+}
+
+/* Hide old progress elements; now we use the new box */
+.mprog, #pendwrap { display: none !important; }
+
 #mine-btn{width:100%;padding:16px;border:none;border-radius:10px;font-family:'Outfit',sans-serif;font-size:16px;font-weight:700;cursor:pointer;transition:all .2s}
 #mine-btn.start{background:linear-gradient(135deg,var(--accent),#00ccff);color:#030712}
 #mine-btn.claim{background:linear-gradient(135deg,var(--accent3),#f97316);color:#030712;animation:claimPulse 2s ease-in-out infinite}
 #mine-btn.mining{background:var(--surface2);color:var(--muted);cursor:default;border:1px solid var(--border)}
-
-/* Mining progress button (replaces the button while mining) */
-#mine-btn.mining-progress-btn {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px 16px;
-  cursor: default;
-  pointer-events: none;
-}
-.mining-progress-btn .progress-inner {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.mining-progress-btn .progress-bar-wrap {
-  height: 6px;
-  background: var(--surface2);
-  border-radius: 99px;
-  overflow: hidden;
-}
-.mining-progress-btn .progress-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--accent), #00ccff);
-  border-radius: 99px;
-  transition: width 0.8s linear;
-}
-.mining-progress-btn .progress-text {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text);
-  font-family: 'Outfit', sans-serif;
-}
-.mining-progress-btn .progress-text .earned {
-  color: var(--accent);
-  font-family: 'Space Mono', monospace;
-}
-.mining-progress-btn .progress-text .time-left {
-  color: var(--muted);
-  font-size: 12px;
-}
-
-/* Mining status box */
-.mining-status-box {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 14px;
-  margin-bottom: 16px;
-  text-align: center;
-}
-.mining-status-box .status-idle {
-  color: var(--muted);
-  font-size: 14px;
-}
-.mining-status-box .status-mining {
-  display: none;
-}
-.mining-status-box .status-mining .mining-rate {
-  color: var(--accent);
-  font-family: 'Space Mono', monospace;
-  font-size: 14px;
-  margin-bottom: 6px;
-}
-.mining-status-box .status-mining .mining-detail {
-  color: var(--muted);
-  font-size: 12px;
-  margin-bottom: 4px;
-}
-.mining-status-box .status-mining .mining-progress-text {
-  color: var(--accent3);
-  font-size: 12px;
-}
 
 .sgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
 .scard{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px}
@@ -479,20 +439,16 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
           <div class="mcore"><div class="memoji" id="memoji">🐹</div><div class="mrate" id="mrated">IDLE</div></div>
         </div>
 
-        <!-- Mining Status Box (always visible) -->
-        <div class="mining-status-box" id="miningStatusBox">
-          <div class="status-idle" id="statusIdle">
-            <span style="font-size:11px;color:var(--muted);letter-spacing:2px;text-transform:uppercase">IDLE</span>
-          </div>
-          <div class="status-mining" id="statusMining">
-            <div class="mining-rate" id="statusRate">+10.0/hr</div>
-            <div class="mining-detail" style="color:var(--success);margin-bottom:6px;">Mining in progress</div>
-            <div class="mining-detail" id="statusTimeLeft">23h 59m left</div>
-            <div class="mining-progress-text" id="statusProgress">⚠️ Mining... need 100 pts (0 so far)</div>
-          </div>
+        <!-- 🔥 NEW MINING STATUS BOX (always visible during mining) -->
+        <div class="mining-status-box" id="miningStatusBox" style="display:none;">
+          <div class="rate" id="statusRate">+10.0/hr</div>
+          <div class="progress-label">Mining in progress</div>
+          <div class="time-left" id="statusTimeLeft">23h 59m left</div>
+          <div class="session-points" id="statusSessionPoints">+0 Points mined this session</div>
+          <div class="need-points" id="statusNeedPoints">⚠️ Mining... need 100 pts (0 so far)</div>
         </div>
 
-        <!-- Old progress elements (kept hidden, not used anymore) -->
+        <!-- Old progress elements (hidden permanently) -->
         <div class="mprog" id="mpwrap" style="display:none">
           <div class="mprogh"><span id="mplbl">Mining...</span><span id="mptime">0h 0m</span></div>
           <div class="mprogbar"><div class="mprogfill" id="mpfill" style="width:0%"></div></div>
@@ -932,23 +888,18 @@ const MIN_CLAIM = 100;
 function updateMineUI() {
   const btn = document.getElementById('mine-btn');
   const an = document.getElementById('manim');
-  const idleDiv = document.getElementById('statusIdle');
-  const miningDiv = document.getElementById('statusMining');
+  const statusBox = document.getElementById('miningStatusBox');
   if (!me || !btn) return;
   const dur = getDur();
 
   // Idle state
   if (me.mining_claimed) {
-    // Restore to start button
     btn.className = 'start';
     btn.textContent = '⛏️ Start Mining';
     btn.disabled = false;
-    idleDiv.style.display = 'block';
-    miningDiv.style.display = 'none';
+    statusBox.style.display = 'none';
     an.classList.remove('mactive');
     setText('mrated', 'IDLE');
-    document.getElementById('mpwrap').style.display = 'none';
-    document.getElementById('pendwrap').style.display = 'none';
     return;
   }
 
@@ -961,49 +912,31 @@ function updateMineUI() {
   const h = Math.floor(rem / 3600000), m = Math.floor((rem % 3600000) / 60000);
   const rate = (getCPMS() * 3600000).toFixed(1);
 
-  // Status box always visible
-  idleDiv.style.display = 'none';
-  miningDiv.style.display = 'block';
+  // Show status box
+  statusBox.style.display = 'block';
   setText('statusRate', '+' + rate + '/hr');
   setText('statusTimeLeft', (el >= dur) ? 'Ready!' : h + 'h ' + m + 'm left');
-  setText('statusProgress', '⚠️ Mining... need ' + MIN_CLAIM + ' pts (' + earn + ' so far)');
+  setText('statusSessionPoints', '+' + earn.toLocaleString() + ' Points mined this session');
+  setText('statusNeedPoints', '⚠️ Mining... need ' + MIN_CLAIM + ' pts (' + earn + ' so far)');
 
   if (el >= dur) {
-    // Claim button
     btn.className = 'claim';
     btn.textContent = '🏆 Claim ' + earn.toLocaleString() + ' ADZ';
     btn.disabled = false;
     setText('statusTimeLeft', 'Ready!');
-    setText('statusProgress', 'Mining complete! Claim now.');
+    setText('statusNeedPoints', 'Mining complete! Claim now.');
   } else if (canClaim) {
     btn.className = 'claim';
     btn.textContent = '🏆 Claim ' + earn.toLocaleString() + ' ADZ (Early)';
     btn.disabled = false;
   } else {
-    // Mining in progress -> transform button into progress bar
-    btn.className = 'mining-progress-btn';
+    btn.className = 'mining';
+    btn.textContent = 'Already mining';
     btn.disabled = true;
-    const pct = Math.min(100, (el / dur) * 100).toFixed(1);
-    btn.innerHTML = `
-      <div class="progress-inner">
-        <div class="progress-bar-wrap">
-          <div class="progress-bar-fill" style="width:${pct}%"></div>
-        </div>
-        <div class="progress-text">
-          <span>⛏️ Mining...</span>
-          <span class="earned">${earn} pts</span>
-          <span class="time-left">${h}h ${m}m</span>
-        </div>
-      </div>
-    `;
   }
 
   an.classList.add('mactive');
   setText('mrated', '+' + rate + '/hr');
-
-  // Hide old elements
-  document.getElementById('mpwrap').style.display = 'none';
-  document.getElementById('pendwrap').style.display = 'none';
 }
 
 function startTicker() {
