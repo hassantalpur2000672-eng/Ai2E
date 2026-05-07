@@ -203,6 +203,33 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 .rphb{padding:0 16px 16px;font-size:13px;line-height:1.6;color:#c9d1d9;display:none}
 .rphb.open{display:block}
 
+/* MINING STATUS BOX */
+#mining-status-box{background:linear-gradient(135deg,rgba(0,255,136,.06),rgba(124,58,237,.06));border:1px solid rgba(0,255,136,.25);border-radius:14px;padding:16px 18px;margin-bottom:16px;display:none;animation:slideUp .4s ease}
+#mining-status-box.show{display:block}
+.msb-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.msb-title{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1px;font-family:'Space Mono',monospace}
+.msb-live{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--accent);font-family:'Space Mono',monospace;background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.2);border-radius:99px;padding:3px 10px}
+.msb-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 1.2s ease-in-out infinite;flex-shrink:0}
+.msb-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.msb-item{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+.msb-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+.msb-val{font-family:'Space Mono',monospace;font-size:14px;font-weight:700;color:var(--text)}
+.msb-val.green{color:var(--accent)}
+.msb-val.amber{color:var(--accent3)}
+.msb-progwrap{margin-bottom:12px}
+.msb-progh{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:6px}
+.msb-progbar{height:8px;background:var(--surface2);border-radius:99px;overflow:hidden;position:relative}
+.msb-progfill{height:100%;background:linear-gradient(90deg,var(--accent),#00ccff);border-radius:99px;transition:width 1s linear;position:relative}
+.msb-progfill::after{content:'';position:absolute;right:0;top:0;bottom:0;width:20px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.3));border-radius:99px}
+.msb-status-row{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:4px}
+.msb-rate{display:flex;align-items:center;gap:4px;color:var(--accent);font-family:'Space Mono',monospace;font-size:10px}
+/* CLAIM READY STATE */
+#mining-status-box.claim-ready{border-color:rgba(245,158,11,.4);background:linear-gradient(135deg,rgba(245,158,11,.06),rgba(249,115,22,.04))}
+#mining-status-box.claim-ready .msb-title{color:var(--accent3)}
+#mining-status-box.claim-ready .msb-dot{background:var(--accent3)}
+#mining-status-box.claim-ready .msb-live{color:var(--accent3);background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.2)}
+#mining-status-box.claim-ready .msb-progfill{background:linear-gradient(90deg,var(--accent3),#f97316)}
+
 /* BOTTOM NAV */
 .bnav{position:fixed;bottom:0;left:0;right:0;background:rgba(13,17,23,.95);backdrop-filter:blur(20px);border-top:1px solid var(--border);display:flex;z-index:100;padding-bottom:env(safe-area-inset-bottom)}
 .nbtn{flex:1;padding:10px 6px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;color:var(--muted);font-size:9px;font-family:'Space Mono',monospace;letter-spacing:.5px;background:none;border:none;transition:color .2s}
@@ -409,6 +436,43 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
         <div id="pendwrap" style="text-align:center;font-family:'Space Mono',monospace;font-size:12px;color:var(--accent);margin-bottom:12px;display:none">
           +<span id="pendamt">0</span> Points mined this session
         </div>
+        <!-- MINING STATUS BOX -->
+        <div id="mining-status-box">
+          <div class="msb-header">
+            <div class="msb-title"><span>⛏️</span><span id="msb-title-txt">Mining Active</span></div>
+            <div class="msb-live"><div class="msb-dot"></div><span id="msb-live-txt">LIVE</span></div>
+          </div>
+          <div class="msb-grid">
+            <div class="msb-item">
+              <div class="msb-label">Mined So Far</div>
+              <div class="msb-val green" id="msb-earned">0 pts</div>
+            </div>
+            <div class="msb-item">
+              <div class="msb-label">Time Remaining</div>
+              <div class="msb-val amber" id="msb-time">—</div>
+            </div>
+            <div class="msb-item">
+              <div class="msb-label">Mining Rate</div>
+              <div class="msb-val green" id="msb-rate">—/hr</div>
+            </div>
+            <div class="msb-item">
+              <div class="msb-label">Session Start</div>
+              <div class="msb-val" id="msb-start">—</div>
+            </div>
+          </div>
+          <div class="msb-progwrap">
+            <div class="msb-progh">
+              <span id="msb-prog-lbl">Progress</span>
+              <span id="msb-pct">0%</span>
+            </div>
+            <div class="msb-progbar"><div class="msb-progfill" id="msb-fill" style="width:0%"></div></div>
+          </div>
+          <div class="msb-status-row">
+            <span id="msb-hint" style="color:var(--muted);font-size:10px">Earning rewards continuously...</span>
+            <span class="msb-rate">⚡ <span id="msb-power-lbl">1.0x</span></span>
+          </div>
+        </div>
+
         <button id="mine-btn" class="start" onclick="handleMineBtn()">⛏️ Start Mining</button>
       </div>
       <div class="sgrid">
@@ -850,21 +914,68 @@ function updateMineUI() {
   const pw = document.getElementById('mpwrap');
   const pe = document.getElementById('pendwrap');
   const an = document.getElementById('manim');
+  const msb = document.getElementById('mining-status-box');
   if (!me || !btn) return;
   const dur = getDur();
-  if (me.mining_claimed) {
+
+  // IDLE — mining_claimed or no session started yet
+  if (me.mining_claimed || !me.last_mining_start) {
     btn.className = 'start'; btn.textContent = '⛏️ Start Mining'; btn.disabled = false;
     pw.style.display = 'none'; pe.style.display = 'none';
     an.classList.remove('mactive'); setText('mrated', 'IDLE');
+    if (msb) msb.classList.remove('show', 'claim-ready');
     return;
   }
+
   const st = new Date(me.last_mining_start).getTime();
   const el = Math.min(Date.now() - st, dur);
   const earn = Math.floor(getCPMS() * el);
   const canClaim = earn >= MIN_CLAIM || el >= dur;
-  const pct = (el / dur * 100).toFixed(1);
-  const rem = dur - el;
+  const pct = Math.min((el / dur * 100), 100).toFixed(1);
+  const rem = Math.max(dur - el, 0);
   const h = Math.floor(rem / 3600000), m = Math.floor((rem % 3600000) / 60000);
+  const ratePerHr = (getCPMS() * 3600000).toFixed(1);
+
+  // Update mining status box
+  if (msb) {
+    msb.classList.add('show');
+    // Session start time
+    const startDate = new Date(me.last_mining_start);
+    const startStr = startDate.toLocaleTimeString('en', {hour:'2-digit', minute:'2-digit'});
+    setText('msb-start', startStr);
+    setText('msb-rate', '+' + ratePerHr + '/hr');
+    setText('msb-power-lbl', (me.mining_power || 1).toFixed(1) + 'x');
+    setText('msb-earned', earn.toLocaleString() + ' pts');
+    const fill = document.getElementById('msb-fill');
+    if (fill) fill.style.width = pct + '%';
+    setText('msb-pct', pct + '%');
+
+    if (el >= dur) {
+      // Complete
+      msb.classList.add('claim-ready');
+      setText('msb-title-txt', '🏆 Ready to Claim!');
+      setText('msb-live-txt', 'DONE');
+      setText('msb-time', 'Complete!');
+      setText('msb-prog-lbl', 'Mining Complete');
+      setText('msb-hint', '✅ Tap claim button below to collect rewards');
+    } else if (canClaim) {
+      // Early claim available
+      msb.classList.add('claim-ready');
+      setText('msb-title-txt', 'Claim Available');
+      setText('msb-live-txt', 'CLAIM');
+      setText('msb-time', h + 'h ' + m + 'm left');
+      setText('msb-prog-lbl', 'Early Claim Ready');
+      setText('msb-hint', '⚡ Min ' + MIN_CLAIM + ' pts reached — you can claim now!');
+    } else {
+      // Still mining
+      msb.classList.remove('claim-ready');
+      setText('msb-title-txt', 'Mining Active');
+      setText('msb-live-txt', 'LIVE');
+      setText('msb-time', h + 'h ' + m + 'm left');
+      setText('msb-prog-lbl', 'Progress');
+      setText('msb-hint', '⛏️ Earning rewards continuously... come back to claim');
+    }
+  }
 
   if (el >= dur) {
     btn.className = 'claim'; btn.textContent = '🏆 Claim ' + earn.toLocaleString() + ' ADZ'; btn.disabled = false;
@@ -885,7 +996,7 @@ function updateMineUI() {
   setText('mplbl', 'Mining in progress'); setText('mptime', h + 'h ' + m + 'm left');
   setText('pendamt', earn.toLocaleString()); pe.style.display = 'block';
   an.classList.add('mactive');
-  setText('mrated', '+' + (getCPMS() * 3600000).toFixed(1) + '/hr');
+  setText('mrated', '+' + ratePerHr + '/hr');
 }
 
 function startTicker() {
@@ -941,6 +1052,9 @@ async function claimMining() {
     me.total_mined = (me.total_mined || 0) + earned;
     me.mining_claimed = 1;
     localStorage.setItem('adz_user', JSON.stringify(me));
+    // Hide status box on claim
+    const msb = document.getElementById('mining-status-box');
+    if (msb) msb.classList.remove('show', 'claim-ready');
     updateMineUI(); renderUser();
     toast('🏆 Claimed ' + earned.toLocaleString() + ' Points!');
     for (let i = 0; i < 5; i++) setTimeout(spawnCoin, i * 200);
