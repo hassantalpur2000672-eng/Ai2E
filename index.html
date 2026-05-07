@@ -878,7 +878,9 @@ function updateMineUI() {
   if (canClaim) {
     btn.className = 'claim'; btn.textContent = '🏆 Claim ' + earn.toLocaleString() + ' ADZ (Early)'; btn.disabled = false;
   } else {
-    btn.className = 'mining'; btn.textContent = '⏳ Mining... need ' + MIN_CLAIM + ' pts (' + earn + ' so far)'; btn.disabled = false;
+    btn.className = 'mining'; btn.textContent = '⛏️ Mining in Progress...'; btn.disabled = true;
+    // Show clear progress info in status area
+    setText('mplbl', '⏳ Need ' + MIN_CLAIM + ' pts to claim (' + earn + ' mined so far)');
   }
   pw.style.display = 'block';
   document.getElementById('mpfill').style.width = pct + '%';
@@ -928,7 +930,24 @@ async function startMining() {
     me.mining_claimed = 0;
     localStorage.setItem('adz_user', JSON.stringify(me));
     updateMineUI(); toast('⛏️ Mining started! Come back in 24h.'); spawnCoin();
-  } catch(e) { toast('❌ ' + (e.message || 'Failed to start')); }
+  } catch(e) {
+    const msg = e.message || '';
+    if (msg.toLowerCase().includes('already mining')) {
+      // Server says already mining — sync local state from server
+      try {
+        const fresh = await api('/api/me');
+        if (fresh) {
+          me = fresh;
+          localStorage.setItem('adz_user', JSON.stringify(me));
+          updateMineUI();
+          toast('⛏️ Mining already in progress!');
+        }
+      } catch(_) { toast('⛏️ Mining already running!'); }
+    } else {
+      toast('❌ ' + (msg || 'Failed to start'));
+    }
+  }
+}
 }
 
 async function claimMining() {
