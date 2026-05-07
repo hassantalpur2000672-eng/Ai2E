@@ -918,8 +918,10 @@ function updateMineUI() {
   if (!me || !btn) return;
   const dur = getDur();
 
-  // IDLE — mining_claimed or no session started yet
-  if (me.mining_claimed || !me.last_mining_start) {
+  // IDLE — strictly check mining_claimed=1 OR no valid session
+  const isClaimed = (me.mining_claimed == 1 || me.mining_claimed === true);
+  const hasSession = !!(me.last_mining_start && me.last_mining_start !== 'null' && me.last_mining_start !== '');
+  if (isClaimed || !hasSession) {
     btn.className = 'start'; btn.textContent = '⛏️ Start Mining'; btn.disabled = false;
     pw.style.display = 'none'; pe.style.display = 'none';
     an.classList.remove('mactive'); setText('mrated', 'IDLE');
