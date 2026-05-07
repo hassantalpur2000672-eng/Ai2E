@@ -5,7 +5,7 @@
 
 // ---- POPUNDER AD (Adsterra) ----
 // Apna code neeche replace karein:
-(function() {
+/*(function() {
   var s = document.createElement('script');
   s.async = true;
   s.setAttribute('data-cfasync', 'false');
@@ -15,7 +15,7 @@
   var d = document.createElement('div');
   d.id = 'container-f060f56d36d7ed6e6c8161b8f7ec4599';
   document.body.appendChild(d);
-})();
+})();*/
 
 
 // ---- NATIVE BANNER AD ----
