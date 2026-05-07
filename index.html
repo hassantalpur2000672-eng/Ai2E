@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 
+<!-- WalletConnect / Web3Modal -->
 <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
 
 <style>
@@ -130,51 +131,14 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 .bfloat:nth-child(3){bottom:10px;left:10px;animation-delay:1s}.bfloat:nth-child(4){bottom:10px;right:10px;animation-delay:1.5s}
 .bfloat:nth-child(5){top:50%;left:0;transform:translateY(-50%);animation-delay:2s}
 .mactive .mcore{background:radial-gradient(circle,rgba(0,255,136,.25),transparent);border-color:rgba(0,255,136,.5);box-shadow:0 0 30px rgba(0,255,136,.2)}
-
-/* Mining status box – exactly like the screenshot */
-.mining-status-box {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 16px;
-  text-align: center;
-  font-family: 'Outfit', sans-serif;
-}
-.mining-status-box .rate {
-  font-family: 'Space Mono', monospace;
-  font-size: 18px;
-  color: var(--accent);
-  margin-bottom: 8px;
-}
-.mining-status-box .progress-label {
-  color: var(--success);
-  font-size: 12px;
-  margin-bottom: 4px;
-}
-.mining-status-box .time-left {
-  color: var(--muted);
-  font-size: 12px;
-  margin-bottom: 8px;
-}
-.mining-status-box .session-points {
-  color: var(--muted);
-  font-size: 12px;
-  margin-bottom: 8px;
-}
-.mining-status-box .need-points {
-  color: var(--accent3);
-  font-size: 12px;
-}
-
-/* Hide old progress elements; now we use the new box */
-.mprog, #pendwrap { display: none !important; }
-
+.mprog{margin-bottom:16px}
+.mprogh{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:8px}
+.mprogbar{height:6px;background:var(--surface2);border-radius:99px;overflow:hidden}
+.mprogfill{height:100%;background:linear-gradient(90deg,var(--accent),#00ccff);border-radius:99px;transition:width 1s linear}
 #mine-btn{width:100%;padding:16px;border:none;border-radius:10px;font-family:'Outfit',sans-serif;font-size:16px;font-weight:700;cursor:pointer;transition:all .2s}
 #mine-btn.start{background:linear-gradient(135deg,var(--accent),#00ccff);color:#030712}
 #mine-btn.claim{background:linear-gradient(135deg,var(--accent3),#f97316);color:#030712;animation:claimPulse 2s ease-in-out infinite}
 #mine-btn.mining{background:var(--surface2);color:var(--muted);cursor:default;border:1px solid var(--border)}
-
 .sgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
 .scard{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px}
 .scl{font-size:11px;color:var(--muted);margin-bottom:6px}
@@ -438,17 +402,6 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
           <div class="mring r1"></div><div class="mring r2"></div><div class="mring r3"></div>
           <div class="mcore"><div class="memoji" id="memoji">🐹</div><div class="mrate" id="mrated">IDLE</div></div>
         </div>
-
-        <!-- 🔥 NEW MINING STATUS BOX (always visible during mining) -->
-        <div class="mining-status-box" id="miningStatusBox" style="display:none;">
-          <div class="rate" id="statusRate">+10.0/hr</div>
-          <div class="progress-label">Mining in progress</div>
-          <div class="time-left" id="statusTimeLeft">23h 59m left</div>
-          <div class="session-points" id="statusSessionPoints">+0 Points mined this session</div>
-          <div class="need-points" id="statusNeedPoints">⚠️ Mining... need 100 pts (0 so far)</div>
-        </div>
-
-        <!-- Old progress elements (hidden permanently) -->
         <div class="mprog" id="mpwrap" style="display:none">
           <div class="mprogh"><span id="mplbl">Mining...</span><span id="mptime">0h 0m</span></div>
           <div class="mprogbar"><div class="mprogfill" id="mpfill" style="width:0%"></div></div>
@@ -456,7 +409,6 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
         <div id="pendwrap" style="text-align:center;font-family:'Space Mono',monospace;font-size:12px;color:var(--accent);margin-bottom:12px;display:none">
           +<span id="pendamt">0</span> Points mined this session
         </div>
-
         <button id="mine-btn" class="start" onclick="handleMineBtn()">⛏️ Start Mining</button>
       </div>
       <div class="sgrid">
@@ -611,6 +563,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     try {
       // Verify token still valid & refresh user data
       me = await api('/api/me');
+      // If server says mining in progress but claimed=1 locally, fix the mismatch
+      // mining_claimed=0 means actively mining on server
       localStorage.setItem('adz_user', JSON.stringify(me));
       await finishLogin();
       return;
@@ -728,6 +682,7 @@ async function connectWallet(type) {
 }
 
 async function connectEVM(type) {
+  // Try specific wallet providers first
   let provider = null;
 
   if (type === 'metamask' && window.ethereum?.isMetaMask) {
@@ -739,10 +694,12 @@ async function connectEVM(type) {
   } else if (type === 'okx' && window.okxwallet) {
     provider = window.okxwallet;
   } else if (window.ethereum) {
+    // Fallback: use whatever ethereum provider is available
     provider = window.ethereum;
   }
 
   if (!provider) {
+    // No wallet detected on desktop -> open mobile deep link or store
     const links = {
       metamask: 'https://metamask.app.link/dapp/' + window.location.host,
       trust: 'https://link.trustwallet.com/open_url?coin_id=60&url=' + encodeURIComponent(window.location.href),
@@ -752,9 +709,10 @@ async function connectEVM(type) {
     };
     const link = links[type] || links.evm;
 
+    // On mobile, try deep link; on desktop, show install prompt
     if (/Android|iPhone|iPad/i.test(navigator.userAgent)) {
       window.location.href = link;
-      return null;
+      return null; // Will reload via deeplink
     } else {
       toast('🦊 Install ' + type.charAt(0).toUpperCase() + type.slice(1) + ' wallet first!');
       setTimeout(() => window.open('https://metamask.io', '_blank'), 500);
@@ -762,6 +720,7 @@ async function connectEVM(type) {
     }
   }
 
+  // Request accounts
   const accounts = await provider.request({ method: 'eth_requestAccounts' });
   return accounts[0] || null;
 }
@@ -771,6 +730,7 @@ async function connectPhantom() {
     const resp = await window.solana.connect();
     return resp.publicKey.toString();
   }
+  // Mobile deep link
   if (/Android|iPhone|iPad/i.test(navigator.userAgent)) {
     window.location.href = 'https://phantom.app/ul/browse/' + encodeURIComponent(window.location.href);
     return null;
@@ -804,6 +764,7 @@ async function finishLogin() {
       document.body.innerHTML = '<div style="height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;background:#030712;color:#e6edf3;font-family:Outfit,sans-serif"><div style="font-size:64px">🔧</div><div style="font-size:24px;font-weight:800">Under Maintenance</div><div style="color:#7d8590">Back soon!</div></div>';
       return;
     }
+    // Render tasks
     doneTasks = new Set(taskData.done || []);
     renderTasks(taskData.tasks || []);
     await loadRoadmap();
@@ -859,6 +820,7 @@ function renderUser() {
   const al = document.getElementById('avltr');
   if (al) al.textContent = name[0]?.toUpperCase() || '👤';
 
+  // Wallet badge in profile
   const wb = document.getElementById('pwallet-badge');
   if (wb && me.wallet_address) {
     const addr = me.wallet_address;
@@ -887,56 +849,59 @@ const MIN_CLAIM = 100;
 
 function updateMineUI() {
   const btn = document.getElementById('mine-btn');
+  const pw = document.getElementById('mpwrap');
+  const pe = document.getElementById('pendwrap');
   const an = document.getElementById('manim');
-  const statusBox = document.getElementById('miningStatusBox');
   if (!me || !btn) return;
   const dur = getDur();
-
-  // Idle state
   if (me.mining_claimed) {
-    btn.className = 'start';
-    btn.textContent = '⛏️ Start Mining';
-    btn.disabled = false;
-    statusBox.style.display = 'none';
-    an.classList.remove('mactive');
-    setText('mrated', 'IDLE');
+    btn.className = 'start'; btn.textContent = '⛏️ Start Mining'; btn.disabled = false;
+    pw.style.display = 'none'; pe.style.display = 'none';
+    an.classList.remove('mactive'); setText('mrated', 'IDLE');
     return;
   }
-
-  // Mining active
+  // If mining is active but no start time recorded, show idle state
+  if (!me.last_mining_start) {
+    btn.className = 'start'; btn.textContent = '⛏️ Start Mining'; btn.disabled = false;
+    pw.style.display = 'none'; pe.style.display = 'none';
+    an.classList.remove('mactive'); setText('mrated', 'IDLE');
+    return;
+  }
   const st = new Date(me.last_mining_start).getTime();
+  // Guard against invalid date
+  if (isNaN(st)) {
+    btn.className = 'start'; btn.textContent = '⛏️ Start Mining'; btn.disabled = false;
+    pw.style.display = 'none'; pe.style.display = 'none';
+    an.classList.remove('mactive'); setText('mrated', 'IDLE');
+    return;
+  }
   const el = Math.min(Date.now() - st, dur);
   const earn = Math.floor(getCPMS() * el);
   const canClaim = earn >= MIN_CLAIM || el >= dur;
+  const pct = (el / dur * 100).toFixed(1);
   const rem = dur - el;
   const h = Math.floor(rem / 3600000), m = Math.floor((rem % 3600000) / 60000);
-  const rate = (getCPMS() * 3600000).toFixed(1);
-
-  // Show status box
-  statusBox.style.display = 'block';
-  setText('statusRate', '+' + rate + '/hr');
-  setText('statusTimeLeft', (el >= dur) ? 'Ready!' : h + 'h ' + m + 'm left');
-  setText('statusSessionPoints', '+' + earn.toLocaleString() + ' Points mined this session');
-  setText('statusNeedPoints', '⚠️ Mining... need ' + MIN_CLAIM + ' pts (' + earn + ' so far)');
 
   if (el >= dur) {
-    btn.className = 'claim';
-    btn.textContent = '🏆 Claim ' + earn.toLocaleString() + ' ADZ';
-    btn.disabled = false;
-    setText('statusTimeLeft', 'Ready!');
-    setText('statusNeedPoints', 'Mining complete! Claim now.');
-  } else if (canClaim) {
-    btn.className = 'claim';
-    btn.textContent = '🏆 Claim ' + earn.toLocaleString() + ' ADZ (Early)';
-    btn.disabled = false;
-  } else {
-    btn.className = 'mining';
-    btn.textContent = 'Already mining';
-    btn.disabled = true;
+    btn.className = 'claim'; btn.textContent = '🏆 Claim ' + earn.toLocaleString() + ' ADZ'; btn.disabled = false;
+    pw.style.display = 'block';
+    document.getElementById('mpfill').style.width = '100%';
+    setText('mplbl', 'Mining complete!'); setText('mptime', 'Ready!');
+    setText('pendamt', earn.toLocaleString()); pe.style.display = 'block';
+    an.classList.add('mactive'); setText('mrated', 'DONE!');
+    return;
   }
-
+  if (canClaim) {
+    btn.className = 'claim'; btn.textContent = '🏆 Claim ' + earn.toLocaleString() + ' ADZ (Early)'; btn.disabled = false;
+  } else {
+    btn.className = 'mining'; btn.textContent = '⏳ Mining... need ' + MIN_CLAIM + ' pts (' + earn + ' so far)'; btn.disabled = false;
+  }
+  pw.style.display = 'block';
+  document.getElementById('mpfill').style.width = pct + '%';
+  setText('mplbl', 'Mining in progress'); setText('mptime', h + 'h ' + m + 'm left');
+  setText('pendamt', earn.toLocaleString()); pe.style.display = 'block';
   an.classList.add('mactive');
-  setText('mrated', '+' + rate + '/hr');
+  setText('mrated', '+' + (getCPMS() * 3600000).toFixed(1) + '/hr');
 }
 
 function startTicker() {
@@ -975,11 +940,29 @@ async function handleMineBtn() {
 async function startMining() {
   try {
     await api('/api/mine/start', 'POST');
-    me.last_mining_start = new Date().toISOString();
-    me.mining_claimed = 0;
+    // Refresh user data from server to get accurate last_mining_start
+    try {
+      me = await api('/api/me');
+    } catch(_) {
+      // Fallback: set locally if server refresh fails
+      me.last_mining_start = new Date().toISOString();
+      me.mining_claimed = 0;
+    }
     localStorage.setItem('adz_user', JSON.stringify(me));
-    updateMineUI(); toast('⛏️ Mining started! Come back in 24h.'); spawnCoin();
-  } catch(e) { toast('❌ ' + (e.message || 'Failed to start')); }
+    updateMineUI(); startTicker(); toast('⛏️ Mining started! Come back in 24h.'); spawnCoin();
+  } catch(e) {
+    // If server says already mining, refresh state so UI shows correct status
+    if (e.message && e.message.toLowerCase().includes('already mining')) {
+      try {
+        me = await api('/api/me');
+        localStorage.setItem('adz_user', JSON.stringify(me));
+        updateMineUI();
+        toast('⛏️ Mining already in progress!');
+      } catch(_) { toast('❌ ' + (e.message || 'Failed to start')); }
+    } else {
+      toast('❌ ' + (e.message || 'Failed to start'));
+    }
+  }
 }
 
 async function claimMining() {
@@ -1142,8 +1125,11 @@ async function loadTxH() {
 async function loadRoadmap() {
   try {
     const data = await api('/api/admin/blog', 'GET');
+    // Use public roadmap from settings (blog_posts visible to all)
     renderRoadmap(data);
-  } catch(e) {}
+  } catch(e) {
+    // Try without admin (public endpoint not needed, roadmap loaded at login)
+  }
 }
 
 function renderRoadmap(data) {
