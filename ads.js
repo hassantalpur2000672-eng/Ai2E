@@ -1,69 +1,106 @@
 // ============================================
-// ADS.JS — Yahan sirf apni ad scripts paste karein
-// Ye file sare pages pe automatically load hoti hai
+// ADS.JS — Dynamic Ad Loader
+// Admin panel se ads add karo — automatically yahan aayenge
 // ============================================
 
-// ---- POPUNDER AD (Adsterra) ----
-// Apna code neeche replace karein:
-/*(function() {
-  var s = document.createElement('script');
-  s.async = true;
-  s.setAttribute('data-cfasync', 'false');
-  s.src = 'https://pl29342088.profitablecpmratenetwork.com/f060f56d36d7ed6e6c8161b8f7ec4599/invoke.js';
-  document.head.appendChild(s);
+(async function() {
+  try {
+    const API = 'https://ai2e.pages.dev';
+    const page = location.pathname.split('/').pop().replace('.html','') || 'index';
 
-  var d = document.createElement('div');
-  d.id = 'container-f060f56d36d7ed6e6c8161b8f7ec4599';
-  document.body.appendChild(d);
-})();*/
+    const res = await fetch(API + '/api/ads');
+    if (!res.ok) return;
+    const ads = await res.json();
+    if (!Array.isArray(ads) || !ads.length) return;
 
+    // Filter ads for this page
+    const pageAds = ads.filter(ad => {
+      if (!ad.is_active || ad.is_active == 0) return false;
+      const pages = ad.pages ? ad.pages.split(',') : ['index','blog','policies','vision'];
+      return pages.includes(page) || pages.includes('all');
+    });
 
-// ---- NATIVE BANNER AD ----
-// Adsterra se Native Banner ka code yahan paste karein
-// Abhi empty hai — paste karo aur GitHub pe save karo
-/*
-(function() {
-  var s = document.createElement('script');
-  s.async = true;
-  s.src = 'YOUR_NATIVE_BANNER_SCRIPT_URL_HERE';
-  document.head.appendChild(s);
-  var d = document.createElement('div');
-  d.id = 'YOUR_CONTAINER_ID_HERE';
-  document.body.appendChild(d);
+    if (!pageAds.length) return;
+
+    pageAds.forEach(ad => {
+      try {
+        injectAd(ad);
+      } catch(e) {}
+    });
+
+  } catch(e) {}
 })();
-*/
 
+function injectAd(ad) {
+  const type = ad.network || ad.type || 'script';
+  const code = ad.code || '';
+  const url = ad.url || '';
+  const position = ad.position || 'bottom';
 
-// ---- SOCIAL BAR AD ----
-// Adsterra se Social Bar ka code yahan paste karein
-/*
-(function() {
-  var s = document.createElement('script');
-  s.async = true;
-  s.src = 'YOUR_SOCIAL_BAR_SCRIPT_URL_HERE';
-  document.head.appendChild(s);
-})();
-*/
+  if (type === 'script' || type === 'native' || type === 'social' || type === 'popunder') {
+    // Script/JS ads — inject directly
+    if (!code) return;
+    const wrap = document.createElement('div');
+    wrap.innerHTML = code;
+    // Execute scripts inside
+    wrap.querySelectorAll('script').forEach(oldScript => {
+      const newScript = document.createElement('script');
+      if (oldScript.src) {
+        newScript.src = oldScript.src;
+        newScript.async = true;
+        if (oldScript.getAttribute('data-cfasync') !== null) {
+          newScript.setAttribute('data-cfasync', 'false');
+        }
+      } else {
+        newScript.textContent = oldScript.textContent;
+      }
+      document.head.appendChild(newScript);
+    });
+    // Append non-script elements
+    const nonScripts = wrap.querySelectorAll(':not(script)');
+    if (nonScripts.length) {
+      const container = document.createElement('div');
+      container.style.cssText = 'text-align:center;margin:10px 0;';
+      nonScripts.forEach(el => container.appendChild(el.cloneNode(true)));
+      insertByPosition(container, position);
+    }
 
+  } else if (type === 'banner') {
+    if (!url && !code) return;
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'text-align:center;margin:12px 0;';
+    if (code) {
+      wrap.innerHTML = code;
+    } else {
+      wrap.innerHTML = `<a href="${url}" target="_blank" rel="noopener"><img src="${ad.imgUrl||url}" style="max-width:100%;border-radius:8px;" alt="Ad"/></a>`;
+    }
+    insertByPosition(wrap, position);
 
-// ---- BANNER / IMAGE AD ----
-// Apni image URL aur link yahan set karein
-/*
-(function() {
-  var wrap = document.createElement('div');
-  wrap.style.cssText = 'text-align:center;margin:12px 0;';
-  wrap.innerHTML = '<a href="YOUR_AD_LINK" target="_blank"><img src="YOUR_IMAGE_URL" style="max-width:100%;border-radius:8px;" alt="Ad"/></a>';
-  document.body.appendChild(wrap);
-})();
-*/
+  } else if (type === 'iframe') {
+    if (!url) return;
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'text-align:center;margin:12px 0;';
+    wrap.innerHTML = `<iframe src="${url}" width="${ad.width||'300'}" height="${ad.height||'250'}" style="border:none;max-width:100%;" scrolling="no"></iframe>`;
+    insertByPosition(wrap, position);
 
+  } else if (type === 'smartlink') {
+    if (!url) return;
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'text-align:center;margin:12px 0;';
+    wrap.innerHTML = `<a href="${url}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 24px;background:#00ff88;color:#030712;border-radius:8px;font-weight:700;text-decoration:none;">Visit Now →</a>`;
+    insertByPosition(wrap, position);
+  }
+}
 
-// ---- IFRAME AD ----
-/*
-(function() {
-  var wrap = document.createElement('div');
-  wrap.style.cssText = 'text-align:center;margin:12px 0;';
-  wrap.innerHTML = '<iframe src="YOUR_IFRAME_URL" width="300" height="250" style="border:none;max-width:100%;" scrolling="no"></iframe>';
-  document.body.appendChild(wrap);
-})();
-*/
+function insertByPosition(el, position) {
+  if (position === 'top') {
+    document.body.insertBefore(el, document.body.firstChild);
+  } else if (position === 'middle') {
+    const mid = Math.floor(document.body.children.length / 2);
+    const refEl = document.body.children[mid];
+    if (refEl) document.body.insertBefore(el, refEl);
+    else document.body.appendChild(el);
+  } else {
+    document.body.appendChild(el);
+  }
+}
