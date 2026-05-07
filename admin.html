@@ -410,13 +410,13 @@ let isLoggedIn = false;
 let allUsers = [];
 
 function adminLogin() {
-  const p = document.getElementById('a-pass').value;
+  const p = document.getElementById('a-pass').value.trim();
   if (p === ADMIN_KEY) {
     isLoggedIn = true;
     document.getElementById('admin-login').style.display = 'none';
     document.getElementById('admin-app').style.display = 'block';
-    startClock();
-    loadDashboard();
+    try { startClock(); } catch(e) {}
+    try { loadDashboard(); } catch(e) { console.error('Dashboard error:', e); }
   } else {
     document.getElementById('login-err').style.display = 'block';
   }
@@ -794,7 +794,10 @@ async function loadAds() {
       pages: a.pages ? a.pages.split(',') : ['index','blog','policies','vision'],
       scriptCode: a.code || ''
     })) : [];
-  } catch(e) { adsList = []; }
+  } catch(e) { 
+    console.log('Ads load error:', e);
+    adsList = []; 
+  }
   loadPageToggles();
   renderAdsTable();
 }
@@ -894,9 +897,11 @@ function saveAdUnit() {
     url: ad.url || '', pages: (ad.pages||[]).join(','),
     network: ad.type
   };
-  await adm('/api/admin/ads/save','POST', payload);
-  toast(editingAdId !== null ? '✅ Ad updated: '+name : '✅ Ad added: '+name);
-  await loadAds(); closeModal('ad-modal'); generateAllCode();
+  try {
+    await adm('/api/admin/ads/save','POST', payload);
+    toast(editingAdId !== null ? '✅ Ad updated: '+name : '✅ Ad added: '+name);
+    await loadAds(); closeModal('ad-modal'); generateAllCode();
+  } catch(e) { toast('❌ Error: ' + e.message); }
 }
 
 function generateAllCode() {
