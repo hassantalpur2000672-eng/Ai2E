@@ -879,7 +879,7 @@ function onAdTypeChange() {
   document.getElementById('am-field-size').style.display = ['banner','iframe'].includes(t)?'block':'none';
 }
 
-function saveAdUnit() {
+async function saveAdUnit() {
   const name = document.getElementById('am-name').value.trim();
   if (!name) { toast('❌ Name zaruri hai'); return; }
   const type = document.getElementById('am-type').value;
