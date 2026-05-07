@@ -779,20 +779,27 @@ async function saveAllSettings() {
 }
 
 // ============================================
-// AD MANAGER (localStorage — same as before)
+// AD MANAGER (Database — Turso)
 // ============================================
 let adsList = [];
 let editingAdId = null;
 let generatedCodeCache = {};
 
-function loadAds() {
-  const stored = localStorage.getItem('site_ads');
-  adsList = stored ? JSON.parse(stored) : [];
+async function loadAds() {
+  try {
+    const data = await adm('/api/admin/ads');
+    adsList = Array.isArray(data) ? data.map(a => ({
+      ...a,
+      active: a.is_active == 1,
+      pages: a.pages ? a.pages.split(',') : ['index','blog','policies','vision'],
+      scriptCode: a.code || ''
+    })) : [];
+  } catch(e) { adsList = []; }
   loadPageToggles();
   renderAdsTable();
 }
 
-function saveAds() { localStorage.setItem('site_ads', JSON.stringify(adsList)); renderAdsTable(); }
+async function saveAds() { await loadAds(); }
 
 function loadPageToggles() {
   const stored = JSON.parse(localStorage.getItem('page_toggles') || '{}');
@@ -834,8 +841,8 @@ function renderAdsTable() {
     </tr>`).join('');
 }
 
-function toggleAd(i) { adsList[i].active = !adsList[i].active; saveAds(); toast((adsList[i].active?'✅ ON':'⏸ OFF')+': '+adsList[i].name); }
-function deleteAd(i) { if(!confirm('Delete?'))return; adsList.splice(i,1); saveAds(); toast('🗑️ Deleted'); }
+async function toggleAd(i) { const ad=adsList[i]; await adm('/api/admin/ads/save','POST',{...ad,id:ad.id,is_active:ad.active?0:1,pages:(ad.pages||[]).join(','),code:ad.scriptCode||''}); await loadAds(); toast((adsList[i]&&!adsList[i].active?'✅ ON':'⏸ OFF')+': '+ad.name); }
+async function deleteAd(i) { if(!confirm('Delete?'))return; const ad=adsList[i]; await adm('/api/admin/ads/delete','POST',{id:ad.id}); await loadAds(); toast('🗑️ Deleted'); }
 
 function editAd(i) {
   editingAdId = i;
@@ -880,9 +887,16 @@ function saveAdUnit() {
   if (['iframe','smartlink'].includes(type) && !url) { toast('❌ URL darj karein'); return; }
   const pages = ['index','blog','policies','vision'].filter(pg=>{const el=document.getElementById('ampage-'+pg);return el&&el.checked;});
   const ad = { name, type, position:document.getElementById('am-position').value, active:document.getElementById('am-active').value==='true', scriptCode, url, imgUrl, width:document.getElementById('am-width').value, height:document.getElementById('am-height').value, pages };
-  if (editingAdId !== null) { adsList[editingAdId]=ad; toast('✅ Ad updated: '+name); }
-  else { adsList.push(ad); toast('✅ Ad added: '+name); }
-  saveAds(); closeModal('ad-modal'); generateAllCode();
+  const payload = {
+    id: editingAdId !== null ? adsList[editingAdId].id : null,
+    name: ad.name, type: ad.type, position: ad.position,
+    is_active: ad.active ? 1 : 0, code: ad.scriptCode || '',
+    url: ad.url || '', pages: (ad.pages||[]).join(','),
+    network: ad.type
+  };
+  await adm('/api/admin/ads/save','POST', payload);
+  toast(editingAdId !== null ? '✅ Ad updated: '+name : '✅ Ad added: '+name);
+  await loadAds(); closeModal('ad-modal'); generateAllCode();
 }
 
 function generateAllCode() {
