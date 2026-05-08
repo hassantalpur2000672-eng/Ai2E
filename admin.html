@@ -289,10 +289,13 @@
         <option value="twitter">Twitter/X Follow</option>
         <option value="telegram">Telegram Join</option>
         <option value="ad">Ad Watch (timer)</option>
+        <option value="quiz">Quiz (Question & Answer)</option>
       </select>
     </div>
     <div class="field" id="t-url-field"><label>URL</label><input type="url" id="t-url" placeholder="https://..."/></div>
     <div class="field" id="t-adurl-field" style="display:none;"><label>Ad URL</label><input type="url" id="t-adurl" placeholder="https://ad-network.com/ad-id"/></div>
+    <div class="field" id="t-quiz-q-field" style="display:none;"><label>Quiz Sawal (Question)</label><input type="text" id="t-quiz-q" placeholder="Maslan: Bitcoin ka symbol kya hai?"/></div>
+    <div class="field" id="t-quiz-a-field" style="display:none;"><label>Sahi Jawab (Answer) — user ko nahi dikhega</label><input type="text" id="t-quiz-a" placeholder="Maslan: BTC"/></div>
     <div class="field"><label>Points Reward</label><input type="number" id="t-pts" placeholder="100" min="1"/></div>
     <div class="field"><label>Timer (seconds, 0 = none)</label><input type="number" id="t-timer" placeholder="15" min="0"/></div>
     <div class="field"><label>Display Order</label><input type="number" id="t-order" placeholder="1" min="0"/></div>
@@ -510,8 +513,10 @@ async function loadTasks() {
 let tasksCache = [];
 function onTaskTypeChange() {
   const type = document.getElementById('t-type').value;
-  document.getElementById('t-url-field').style.display = type !== 'ad' ? 'block' : 'none';
+  document.getElementById('t-url-field').style.display = (type !== 'ad' && type !== 'quiz') ? 'block' : 'none';
   document.getElementById('t-adurl-field').style.display = type === 'ad' ? 'block' : 'none';
+  document.getElementById('t-quiz-q-field').style.display = type === 'quiz' ? 'block' : 'none';
+  document.getElementById('t-quiz-a-field').style.display = type === 'quiz' ? 'block' : 'none';
 }
 
 async function openTaskModal(id = null) {
@@ -523,12 +528,13 @@ async function openTaskModal(id = null) {
       setVal('t-id', t.id); setVal('t-title', t.title); setVal('t-desc', t.description||'');
       setVal('t-icon', t.icon||''); setVal('t-type', t.task_type);
       setVal('t-url', t.url||''); setVal('t-adurl', t.ad_url||'');
+      setVal('t-quiz-q', t.quiz_question||''); setVal('t-quiz-a', t.quiz_answer||'');
       setVal('t-pts', t.points_reward); setVal('t-timer', t.timer_seconds||0);
       setVal('t-order', t.display_order||0); setVal('t-active', t.is_active?'true':'false');
       onTaskTypeChange();
     }
   } else {
-    ['t-id','t-title','t-desc','t-url','t-adurl'].forEach(id => setVal(id,''));
+    ['t-id','t-title','t-desc','t-url','t-adurl','t-quiz-q','t-quiz-a'].forEach(id => setVal(id,''));
     setVal('t-icon','🎯'); setVal('t-pts','100'); setVal('t-timer','0');
     setVal('t-order','99'); setVal('t-type','link'); setVal('t-active','true'); onTaskTypeChange();
   }
@@ -547,12 +553,15 @@ async function saveTask() {
     task_type: document.getElementById('t-type').value,
     url: document.getElementById('t-url').value.trim() || null,
     ad_url: document.getElementById('t-adurl').value.trim() || null,
+    quiz_question: document.getElementById('t-quiz-q').value.trim() || null,
+    quiz_answer: document.getElementById('t-quiz-a').value.trim() || null,
     points_reward: parseInt(document.getElementById('t-pts').value) || 100,
     timer_seconds: parseInt(document.getElementById('t-timer').value) || 0,
     display_order: parseInt(document.getElementById('t-order').value) || 99,
     is_active: document.getElementById('t-active').value === 'true'
   };
   if (!payload.title) { toast('Title required'); return; }
+  if (payload.task_type === 'quiz' && (!payload.quiz_question || !payload.quiz_answer)) { toast('Quiz ke liye sawal aur jawab dono zaroori hain!'); return; }
   try {
     await adm('/api/admin/tasks/save', 'POST', payload);
     toast(id ? '✅ Task updated' : '✅ Task created');
