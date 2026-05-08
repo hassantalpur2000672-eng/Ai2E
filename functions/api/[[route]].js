@@ -5,6 +5,7 @@
 // DB MIGRATION REQUIRED — run these SQL commands in Turso once:
 //   ALTER TABLE tasks ADD COLUMN quiz_question TEXT;
 //   ALTER TABLE tasks ADD COLUMN quiz_answer TEXT;
+//   ALTER TABLE tasks ADD COLUMN verify_code TEXT;
 //   CREATE TABLE IF NOT EXISTS quiz_attempts (
 //     id TEXT PRIMARY KEY,
 //     user_id TEXT NOT NULL,
@@ -297,6 +298,8 @@ export async function onRequest({ request, env }) {
       const already = await dbFirst(env, 'SELECT id FROM user_tasks WHERE user_id = ? AND task_id = ?', [user.id, task_id]);
       if (already) return err('Already completed');
       if (task.task_type === 'quiz') return err('Quiz tasks require answer verification');
+      // If task has a verify code, block direct completion — must go through /api/tasks/verify-code
+      if (task.verify_code && task.verify_code.trim() !== '') return err('This task requires a secret code to complete');
       await dbRun(env, "INSERT INTO user_tasks (id,user_id,task_id,completed_at) VALUES (?,?,?,datetime('now'))",
         [crypto.randomUUID(), user.id, task_id]);
       await dbRun(env, 'UPDATE users SET points = points + ?, total_tasks_completed = total_tasks_completed + 1 WHERE id = ?',
@@ -304,6 +307,58 @@ export async function onRequest({ request, env }) {
       await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",
         [crypto.randomUUID(), user.id, 'task_complete', task.points_reward, '✅ ' + task.title]);
       return json({ success: true, earned: task.points_reward });
+    }
+
+    // VERIFY CODE — user URL/video pe jaake code dhundta hai, yahan submit karta hai
+    if (path === '/api/tasks/verify-code' && request.method === 'POST') {
+      const user = await getUser(request, env);
+      if (!user) return err('Unauthorized', 401);
+      const { task_id, code } = await request.json();
+      if (!task_id || !code) return err('Task ID aur code zaroori hain');
+      const task = await dbFirst(env, 'SELECT * FROM tasks WHERE id = ? AND is_active = 1', [task_id]);
+      if (!task) return err('Task nahi mila');
+      const already = await dbFirst(env, 'SELECT id FROM user_tasks WHERE user_id = ? AND task_id = ?', [user.id, task_id]);
+      if (already) return err('Already completed');
+      // Check attempts (reuse quiz_attempts table)
+      let attempt = await dbFirst(env, 'SELECT * FROM quiz_attempts WHERE user_id = ? AND task_id = ?', [user.id, task_id]);
+      const maxAttempts = 3;
+      const attempts = attempt ? attempt.attempts : 0;
+      if (attempt && attempt.failed == 1) return json({ success: false, failed: true, message: 'Aap fail ho chuke hain. Dobara task shuru karen.' });
+      const correct = (task.verify_code || '').trim().toLowerCase();
+      const given = (code || '').trim().toLowerCase();
+      const isCorrect = correct === given;
+      if (isCorrect) {
+        await dbRun(env, "INSERT INTO user_tasks (id,user_id,task_id,completed_at) VALUES (?,?,?,datetime('now'))",
+          [crypto.randomUUID(), user.id, task_id]);
+        await dbRun(env, 'UPDATE users SET points = points + ?, total_tasks_completed = total_tasks_completed + 1 WHERE id = ?',
+          [task.points_reward, user.id]);
+        await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",
+          [crypto.randomUUID(), user.id, 'task_complete', task.points_reward, '✅ ' + task.title]);
+        if (attempt) await dbRun(env, 'DELETE FROM quiz_attempts WHERE user_id = ? AND task_id = ?', [user.id, task_id]);
+        return json({ success: true, earned: task.points_reward });
+      } else {
+        const newAttempts = attempts + 1;
+        const isFailed = newAttempts >= maxAttempts;
+        if (attempt) {
+          await dbRun(env, 'UPDATE quiz_attempts SET attempts = ?, failed = ? WHERE user_id = ? AND task_id = ?',
+            [newAttempts, isFailed ? 1 : 0, user.id, task_id]);
+        } else {
+          await dbRun(env, "INSERT INTO quiz_attempts (id,user_id,task_id,attempts,failed,created_at) VALUES (?,?,?,?,?,datetime('now'))",
+            [crypto.randomUUID(), user.id, task_id, newAttempts, isFailed ? 1 : 0]);
+        }
+        const remaining = maxAttempts - newAttempts;
+        if (isFailed) return json({ success: false, failed: true, message: 'Galat code! 3 baar fail ho gaye. Dobara task shuru karen.' });
+        return json({ success: false, failed: false, remaining, message: 'Galat code! ' + remaining + ' maukay baki hain.' });
+      }
+    }
+
+    // VERIFY CODE RESET — fail hone k baad dobara shuru
+    if (path === '/api/tasks/verify-reset' && request.method === 'POST') {
+      const user = await getUser(request, env);
+      if (!user) return err('Unauthorized', 401);
+      const { task_id } = await request.json();
+      await dbRun(env, 'DELETE FROM quiz_attempts WHERE user_id = ? AND task_id = ?', [user.id, task_id]);
+      return json({ success: true });
     }
 
     if (path === '/api/tasks/quiz-verify' && request.method === 'POST') {
@@ -412,13 +467,13 @@ export async function onRequest({ request, env }) {
         return json(await dbAll(env, 'SELECT * FROM tasks ORDER BY display_order'));
       }
       if (path === '/api/admin/tasks/save' && request.method === 'POST') {
-        const { id, title, description, icon, task_type, url, ad_url, quiz_question, quiz_answer, points_reward, timer_seconds, display_order, is_active } = body;
+        const { id, title, description, icon, task_type, url, ad_url, quiz_question, quiz_answer, verify_code, points_reward, timer_seconds, display_order, is_active } = body;
         if (id) {
-          await dbRun(env, 'UPDATE tasks SET title=?,description=?,icon=?,task_type=?,url=?,ad_url=?,quiz_question=?,quiz_answer=?,points_reward=?,timer_seconds=?,display_order=?,is_active=? WHERE id=?',
-            [title, description||null, icon||'🎯', task_type, url||null, ad_url||null, quiz_question||null, quiz_answer||null, points_reward, timer_seconds||0, display_order||99, is_active?1:0, id]);
+          await dbRun(env, 'UPDATE tasks SET title=?,description=?,icon=?,task_type=?,url=?,ad_url=?,quiz_question=?,quiz_answer=?,verify_code=?,points_reward=?,timer_seconds=?,display_order=?,is_active=? WHERE id=?',
+            [title, description||null, icon||'🎯', task_type, url||null, ad_url||null, quiz_question||null, quiz_answer||null, verify_code||null, points_reward, timer_seconds||0, display_order||99, is_active?1:0, id]);
         } else {
-          await dbRun(env, "INSERT INTO tasks (id,title,description,icon,task_type,url,ad_url,quiz_question,quiz_answer,points_reward,timer_seconds,display_order,is_active,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))",
-            [crypto.randomUUID(), title, description||null, icon||'🎯', task_type, url||null, ad_url||null, quiz_question||null, quiz_answer||null, points_reward, timer_seconds||0, display_order||99, is_active?1:0]);
+          await dbRun(env, "INSERT INTO tasks (id,title,description,icon,task_type,url,ad_url,quiz_question,quiz_answer,verify_code,points_reward,timer_seconds,display_order,is_active,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))",
+            [crypto.randomUUID(), title, description||null, icon||'🎯', task_type, url||null, ad_url||null, quiz_question||null, quiz_answer||null, verify_code||null, points_reward, timer_seconds||0, display_order||99, is_active?1:0]);
         }
         return json({ success: true });
       }
