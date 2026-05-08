@@ -246,6 +246,27 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 #aclbtn{width:100%;padding:13px;background:var(--accent);color:#030712;border:none;border-radius:8px;font-family:'Outfit',sans-serif;font-size:15px;font-weight:700;cursor:pointer;display:none;margin-top:12px}
 #aclbtn.show{display:block}
 
+/* QUIZ MODAL */
+#quiz-modal{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(12px);display:none;align-items:center;justify-content:center;z-index:8500;padding:20px}
+#quiz-modal.show{display:flex}
+.quiz-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px 22px;width:100%;max-width:360px}
+.quiz-title{font-size:16px;font-weight:800;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.quiz-pts{font-family:'Space Mono',monospace;font-size:12px;color:var(--accent);background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.2);border-radius:99px;padding:3px 10px;margin-bottom:14px;display:inline-block}
+.quiz-q{font-size:14px;line-height:1.6;color:var(--text);margin-bottom:16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 12px}
+.quiz-inp{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:11px 14px;color:var(--text);font-family:'Outfit',sans-serif;font-size:14px;outline:none;transition:border-color .2s;margin-bottom:10px}
+.quiz-inp:focus{border-color:var(--accent)}
+.quiz-chances{font-size:11px;color:var(--muted);margin-bottom:14px;display:flex;align-items:center;gap:6px}
+.quiz-dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
+.quiz-dot.active{background:var(--accent)}.quiz-dot.used{background:var(--danger)}.quiz-dot.empty{background:var(--border)}
+.quiz-msg{font-size:12px;border-radius:8px;padding:8px 12px;margin-bottom:12px;display:none}
+.quiz-msg.err{background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.3);color:var(--danger)}
+.quiz-msg.suc{background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.2);color:var(--accent)}
+.quiz-msg.show{display:block}
+.quiz-actions{display:flex;gap:8px}
+.quiz-submit{flex:1;padding:12px;background:var(--accent);color:#030712;border:none;border-radius:8px;font-family:'Outfit',sans-serif;font-size:14px;font-weight:700;cursor:pointer}
+.quiz-submit:disabled{opacity:.5;cursor:not-allowed}
+.quiz-cancel{padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);font-family:'Outfit',sans-serif;font-size:14px;cursor:pointer}
+
 /* TOAST */
 #toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--surface2);border:1px solid var(--border);padding:9px 18px;border-radius:99px;font-size:13px;font-weight:500;white-space:nowrap;z-index:9999;opacity:0;transition:all .3s;pointer-events:none;max-width:90vw}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -552,6 +573,27 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
     <button class="nbtn" onclick="nav('profile',this)"><div class="nbico">👤</div>PROFILE</button>
     <button class="nbtn" onclick="nav('road',this)"><div class="nbico">📍</div>ROAD</button>
   </nav>
+</div>
+
+<!-- QUIZ MODAL -->
+<div id="quiz-modal">
+  <div class="quiz-box">
+    <div class="quiz-title">🧠 <span id="quiz-task-title">Quiz Task</span></div>
+    <div class="quiz-pts" id="quiz-pts">+100 Points</div>
+    <div class="quiz-q" id="quiz-question">Sawal yahan aayega...</div>
+    <input class="quiz-inp" type="text" id="quiz-answer-inp" placeholder="Apna jawab likhein..." autocomplete="off"/>
+    <div class="quiz-chances" id="quiz-chances">
+      <span>Maukay:</span>
+      <span class="quiz-dot active" id="qd1"></span>
+      <span class="quiz-dot active" id="qd2"></span>
+      <span class="quiz-dot active" id="qd3"></span>
+    </div>
+    <div class="quiz-msg" id="quiz-msg"></div>
+    <div class="quiz-actions">
+      <button class="quiz-cancel" onclick="closeQuizModal()">❌ Band Karo</button>
+      <button class="quiz-submit" id="quiz-submit-btn" onclick="submitQuizAnswer()">✅ Jawab Den</button>
+    </div>
+  </div>
 </div>
 
 <!-- AD MODAL -->
@@ -1080,10 +1122,20 @@ function renderTasks(tasks) {
   if (!tasks || !tasks.length) { c.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:16px">No tasks available.</div>'; return; }
   c.innerHTML = tasks.map(t => {
     const d = doneTasks.has(t.id);
+    let btn = '';
+    if (d) {
+      btn = `<button class="tbtn dbtn">✅ Done</button>`;
+    } else if (t.task_type === 'ad') {
+      btn = `<button class="tbtn go" onclick="startAd('${t.id}','${esc(t.ad_url || t.url || '')}',${t.timer_seconds || 15},${t.points_reward})">▶ Watch</button>`;
+    } else if (t.task_type === 'quiz') {
+      btn = `<button class="tbtn go" style="background:var(--accent2);color:white" onclick="openQuizModal('${t.id}','${esc(t.title)}',${t.points_reward},'${esc(t.quiz_question||'')}')">🧠 Quiz</button>`;
+    } else {
+      btn = `<button class="tbtn go" onclick="doTask('${t.id}','${esc(t.url || '')}',${t.points_reward})">▶ Visit</button>`;
+    }
     return `<div class="tcard ${d ? 'done' : ''}" id="tc-${t.id}">
       <div class="tico">${t.icon || '🎯'}</div>
-      <div class="tinfo"><div class="ttitle">${esc(t.title)}</div><div class="tsub">+${t.points_reward} Points${t.timer_seconds ? ' • ' + t.timer_seconds + 's' : ''}</div></div>
-      ${d ? `<button class="tbtn dbtn">✅ Done</button>` : t.task_type === 'ad' ? `<button class="tbtn go" onclick="startAd('${t.id}','${esc(t.ad_url || t.url || '')}',${t.timer_seconds || 15},${t.points_reward})">▶ Watch</button>` : `<button class="tbtn go" onclick="doTask('${t.id}','${esc(t.url || '')}',${t.points_reward})">▶ Visit</button>`}
+      <div class="tinfo"><div class="ttitle">${esc(t.title)}</div><div class="tsub">+${t.points_reward} Points${t.task_type === 'quiz' ? ' • Quiz' : t.timer_seconds ? ' • ' + t.timer_seconds + 's' : ''}</div></div>
+      ${btn}
     </div>`;
   }).join('');
 }
@@ -1280,11 +1332,103 @@ function closeLoginMenu() {
   if (m) m.style.transform = 'translateX(110%)';
   if (o) o.style.display = 'none';
 }
+// ============================================
+// QUIZ
+// ============================================
+let activeQuiz = null;
+
+function openQuizModal(id, title, pts, question) {
+  activeQuiz = { id, title, pts, attempts: 0 };
+  setText('quiz-task-title', title);
+  document.getElementById('quiz-pts').textContent = '+' + pts + ' Points';
+  document.getElementById('quiz-question').textContent = question || 'Sawal load nahi hua...';
+  document.getElementById('quiz-answer-inp').value = '';
+  document.getElementById('quiz-submit-btn').disabled = false;
+  const msg = document.getElementById('quiz-msg');
+  msg.className = 'quiz-msg'; msg.textContent = '';
+  updateQuizDots(0);
+  document.getElementById('quiz-modal').classList.add('show');
+  setTimeout(() => document.getElementById('quiz-answer-inp').focus(), 300);
+}
+
+function closeQuizModal() {
+  document.getElementById('quiz-modal').classList.remove('show');
+  activeQuiz = null;
+}
+
+function updateQuizDots(usedCount) {
+  for (let i = 1; i <= 3; i++) {
+    const dot = document.getElementById('qd' + i);
+    if (!dot) continue;
+    dot.className = 'quiz-dot ' + (i <= usedCount ? 'used' : 'active');
+  }
+}
+
+async function submitQuizAnswer() {
+  if (!activeQuiz) return;
+  const ans = document.getElementById('quiz-answer-inp').value.trim();
+  if (!ans) { showQuizMsg('err', 'Pehle jawab likhein!'); return; }
+  const btn = document.getElementById('quiz-submit-btn');
+  btn.disabled = true; btn.textContent = '⏳ Check ho raha...';
+  try {
+    const res = await api('/api/tasks/quiz-verify', 'POST', { task_id: activeQuiz.id, answer: ans });
+    if (res.success) {
+      updateQuizDots(0);
+      showQuizMsg('suc', '🎉 Sahi jawab! +' + res.earned + ' Points milay!');
+      doneTasks.add(activeQuiz.id);
+      const card = document.getElementById('tc-' + activeQuiz.id);
+      if (card) { card.classList.add('done'); const b = card.querySelector('.tbtn'); if (b) { b.className = 'tbtn dbtn'; b.textContent = '✅ Done'; } }
+      spawnCoin(); spawnCoin();
+      setTimeout(() => { closeQuizModal(); refreshMe(); toast('✅ +' + res.earned + ' Points earned!'); }, 1800);
+    } else {
+      activeQuiz.attempts = (activeQuiz.attempts || 0) + 1;
+      updateQuizDots(activeQuiz.attempts);
+      if (res.failed) {
+        showQuizMsg('err', '❌ ' + (res.message || '3 baar fail. Dobara koshish karo.'));
+        btn.textContent = '🔄 Dobara Shuru';
+        btn.disabled = false;
+        btn.onclick = async () => {
+          btn.disabled = true; btn.textContent = '⏳...';
+          await api('/api/tasks/quiz-reset', 'POST', { task_id: activeQuiz.id });
+          closeQuizModal();
+          toast('🔄 Quiz reset ho gaya. Dobara try karen!');
+        };
+      } else {
+        showQuizMsg('err', '❌ ' + (res.message || 'Galat jawab!'));
+        document.getElementById('quiz-answer-inp').value = '';
+        btn.disabled = false; btn.textContent = '✅ Jawab Den';
+        document.getElementById('quiz-answer-inp').focus();
+      }
+    }
+  } catch(e) {
+    showQuizMsg('err', e.message || 'Error aaya. Try karo.');
+    btn.disabled = false; btn.textContent = '✅ Jawab Den';
+  }
+}
+
+function showQuizMsg(type, msg) {
+  const el = document.getElementById('quiz-msg');
+  el.className = 'quiz-msg ' + type + ' show';
+  el.textContent = msg;
+}
+
+// Enter key support for quiz
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('quiz-modal').classList.contains('show')) {
+    submitQuizAnswer();
+  }
+});
+
+// ============================================
+// HELPERS
+// ============================================
 function toggleMenu() { const m=document.getElementById('hmenu'),b=document.getElementById('hmbtn'),o=document.getElementById('hmoverlay');m.classList.toggle('open');b.classList.toggle('open');o.classList.toggle('open'); }
 function closeMenu() { const m=document.getElementById('hmenu'),b=document.getElementById('hmbtn'),o=document.getElementById('hmoverlay');m?.classList.remove('open');b?.classList.remove('open');o?.classList.remove('open'); }
 function showE(m) { const el=document.getElementById('emsg');el.textContent=m;el.classList.add('show'); }
 function showS(m) { const el=document.getElementById('smsg');el.textContent=m;el.classList.add('show'); }
 function clrMsg() { document.getElementById('emsg').classList.remove('show');document.getElementById('smsg').classList.remove('show'); }
+
+
 </script>
 
 <script src="ads.js"></script>
