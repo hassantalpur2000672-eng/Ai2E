@@ -1,19 +1,7 @@
- // ============================================
+// ============================================
 // AirDrop Zone — Cloudflare Pages Function
 // Database: Turso (LibSQL)
-// ============================================
-// DB MIGRATION REQUIRED — run these SQL commands in Turso once:
-//   ALTER TABLE tasks ADD COLUMN quiz_question TEXT;
-//   ALTER TABLE tasks ADD COLUMN quiz_answer TEXT;
-//   ALTER TABLE tasks ADD COLUMN verify_code TEXT;
-//   CREATE TABLE IF NOT EXISTS quiz_attempts (
-//     id TEXT PRIMARY KEY,
-//     user_id TEXT NOT NULL,
-//     task_id TEXT NOT NULL,
-//     attempts INTEGER DEFAULT 0,
-//     failed INTEGER DEFAULT 0,
-//     created_at TEXT
-//   );
+// Updated: Secure PBKDF2 password hashing
 // ============================================
 
 const CORS = {
@@ -22,6 +10,7 @@ const CORS = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
+// ── Database helper (Turso via HTTP) ─────
 async function turso(env, sql, args = []) {
   const url = env.TURSO_URL.replace('libsql://', 'https://');
   const res = await fetch(`${url}/v2/pipeline`, {
@@ -72,6 +61,7 @@ async function dbRun(env, sql, args = []) {
   return await turso(env, sql, args);
 }
 
+// ── Token helpers (JWT-like) ─────────────
 async function makeToken(userId, env) {
   const data = JSON.stringify({ id: userId, ts: Date.now() });
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(env.JWT_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
@@ -89,24 +79,65 @@ async function verifyToken(token, env) {
     const valid = await crypto.subtle.verify('HMAC', key, sig, new TextEncoder().encode(data));
     if (!valid) return null;
     const parsed = JSON.parse(data);
-    if (Date.now() - parsed.ts > 30 * 24 * 60 * 60 * 1000) return null;
+    if (Date.now() - parsed.ts > 30 * 24 * 60 * 60 * 1000) return null; // 30 days
     return parsed;
   } catch { return null; }
 }
 
-async function hashPassword(password) {
+// ── Password hashing (NEW: PBKDF2, per-user random salt) ─
+async function legacyHash(password) {
+  // Old method (for migration only)
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password + 'ADZ_SALT_2025'));
   return btoa(String.fromCharCode(...new Uint8Array(buf)));
 }
 
+async function hashPassword(password) {
+  const encoder = new TextEncoder();
+  const salt = crypto.getRandomValues(new Uint8Array(16)); // 16-byte random salt
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']
+  );
+  const derived = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt, iterations: 210000, hash: 'SHA-256' },
+    keyMaterial, 256
+  );
+  const hashArray = Array.from(new Uint8Array(derived));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
+  return `${saltHex}:${hashHex}`;
+}
+
+async function verifyPassword(password, storedHash) {
+  if (!storedHash) return false;
+  // Check if old format (no colon)
+  if (!storedHash.includes(':')) {
+    const old = await legacyHash(password);
+    return old === storedHash;
+  }
+  // New format: salt:hash
+  const [saltHex, hashHex] = storedHash.split(':');
+  if (!saltHex || !hashHex) return false;
+  const encoder = new TextEncoder();
+  const salt = new Uint8Array(saltHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']
+  );
+  const derived = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt, iterations: 210000, hash: 'SHA-256' },
+    keyMaterial, 256
+  );
+  const newHash = Array.from(new Uint8Array(derived))
+    .map(b => b.toString(16).padStart(2, '0')).join('');
+  return newHash === hashHex;
+}
+
+// ── Utilities ────────────────────────────
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
 }
-
 function err(msg, status = 400) {
   return json({ error: msg }, status);
 }
-
 async function getUser(req, env) {
   const auth = req.headers.get('Authorization') || '';
   const token = auth.replace('Bearer ', '');
@@ -116,6 +147,7 @@ async function getUser(req, env) {
   return await dbFirst(env, 'SELECT * FROM users WHERE id = ?', [parsed.id]);
 }
 
+// ============================================
 export async function onRequest({ request, env }) {
   if (request.method === 'OPTIONS') return new Response(null, { headers: CORS });
 
@@ -123,7 +155,6 @@ export async function onRequest({ request, env }) {
   const path = url.pathname;
 
   try {
-
     // ── AUTH ──────────────────────────────────────
     if (path === '/api/auth/register' && request.method === 'POST') {
       const { username, email, password, ref_code } = await request.json();
@@ -136,17 +167,22 @@ export async function onRequest({ request, env }) {
       const uExists = await dbFirst(env, 'SELECT id FROM users WHERE username = ?', [username.toLowerCase()]);
       if (uExists) return err('Username taken');
 
-      const hashed = await hashPassword(password);
+      const hashed = await hashPassword(password); // new secure hash
       const myRef = 'ADZ' + Math.random().toString(36).substr(2, 7).toUpperCase();
       const id = crypto.randomUUID();
       const cfg = await dbFirst(env, "SELECT value FROM settings WHERE key = 'welcome_bonus'");
       const bonus = parseInt(cfg?.value || '1000');
 
-      await dbRun(env, `INSERT INTO users (id,username,email,password_hash,referral_code,referred_by,points,total_mined,mining_power,login_method,mining_claimed,created_at) VALUES (?,?,?,?,?,?,?,0,1.0,'email',1,datetime('now'))`,
-        [id, username.toLowerCase(), email, hashed, myRef, ref_code || null, bonus]);
+      await dbRun(env,
+        `INSERT INTO users (id,username,email,password_hash,referral_code,referred_by,points,total_mined,mining_power,login_method,mining_claimed,created_at)
+         VALUES (?,?,?,?,?,?,?,0,1.0,'email',1,datetime('now'))`,
+        [id, username.toLowerCase(), email, hashed, myRef, ref_code || null, bonus]
+      );
 
-      await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",
-        [crypto.randomUUID(), id, 'welcome_bonus', bonus, '🎉 Welcome bonus']);
+      await dbRun(env,
+        "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",
+        [crypto.randomUUID(), id, 'welcome_bonus', bonus, '🎉 Welcome bonus']
+      );
 
       if (ref_code) {
         const refUser = await dbFirst(env, 'SELECT * FROM users WHERE referral_code = ?', [ref_code]);
@@ -154,8 +190,10 @@ export async function onRequest({ request, env }) {
           const cfgR = await dbFirst(env, "SELECT value FROM settings WHERE key = 'referral_bonus'");
           const rb = parseInt(cfgR?.value || '500');
           await dbRun(env, 'UPDATE users SET points = points + ?, referral_count = referral_count + 1 WHERE id = ?', [rb, refUser.id]);
-          await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",
-            [crypto.randomUUID(), refUser.id, 'referral_bonus', rb, '👥 New referral: @' + username]);
+          await dbRun(env,
+            "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",
+            [crypto.randomUUID(), refUser.id, 'referral_bonus', rb, '👥 New referral: @' + username]
+          );
         }
       }
 
@@ -167,10 +205,21 @@ export async function onRequest({ request, env }) {
     if (path === '/api/auth/login' && request.method === 'POST') {
       const { email, password } = await request.json();
       if (!email || !password) return err('Email and password required');
-      const hashed = await hashPassword(password);
-      const user = await dbFirst(env, 'SELECT * FROM users WHERE email = ? AND password_hash = ?', [email, hashed]);
+
+      const user = await dbFirst(env, 'SELECT * FROM users WHERE email = ?', [email]);
       if (!user) return err('Wrong email or password');
       if (user.is_banned == 1) return err('Account banned');
+
+      // Verify password (handles old/new format + automatic upgrade)
+      const valid = await verifyPassword(password, user.password_hash);
+      if (!valid) return err('Wrong email or password');
+
+      // If old format, upgrade to new format on-the-fly
+      if (!user.password_hash.includes(':')) {
+        const newHash = await hashPassword(password);
+        await dbRun(env, 'UPDATE users SET password_hash = ? WHERE id = ?', [newHash, user.id]);
+      }
+
       const token = await makeToken(user.id, env);
       return json({ token, user });
     }
@@ -188,11 +237,16 @@ export async function onRequest({ request, env }) {
         const cfg = await dbFirst(env, "SELECT value FROM settings WHERE key = 'welcome_bonus'");
         const bonus = parseInt(cfg?.value || '1000');
 
-        await dbRun(env, `INSERT INTO users (id,username,wallet_address,wallet_type,referral_code,referred_by,points,total_mined,mining_power,login_method,mining_claimed,created_at) VALUES (?,?,?,?,?,?,?,0,1.0,?,1,datetime('now'))`,
-          [id, username, addr, wallet_type || 'web3', myRef, ref_code || null, bonus, wallet_type || 'wallet']);
+        await dbRun(env,
+          `INSERT INTO users (id,username,wallet_address,wallet_type,referral_code,referred_by,points,total_mined,mining_power,login_method,mining_claimed,created_at)
+           VALUES (?,?,?,?,?,?,?,0,1.0,?,1,datetime('now'))`,
+          [id, username, addr, wallet_type || 'web3', myRef, ref_code || null, bonus, wallet_type || 'wallet']
+        );
 
-        await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",
-          [crypto.randomUUID(), id, 'welcome_bonus', bonus, '🎉 Welcome bonus']);
+        await dbRun(env,
+          "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",
+          [crypto.randomUUID(), id, 'welcome_bonus', bonus, '🎉 Welcome bonus']
+        );
 
         if (ref_code) {
           const refUser = await dbFirst(env, 'SELECT * FROM users WHERE referral_code = ?', [ref_code]);
@@ -232,8 +286,7 @@ export async function onRequest({ request, env }) {
       if (user.mining_claimed != 1) return err('Already mining');
       const now = new Date().toISOString();
       await dbRun(env, "UPDATE users SET last_mining_start = ?, mining_claimed = 0 WHERE id = ?", [now, user.id]);
-      await dbRun(env, "INSERT INTO mining_sessions (id,user_id,started_at,mining_power) VALUES (?,?,?,?)",
-        [crypto.randomUUID(), user.id, now, user.mining_power]);
+      await dbRun(env, "INSERT INTO mining_sessions (id,user_id,started_at,mining_power) VALUES (?,?,?,?)", [crypto.randomUUID(), user.id, now, user.mining_power]);
       return json({ success: true });
     }
 
@@ -255,12 +308,9 @@ export async function onRequest({ request, env }) {
 
       const newPts = parseInt(user.points || 0) + earned;
       const newMined = parseInt(user.total_mined || 0) + earned;
-      await dbRun(env, 'UPDATE users SET points = ?, total_mined = ?, total_claimed = total_claimed + ?, mining_claimed = 1 WHERE id = ?',
-        [newPts, newMined, earned, user.id]);
-      await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",
-        [crypto.randomUUID(), user.id, 'mining_claim', earned, '⛏️ Mining claim']);
-      await dbRun(env, "UPDATE mining_sessions SET claimed_at = datetime('now'), coins_earned = ?, is_claimed = 1 WHERE user_id = ? AND is_claimed = 0",
-        [earned, user.id]);
+      await dbRun(env, 'UPDATE users SET points = ?, total_mined = ?, total_claimed = total_claimed + ?, mining_claimed = 1 WHERE id = ?', [newPts, newMined, earned, user.id]);
+      await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, 'mining_claim', earned, '⛏️ Mining claim']);
+      await dbRun(env, "UPDATE mining_sessions SET claimed_at = datetime('now'), coins_earned = ?, is_claimed = 1 WHERE user_id = ? AND is_claimed = 0", [earned, user.id]);
 
       if (user.referred_by && newMined === earned) {
         const refUser = await dbFirst(env, 'SELECT * FROM users WHERE referral_code = ?', [user.referred_by]);
@@ -272,10 +322,8 @@ export async function onRequest({ request, env }) {
           const newAR = parseInt(refUser.active_referral_count || 0) + 1;
           const newPow = Math.min(1.0 + newAR * ppr, maxP);
           const arb = parseInt(cfgARB?.value || '200');
-          await dbRun(env, 'UPDATE users SET active_referral_count = ?, mining_power = ?, points = points + ? WHERE id = ?',
-            [newAR, newPow, arb, refUser.id]);
-          await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",
-            [crypto.randomUUID(), refUser.id, 'active_referral_bonus', arb, '🔥 @' + user.username + ' started mining!']);
+          await dbRun(env, 'UPDATE users SET active_referral_count = ?, mining_power = ?, points = points + ? WHERE id = ?', [newAR, newPow, arb, refUser.id]);
+          await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), refUser.id, 'active_referral_bonus', arb, '🔥 @' + user.username + ' started mining!']);
         }
       }
       return json({ success: true, earned });
@@ -298,14 +346,10 @@ export async function onRequest({ request, env }) {
       const already = await dbFirst(env, 'SELECT id FROM user_tasks WHERE user_id = ? AND task_id = ?', [user.id, task_id]);
       if (already) return err('Already completed');
       if (task.task_type === 'quiz') return err('Quiz tasks require answer verification');
-      // If task has a verify code, block direct completion — must go through /api/tasks/verify-code
       if (task.verify_code && task.verify_code.trim() !== '') return err('This task requires a secret code to complete');
-      await dbRun(env, "INSERT INTO user_tasks (id,user_id,task_id,completed_at) VALUES (?,?,?,datetime('now'))",
-        [crypto.randomUUID(), user.id, task_id]);
-      await dbRun(env, 'UPDATE users SET points = points + ?, total_tasks_completed = total_tasks_completed + 1 WHERE id = ?',
-        [task.points_reward, user.id]);
-      await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",
-        [crypto.randomUUID(), user.id, 'task_complete', task.points_reward, '✅ ' + task.title]);
+      await dbRun(env, "INSERT INTO user_tasks (id,user_id,task_id,completed_at) VALUES (?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, task_id]);
+      await dbRun(env, 'UPDATE users SET points = points + ?, total_tasks_completed = total_tasks_completed + 1 WHERE id = ?', [task.points_reward, user.id]);
+      await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, 'task_complete', task.points_reward, '✅ ' + task.title]);
       return json({ success: true, earned: task.points_reward });
     }
 
@@ -319,7 +363,6 @@ export async function onRequest({ request, env }) {
       if (!task) return err('Task nahi mila');
       const already = await dbFirst(env, 'SELECT id FROM user_tasks WHERE user_id = ? AND task_id = ?', [user.id, task_id]);
       if (already) return err('Already completed');
-      // Check attempts (reuse quiz_attempts table)
       let attempt = await dbFirst(env, 'SELECT * FROM quiz_attempts WHERE user_id = ? AND task_id = ?', [user.id, task_id]);
       const maxAttempts = 3;
       const attempts = attempt ? attempt.attempts : 0;
@@ -328,23 +371,18 @@ export async function onRequest({ request, env }) {
       const given = (code || '').trim().toLowerCase();
       const isCorrect = correct === given;
       if (isCorrect) {
-        await dbRun(env, "INSERT INTO user_tasks (id,user_id,task_id,completed_at) VALUES (?,?,?,datetime('now'))",
-          [crypto.randomUUID(), user.id, task_id]);
-        await dbRun(env, 'UPDATE users SET points = points + ?, total_tasks_completed = total_tasks_completed + 1 WHERE id = ?',
-          [task.points_reward, user.id]);
-        await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",
-          [crypto.randomUUID(), user.id, 'task_complete', task.points_reward, '✅ ' + task.title]);
+        await dbRun(env, "INSERT INTO user_tasks (id,user_id,task_id,completed_at) VALUES (?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, task_id]);
+        await dbRun(env, 'UPDATE users SET points = points + ?, total_tasks_completed = total_tasks_completed + 1 WHERE id = ?', [task.points_reward, user.id]);
+        await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, 'task_complete', task.points_reward, '✅ ' + task.title]);
         if (attempt) await dbRun(env, 'DELETE FROM quiz_attempts WHERE user_id = ? AND task_id = ?', [user.id, task_id]);
         return json({ success: true, earned: task.points_reward });
       } else {
         const newAttempts = attempts + 1;
         const isFailed = newAttempts >= maxAttempts;
         if (attempt) {
-          await dbRun(env, 'UPDATE quiz_attempts SET attempts = ?, failed = ? WHERE user_id = ? AND task_id = ?',
-            [newAttempts, isFailed ? 1 : 0, user.id, task_id]);
+          await dbRun(env, 'UPDATE quiz_attempts SET attempts = ?, failed = ? WHERE user_id = ? AND task_id = ?', [newAttempts, isFailed ? 1 : 0, user.id, task_id]);
         } else {
-          await dbRun(env, "INSERT INTO quiz_attempts (id,user_id,task_id,attempts,failed,created_at) VALUES (?,?,?,?,?,datetime('now'))",
-            [crypto.randomUUID(), user.id, task_id, newAttempts, isFailed ? 1 : 0]);
+          await dbRun(env, "INSERT INTO quiz_attempts (id,user_id,task_id,attempts,failed,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, task_id, newAttempts, isFailed ? 1 : 0]);
         }
         const remaining = maxAttempts - newAttempts;
         if (isFailed) return json({ success: false, failed: true, message: 'Galat code! 3 baar fail ho gaye. Dobara task shuru karen.' });
@@ -378,23 +416,18 @@ export async function onRequest({ request, env }) {
       const given = (answer || '').trim().toLowerCase();
       const isCorrect = correct === given;
       if (isCorrect) {
-        await dbRun(env, "INSERT INTO user_tasks (id,user_id,task_id,completed_at) VALUES (?,?,?,datetime('now'))",
-          [crypto.randomUUID(), user.id, task_id]);
-        await dbRun(env, 'UPDATE users SET points = points + ?, total_tasks_completed = total_tasks_completed + 1 WHERE id = ?',
-          [task.points_reward, user.id]);
-        await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",
-          [crypto.randomUUID(), user.id, 'task_complete', task.points_reward, '✅ Quiz: ' + task.title]);
+        await dbRun(env, "INSERT INTO user_tasks (id,user_id,task_id,completed_at) VALUES (?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, task_id]);
+        await dbRun(env, 'UPDATE users SET points = points + ?, total_tasks_completed = total_tasks_completed + 1 WHERE id = ?', [task.points_reward, user.id]);
+        await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, 'task_complete', task.points_reward, '✅ Quiz: ' + task.title]);
         if (attempt) await dbRun(env, 'DELETE FROM quiz_attempts WHERE user_id = ? AND task_id = ?', [user.id, task_id]);
         return json({ success: true, earned: task.points_reward });
       } else {
         const newAttempts = attempts + 1;
         const isFailed = newAttempts >= maxAttempts;
         if (attempt) {
-          await dbRun(env, 'UPDATE quiz_attempts SET attempts = ?, failed = ? WHERE user_id = ? AND task_id = ?',
-            [newAttempts, isFailed ? 1 : 0, user.id, task_id]);
+          await dbRun(env, 'UPDATE quiz_attempts SET attempts = ?, failed = ? WHERE user_id = ? AND task_id = ?', [newAttempts, isFailed ? 1 : 0, user.id, task_id]);
         } else {
-          await dbRun(env, "INSERT INTO quiz_attempts (id,user_id,task_id,attempts,failed,created_at) VALUES (?,?,?,?,?,datetime('now'))",
-            [crypto.randomUUID(), user.id, task_id, newAttempts, isFailed ? 1 : 0]);
+          await dbRun(env, "INSERT INTO quiz_attempts (id,user_id,task_id,attempts,failed,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, task_id, newAttempts, isFailed ? 1 : 0]);
         }
         const remaining = maxAttempts - newAttempts;
         if (isFailed) return json({ success: false, failed: true, message: 'Galat jawab! 3 baar fail ho gaye. Dobara task shuru karen.' });
@@ -442,7 +475,6 @@ export async function onRequest({ request, env }) {
       return json({ users: parseInt(uc?.c || 0), total_mined: parseInt(tm?.s || 0) });
     }
 
-
     // ── ADS ───────────────────────────────────────
     if (path === '/api/ads' && request.method === 'GET') {
       const results = await dbAll(env, 'SELECT * FROM ads WHERE is_active = 1 ORDER BY created_at DESC');
@@ -459,8 +491,7 @@ export async function onRequest({ request, env }) {
         return json(await dbAll(env, 'SELECT * FROM users ORDER BY created_at DESC LIMIT 100'));
       }
       if (path === '/api/admin/users/update' && request.method === 'POST') {
-        await dbRun(env, 'UPDATE users SET username=?,points=?,mining_power=?,is_banned=? WHERE id=?',
-          [body.username, body.points, body.mining_power, body.is_banned ? 1 : 0, body.id]);
+        await dbRun(env, 'UPDATE users SET username=?,points=?,mining_power=?,is_banned=? WHERE id=?', [body.username, body.points, body.mining_power, body.is_banned ? 1 : 0, body.id]);
         return json({ success: true });
       }
       if (path === '/api/admin/tasks' && request.method === 'GET') {
@@ -469,11 +500,9 @@ export async function onRequest({ request, env }) {
       if (path === '/api/admin/tasks/save' && request.method === 'POST') {
         const { id, title, description, icon, task_type, url, ad_url, quiz_question, quiz_answer, verify_code, points_reward, timer_seconds, display_order, is_active } = body;
         if (id) {
-          await dbRun(env, 'UPDATE tasks SET title=?,description=?,icon=?,task_type=?,url=?,ad_url=?,quiz_question=?,quiz_answer=?,verify_code=?,points_reward=?,timer_seconds=?,display_order=?,is_active=? WHERE id=?',
-            [title, description||null, icon||'🎯', task_type, url||null, ad_url||null, quiz_question||null, quiz_answer||null, verify_code||null, points_reward, timer_seconds||0, display_order||99, is_active?1:0, id]);
+          await dbRun(env, 'UPDATE tasks SET title=?,description=?,icon=?,task_type=?,url=?,ad_url=?,quiz_question=?,quiz_answer=?,verify_code=?,points_reward=?,timer_seconds=?,display_order=?,is_active=? WHERE id=?', [title, description||null, icon||'🎯', task_type, url||null, ad_url||null, quiz_question||null, quiz_answer||null, verify_code||null, points_reward, timer_seconds||0, display_order||99, is_active?1:0, id]);
         } else {
-          await dbRun(env, "INSERT INTO tasks (id,title,description,icon,task_type,url,ad_url,quiz_question,quiz_answer,verify_code,points_reward,timer_seconds,display_order,is_active,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))",
-            [crypto.randomUUID(), title, description||null, icon||'🎯', task_type, url||null, ad_url||null, quiz_question||null, quiz_answer||null, verify_code||null, points_reward, timer_seconds||0, display_order||99, is_active?1:0]);
+          await dbRun(env, "INSERT INTO tasks (id,title,description,icon,task_type,url,ad_url,quiz_question,quiz_answer,verify_code,points_reward,timer_seconds,display_order,is_active,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), title, description||null, icon||'🎯', task_type, url||null, ad_url||null, quiz_question||null, quiz_answer||null, verify_code||null, points_reward, timer_seconds||0, display_order||99, is_active?1:0]);
         }
         return json({ success: true });
       }
@@ -494,11 +523,9 @@ export async function onRequest({ request, env }) {
         const { id, title, slug, category, phase, excerpt, content, display_order, status } = body;
         const sl = slug || title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
         if (id) {
-          await dbRun(env, 'UPDATE blog_posts SET title=?,slug=?,category=?,phase=?,excerpt=?,content=?,display_order=?,status=? WHERE id=?',
-            [title, sl, category||'roadmap', phase||null, excerpt||null, content||null, display_order||99, status||'published', id]);
+          await dbRun(env, 'UPDATE blog_posts SET title=?,slug=?,category=?,phase=?,excerpt=?,content=?,display_order=?,status=? WHERE id=?', [title, sl, category||'roadmap', phase||null, excerpt||null, content||null, display_order||99, status||'published', id]);
         } else {
-          await dbRun(env, "INSERT INTO blog_posts (id,title,slug,category,phase,excerpt,content,display_order,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,datetime('now'))",
-            [crypto.randomUUID(), title, sl, category||'roadmap', phase||null, excerpt||null, content||null, display_order||99, status||'published']);
+          await dbRun(env, "INSERT INTO blog_posts (id,title,slug,category,phase,excerpt,content,display_order,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), title, sl, category||'roadmap', phase||null, excerpt||null, content||null, display_order||99, status||'published']);
         }
         return json({ success: true });
       }
@@ -525,11 +552,9 @@ export async function onRequest({ request, env }) {
         const pg = Array.isArray(pages) ? pages.join(',') : (pages || 'index,blog,policies,vision');
         const net = network || type || 'script';
         if (id) {
-          await dbRun(env, 'UPDATE ads SET name=?,network=?,position=?,code=?,url=?,pages=?,is_active=? WHERE id=?',
-            [name, net, position||'bottom', code||'', url||'', pg, is_active!=null?is_active:1, id]);
+          await dbRun(env, 'UPDATE ads SET name=?,network=?,position=?,code=?,url=?,pages=?,is_active=? WHERE id=?', [name, net, position||'bottom', code||'', url||'', pg, is_active!=null?is_active:1, id]);
         } else {
-          await dbRun(env, "INSERT INTO ads (id,name,network,position,code,url,pages,is_active,created_at) VALUES (?,?,?,?,?,?,?,?,datetime('now'))",
-            [crypto.randomUUID(), name, net, position||'bottom', code||'', url||'', pg, is_active!=null?is_active:1]);
+          await dbRun(env, "INSERT INTO ads (id,name,network,position,code,url,pages,is_active,created_at) VALUES (?,?,?,?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), name, net, position||'bottom', code||'', url||'', pg, is_active!=null?is_active:1]);
         }
         return json({ success: true });
       }
