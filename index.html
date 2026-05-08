@@ -376,7 +376,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 <div id="wallet-modal">
   <div class="wallet-sheet">
     <div class="wallet-sheet-title">👛 Connect Wallet</div>
-    <div class="wallet-sheet-sub">Apna wallet choose karein. Agar mobile app install hai tu seedha khulega.</div>
+    <div class="wallet-sheet-sub">Choose your wallet. If the mobile app is installed, it will open directly.</div>
     <div class="wallet-grid">
 
       <!-- MetaMask -->
@@ -600,10 +600,10 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
   <div class="vcode-box">
     <div class="vcode-title">🔐 <span id="vcode-task-title">Task Verify</span></div>
     <div class="vcode-pts" id="vcode-pts">+100 Points</div>
-    <div class="vcode-hint" id="vcode-hint">💡 Task complete karo, phir wahan diya gaya secret code yahan enter karo.</div>
-    <input class="vcode-inp" type="text" id="vcode-inp" placeholder="CODE YAHAN LIKHEIN" autocomplete="off" autocapitalize="characters"/>
+    <div class="vcode-hint" id="vcode-hint">💡 Complete the task, then enter the secret code shown there.</div>
+    <input class="vcode-inp" type="text" id="vcode-inp" placeholder="ENTER CODE HERE" autocomplete="off" autocapitalize="characters"/>
     <div class="vcode-chances" id="vcode-chances">
-      <span>Maukay:</span>
+      <span>Attempts:</span>
       <span class="quiz-dot active" id="vcd1"></span>
       <span class="quiz-dot active" id="vcd2"></span>
       <span class="quiz-dot active" id="vcd3"></span>
@@ -611,7 +611,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
     <div class="vcode-msg" id="vcode-msg"></div>
     <div class="vcode-actions">
       <button class="vcode-cancel" onclick="closeVcodeModal()">❌ Cancel</button>
-      <button class="vcode-submit" id="vcode-submit-btn" onclick="submitVerifyCode()">✅ Verify Karo</button>
+      <button class="vcode-submit" id="vcode-submit-btn" onclick="submitVerifyCode()">✅ Verify</button>
     </div>
   </div>
 </div>
@@ -621,18 +621,18 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
   <div class="quiz-box">
     <div class="quiz-title">🧠 <span id="quiz-task-title">Quiz Task</span></div>
     <div class="quiz-pts" id="quiz-pts">+100 Points</div>
-    <div class="quiz-q" id="quiz-question">Sawal yahan aayega...</div>
-    <input class="quiz-inp" type="text" id="quiz-answer-inp" placeholder="Apna jawab likhein..." autocomplete="off"/>
+    <div class="quiz-q" id="quiz-question">Question will appear here...</div>
+    <input class="quiz-inp" type="text" id="quiz-answer-inp" placeholder="Enter your answer..." autocomplete="off"/>
     <div class="quiz-chances" id="quiz-chances">
-      <span>Maukay:</span>
+      <span>Attempts:</span>
       <span class="quiz-dot active" id="qd1"></span>
       <span class="quiz-dot active" id="qd2"></span>
       <span class="quiz-dot active" id="qd3"></span>
     </div>
     <div class="quiz-msg" id="quiz-msg"></div>
     <div class="quiz-actions">
-      <button class="quiz-cancel" onclick="closeQuizModal()">❌ Band Karo</button>
-      <button class="quiz-submit" id="quiz-submit-btn" onclick="submitQuizAnswer()">✅ Jawab Den</button>
+      <button class="quiz-cancel" onclick="closeQuizModal()">❌ Close</button>
+      <button class="quiz-submit" id="quiz-submit-btn" onclick="submitQuizAnswer()">✅ Submit</button>
     </div>
   </div>
 </div>
@@ -654,7 +654,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 
 <script>
 // ============================================
-// CONFIG — APNA CLOUDFLARE WORKER URL YAHAN LIKHO
+// CONFIG
 // ============================================
 const API = 'https://ai2e.pages.dev';
 const APP_URL = 'https://ai2e.pages.dev';
@@ -698,10 +698,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (el) { el.value = ref.toUpperCase(); switchTab('up'); }
   }
 
-  // Load stats for login page
   loadStats();
 
-  // Check saved session (LocalStorage)
   const savedToken = localStorage.getItem('adz_token');
   const savedUser = localStorage.getItem('adz_user');
 
@@ -710,13 +708,11 @@ window.addEventListener('DOMContentLoaded', async () => {
     me = JSON.parse(savedUser);
     setL('LOADING MINER...');
     try {
-      // Verify token still valid & refresh user data
       me = await api('/api/me');
       localStorage.setItem('adz_user', JSON.stringify(me));
       await finishLogin();
       return;
     } catch(e) {
-      // Token expired or invalid
       localStorage.removeItem('adz_token');
       localStorage.removeItem('adz_user');
       token = null; me = null;
@@ -798,11 +794,9 @@ async function connectWallet(type) {
     let walletType = type;
 
     if (type === 'phantom') {
-      // Solana Phantom
       address = await connectPhantom();
       walletType = 'phantom';
     } else {
-      // EVM wallets (MetaMask, Trust, Coinbase, OKX, any EVM)
       address = await connectEVM(type);
       walletType = type;
     }
@@ -829,7 +823,6 @@ async function connectWallet(type) {
 }
 
 async function connectEVM(type) {
-  // Try specific wallet providers first
   let provider = null;
 
   if (type === 'metamask' && window.ethereum?.isMetaMask) {
@@ -841,12 +834,10 @@ async function connectEVM(type) {
   } else if (type === 'okx' && window.okxwallet) {
     provider = window.okxwallet;
   } else if (window.ethereum) {
-    // Fallback: use whatever ethereum provider is available
     provider = window.ethereum;
   }
 
   if (!provider) {
-    // No wallet detected on desktop -> open mobile deep link or store
     const links = {
       metamask: 'https://metamask.app.link/dapp/' + window.location.host,
       trust: 'https://link.trustwallet.com/open_url?coin_id=60&url=' + encodeURIComponent(window.location.href),
@@ -856,10 +847,9 @@ async function connectEVM(type) {
     };
     const link = links[type] || links.evm;
 
-    // On mobile, try deep link; on desktop, show install prompt
     if (/Android|iPhone|iPad/i.test(navigator.userAgent)) {
       window.location.href = link;
-      return null; // Will reload via deeplink
+      return null;
     } else {
       toast('🦊 Install ' + type.charAt(0).toUpperCase() + type.slice(1) + ' wallet first!');
       setTimeout(() => window.open('https://metamask.io', '_blank'), 500);
@@ -867,7 +857,6 @@ async function connectEVM(type) {
     }
   }
 
-  // Request accounts
   const accounts = await provider.request({ method: 'eth_requestAccounts' });
   return accounts[0] || null;
 }
@@ -877,7 +866,6 @@ async function connectPhantom() {
     const resp = await window.solana.connect();
     return resp.publicKey.toString();
   }
-  // Mobile deep link
   if (/Android|iPhone|iPad/i.test(navigator.userAgent)) {
     window.location.href = 'https://phantom.app/ul/browse/' + encodeURIComponent(window.location.href);
     return null;
@@ -911,7 +899,6 @@ async function finishLogin() {
       document.body.innerHTML = '<div style="height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;background:#030712;color:#e6edf3;font-family:Outfit,sans-serif"><div style="font-size:64px">🔧</div><div style="font-size:24px;font-weight:800">Under Maintenance</div><div style="color:#7d8590">Back soon!</div></div>';
       return;
     }
-    // Render tasks
     doneTasks = new Set(taskData.done || []);
     renderTasks(taskData.tasks || []);
     await loadRoadmap();
@@ -967,7 +954,6 @@ function renderUser() {
   const al = document.getElementById('avltr');
   if (al) al.textContent = name[0]?.toUpperCase() || '👤';
 
-  // Wallet badge in profile
   const wb = document.getElementById('pwallet-badge');
   if (wb && me.wallet_address) {
     const addr = me.wallet_address;
@@ -1003,7 +989,6 @@ function updateMineUI() {
   if (!me || !btn) return;
   const dur = getDur();
 
-  // IDLE — strictly check mining_claimed=1 OR no valid session
   const isClaimed = (me.mining_claimed == 1 || me.mining_claimed === true);
   const hasSession = !!(me.last_mining_start && me.last_mining_start !== 'null' && me.last_mining_start !== '');
   if (isClaimed || !hasSession) {
@@ -1023,10 +1008,8 @@ function updateMineUI() {
   const h = Math.floor(rem / 3600000), m = Math.floor((rem % 3600000) / 60000);
   const ratePerHr = (getCPMS() * 3600000).toFixed(1);
 
-  // Update mining status box
   if (msb) {
     msb.classList.add('show');
-    // Session start time
     const startDate = new Date(me.last_mining_start);
     const startStr = startDate.toLocaleTimeString('en', {hour:'2-digit', minute:'2-digit'});
     setText('msb-start', startStr);
@@ -1038,7 +1021,6 @@ function updateMineUI() {
     setText('msb-pct', pct + '%');
 
     if (el >= dur) {
-      // Complete
       msb.classList.add('claim-ready');
       setText('msb-title-txt', '🏆 Ready to Claim!');
       setText('msb-live-txt', 'DONE');
@@ -1046,7 +1028,6 @@ function updateMineUI() {
       setText('msb-prog-lbl', 'Mining Complete');
       setText('msb-hint', '✅ Tap claim button below to collect rewards');
     } else if (canClaim) {
-      // Early claim available
       msb.classList.add('claim-ready');
       setText('msb-title-txt', 'Claim Available');
       setText('msb-live-txt', 'CLAIM');
@@ -1054,7 +1035,6 @@ function updateMineUI() {
       setText('msb-prog-lbl', 'Early Claim Ready');
       setText('msb-hint', '⚡ Min ' + MIN_CLAIM + ' pts reached — you can claim now!');
     } else {
-      // Still mining
       msb.classList.remove('claim-ready');
       setText('msb-title-txt', 'Mining Active');
       setText('msb-live-txt', 'LIVE');
@@ -1086,7 +1066,6 @@ function updateMineUI() {
   setText('mrated', '+' + ratePerHr + '/hr');
 }
 
-// Refresh me object from DB and re-render everything
 async function refreshMe() {
   try {
     me = await api('/api/me');
@@ -1098,9 +1077,7 @@ async function refreshMe() {
 
 function startTicker() {
   clearInterval(mInt);
-  // Every 30s: sync balance from server (DB is truth)
   mInt = setInterval(() => { refreshMe(); }, 30000);
-  // Also update mining progress bar every 5s (UI only, no balance mutation)
   setInterval(() => { if (me) updateMineUI(); }, 5000);
 }
 
@@ -1112,17 +1089,18 @@ function startAnimalLoop() {
   }, 2000);
 }
 
+// Fixed bug: declared `dur` variable properly
 async function handleMineBtn() {
   if (!me) return;
-  // Consistent check: isClaimed = true means mining is done/not started → start new session
+  const dur = getDur(); // <-- fixed missing variable
   const isClaimed = (me.mining_claimed == 1 || me.mining_claimed === true);
   const hasSession = !!(me.last_mining_start && me.last_mining_start !== 'null' && me.last_mining_start !== '');
   if (isClaimed || !hasSession) {
     await startMining();
   } else {
-    const e = Math.min(Date.now() - new Date(me.last_mining_start).getTime(), getDur());
+    const e = Math.min(Date.now() - new Date(me.last_mining_start).getTime(), dur);
     const earn = Math.floor(getCPMS() * e);
-    if (earn >= MIN_CLAIM || e >= getDur()) await claimMining();
+    if (earn >= MIN_CLAIM || e >= dur) await claimMining();
     else toast('⏳ Mine at least ' + MIN_CLAIM + ' points first! (' + earn + ' so far)');
   }
 }
@@ -1131,7 +1109,7 @@ async function startMining() {
   try {
     await api('/api/mine/start', 'POST');
     toast('⛏️ Mining started! Come back in 24h.'); spawnCoin();
-    await refreshMe(); // Pull fresh state from DB
+    await refreshMe();
   } catch(e) { toast('❌ ' + (e.message || 'Failed to start')); }
 }
 
@@ -1141,12 +1119,10 @@ async function claimMining() {
   try {
     const data = await api('/api/mine/claim', 'POST');
     const earned = data.earned || 0;
-    // Hide status box immediately
     const msb = document.getElementById('mining-status-box');
     if (msb) msb.classList.remove('show', 'claim-ready');
     toast('🏆 Claimed ' + earned.toLocaleString() + ' Points!');
     for (let i = 0; i < 5; i++) setTimeout(spawnCoin, i * 200);
-    // Always pull fresh balance from DB — never calculate locally
     await refreshMe();
   } catch(e) {
     toast('❌ ' + (e.message || 'Claim failed'));
@@ -1155,7 +1131,7 @@ async function claimMining() {
 }
 
 // ============================================
-// TASKS
+// TASKS (English)
 // ============================================
 function renderTasks(tasks) {
   const c = document.getElementById('tasklist');
@@ -1196,11 +1172,9 @@ async function finTask(id, pts) {
   try {
     await api('/api/tasks/complete', 'POST', { task_id: id });
     doneTasks.add(id);
-    // Mark card done in UI immediately
     const card = document.getElementById('tc-' + id);
     if (card) { card.classList.add('done'); const b = card.querySelector('.tbtn'); if (b) { b.className = 'tbtn dbtn'; b.textContent = '✅ Done'; } }
     toast('✅ +' + pts + ' Points earned!'); spawnCoin();
-    // Pull fresh balance from DB — no local math
     await refreshMe();
   } catch(e) { toast('❌ ' + (e.message || 'Error')); }
 }
@@ -1230,6 +1204,173 @@ async function claimAd() {
   clearInterval(adTmr);
   await finTask(id, pts);
   padAd = null;
+}
+
+// ============================================
+// VERIFY CODE (English)
+// ============================================
+let activeVcode = null;
+
+function doTaskWithCode(id, url, pts, title) {
+  if (doneTasks.has(id)) return;
+  if (url) window.open(url, '_blank');
+  setTimeout(() => openVcodeModal(id, title, pts), 1500);
+}
+
+function openVcodeModal(id, title, pts) {
+  activeVcode = { id, title, pts, attempts: 0 };
+  setText('vcode-task-title', title);
+  document.getElementById('vcode-pts').textContent = '+' + pts + ' Points';
+  document.getElementById('vcode-inp').value = '';
+  document.getElementById('vcode-submit-btn').disabled = false;
+  document.getElementById('vcode-submit-btn').textContent = '✅ Verify';
+  document.getElementById('vcode-submit-btn').onclick = submitVerifyCode;
+  const msg = document.getElementById('vcode-msg');
+  msg.className = 'vcode-msg'; msg.textContent = '';
+  updateVcodeDots(0);
+  document.getElementById('vcode-modal').classList.add('show');
+  setTimeout(() => document.getElementById('vcode-inp').focus(), 300);
+}
+
+function closeVcodeModal() {
+  document.getElementById('vcode-modal').classList.remove('show');
+  activeVcode = null;
+}
+
+function updateVcodeDots(usedCount) {
+  for (let i = 1; i <= 3; i++) {
+    const dot = document.getElementById('vcd' + i);
+    if (!dot) continue;
+    dot.className = 'quiz-dot ' + (i <= usedCount ? 'used' : 'active');
+  }
+}
+
+async function submitVerifyCode() {
+  if (!activeVcode) return;
+  const code = document.getElementById('vcode-inp').value.trim();
+  if (!code) { showVcodeMsg('err', 'Enter code first!'); return; }
+  const btn = document.getElementById('vcode-submit-btn');
+  btn.disabled = true; btn.textContent = '⏳ Checking...';
+  try {
+    const res = await api('/api/tasks/verify-code', 'POST', { task_id: activeVcode.id, code });
+    if (res.success) {
+      updateVcodeDots(0);
+      showVcodeMsg('suc', '🎉 Correct code! +' + res.earned + ' Points earned!');
+      doneTasks.add(activeVcode.id);
+      const card = document.getElementById('tc-' + activeVcode.id);
+      if (card) { card.classList.add('done'); const b = card.querySelector('.tbtn'); if (b) { b.className = 'tbtn dbtn'; b.textContent = '✅ Done'; } }
+      spawnCoin(); spawnCoin();
+      setTimeout(() => { closeVcodeModal(); refreshMe(); toast('✅ +' + res.earned + ' Points earned!'); }, 1800);
+    } else {
+      activeVcode.attempts = (activeVcode.attempts || 0) + 1;
+      updateVcodeDots(activeVcode.attempts);
+      if (res.failed) {
+        showVcodeMsg('err', '❌ ' + (res.message || '3 attempts failed. Start the task again.'));
+        btn.textContent = '🔄 Start Over';
+        btn.disabled = false;
+        btn.onclick = async () => {
+          btn.disabled = true; btn.textContent = '⏳...';
+          await api('/api/tasks/verify-reset', 'POST', { task_id: activeVcode.id });
+          closeVcodeModal();
+          toast('🔄 Reset done. Do the task again!');
+        };
+      } else {
+        showVcodeMsg('err', '❌ ' + (res.message || 'Incorrect code!'));
+        document.getElementById('vcode-inp').value = '';
+        btn.disabled = false; btn.textContent = '✅ Verify';
+        document.getElementById('vcode-inp').focus();
+      }
+    }
+  } catch(e) {
+    showVcodeMsg('err', e.message || 'Error occurred. Please try again.');
+    btn.disabled = false; btn.textContent = '✅ Verify';
+  }
+}
+
+function showVcodeMsg(type, msg) {
+  const el = document.getElementById('vcode-msg');
+  el.className = 'vcode-msg ' + type + ' show';
+  el.textContent = msg;
+}
+
+// ============================================
+// QUIZ (English)
+// ============================================
+let activeQuiz = null;
+
+function openQuizModal(id, title, pts, question) {
+  activeQuiz = { id, title, pts, attempts: 0 };
+  setText('quiz-task-title', title);
+  document.getElementById('quiz-pts').textContent = '+' + pts + ' Points';
+  document.getElementById('quiz-question').textContent = question || 'Question not loaded...';
+  document.getElementById('quiz-answer-inp').value = '';
+  document.getElementById('quiz-submit-btn').disabled = false;
+  const msg = document.getElementById('quiz-msg');
+  msg.className = 'quiz-msg'; msg.textContent = '';
+  updateQuizDots(0);
+  document.getElementById('quiz-modal').classList.add('show');
+  setTimeout(() => document.getElementById('quiz-answer-inp').focus(), 300);
+}
+
+function closeQuizModal() {
+  document.getElementById('quiz-modal').classList.remove('show');
+  activeQuiz = null;
+}
+
+function updateQuizDots(usedCount) {
+  for (let i = 1; i <= 3; i++) {
+    const dot = document.getElementById('qd' + i);
+    if (!dot) continue;
+    dot.className = 'quiz-dot ' + (i <= usedCount ? 'used' : 'active');
+  }
+}
+
+async function submitQuizAnswer() {
+  if (!activeQuiz) return;
+  const ans = document.getElementById('quiz-answer-inp').value.trim();
+  if (!ans) { showQuizMsg('err', 'Enter your answer first!'); return; }
+  const btn = document.getElementById('quiz-submit-btn');
+  btn.disabled = true; btn.textContent = '⏳ Checking...';
+  try {
+    const res = await api('/api/tasks/quiz-verify', 'POST', { task_id: activeQuiz.id, answer: ans });
+    if (res.success) {
+      updateQuizDots(0);
+      showQuizMsg('suc', '🎉 Correct answer! +' + res.earned + ' Points earned!');
+      doneTasks.add(activeQuiz.id);
+      const card = document.getElementById('tc-' + activeQuiz.id);
+      if (card) { card.classList.add('done'); const b = card.querySelector('.tbtn'); if (b) { b.className = 'tbtn dbtn'; b.textContent = '✅ Done'; } }
+      spawnCoin(); spawnCoin();
+      setTimeout(() => { closeQuizModal(); refreshMe(); toast('✅ +' + res.earned + ' Points earned!'); }, 1800);
+    } else {
+      activeQuiz.attempts = (activeQuiz.attempts || 0) + 1;
+      updateQuizDots(activeQuiz.attempts);
+      if (res.failed) {
+        showQuizMsg('err', '❌ ' + (res.message || '3 attempts failed. Please try again.'));
+        btn.textContent = '🔄 Start Over';
+        btn.disabled = false;
+        btn.onclick = async () => {
+          btn.disabled = true; btn.textContent = '⏳...';
+          await api('/api/tasks/quiz-reset', 'POST', { task_id: activeQuiz.id });
+          closeQuizModal();
+          toast('🔄 Quiz reset. Try again!');
+        };
+      } else {
+        showQuizMsg('err', '❌ ' + (res.message || 'Wrong answer!'));
+        document.getElementById('quiz-answer-inp').value = '';
+        btn.disabled = false; btn.textContent = '✅ Submit';
+        document.getElementById('quiz-answer-inp').focus();
+      }
+    }
+  } catch(e) {
+    showQuizMsg('err', e.message || 'Error occurred. Please try again.');
+    btn.disabled = false; btn.textContent = '✅ Submit';
+  }
+}
+
+function showQuizMsg(type, msg) {
+  const el = document.getElementById('quiz-msg');
+  el.className = 'quiz-msg ' + type + ' show';
+  el.textContent = msg;
 }
 
 // ============================================
@@ -1307,11 +1448,8 @@ async function loadTxH() {
 async function loadRoadmap() {
   try {
     const data = await api('/api/admin/blog', 'GET');
-    // Use public roadmap from settings (blog_posts visible to all)
     renderRoadmap(data);
-  } catch(e) {
-    // Try without admin (public endpoint not needed, roadmap loaded at login)
-  }
+  } catch(e) {}
 }
 
 function renderRoadmap(data) {
@@ -1365,6 +1503,8 @@ function esc(s) { if (!s) return ''; return s.replace(/&/g,'&amp;').replace(/</g
 function fNum(n) { n = parseInt(n)||0; if(n>=1000000) return (n/1000000).toFixed(1)+'M'; if(n>=1000) return (n/1000).toFixed(1)+'K'; return n.toString(); }
 function spawnCoin() { const c = document.createElement('div'); c.className='cfly'; c.textContent=['🪙','💰','⭐','✨'][Math.floor(Math.random()*4)]; c.style.left=(20+Math.random()*60)+'vw'; c.style.bottom='100px'; document.body.appendChild(c); setTimeout(()=>c.remove(),1500); }
 function setL(t) { const el = document.getElementById('ltxt'); if (el) el.textContent = t; }
+function toggleMenu() { const m=document.getElementById('hmenu'),b=document.getElementById('hmbtn'),o=document.getElementById('hmoverlay');m.classList.toggle('open');b.classList.toggle('open');o.classList.toggle('open'); }
+function closeMenu() { const m=document.getElementById('hmenu'),b=document.getElementById('hmbtn'),o=document.getElementById('hmoverlay');m?.classList.remove('open');b?.classList.remove('open');o?.classList.remove('open'); }
 function toggleLoginMenu() {
   const m = document.getElementById('ln-hmenu'), o = document.getElementById('ln-overlay');
   const isOpen = m.style.transform === 'translateX(0%)';
@@ -1376,196 +1516,9 @@ function closeLoginMenu() {
   if (m) m.style.transform = 'translateX(110%)';
   if (o) o.style.display = 'none';
 }
-// ============================================
-// VERIFY CODE (task pe jaake code dhundho)
-// ============================================
-let activeVcode = null;
-
-function doTaskWithCode(id, url, pts, title) {
-  if (doneTasks.has(id)) return;
-  if (url) window.open(url, '_blank');
-  // Small delay then show code modal
-  setTimeout(() => openVcodeModal(id, title, pts), 1500);
-}
-
-function openVcodeModal(id, title, pts) {
-  activeVcode = { id, title, pts, attempts: 0 };
-  setText('vcode-task-title', title);
-  document.getElementById('vcode-pts').textContent = '+' + pts + ' Points';
-  document.getElementById('vcode-inp').value = '';
-  document.getElementById('vcode-submit-btn').disabled = false;
-  document.getElementById('vcode-submit-btn').textContent = '✅ Verify Karo';
-  document.getElementById('vcode-submit-btn').onclick = submitVerifyCode;
-  const msg = document.getElementById('vcode-msg');
-  msg.className = 'vcode-msg'; msg.textContent = '';
-  updateVcodeDots(0);
-  document.getElementById('vcode-modal').classList.add('show');
-  setTimeout(() => document.getElementById('vcode-inp').focus(), 300);
-}
-
-function closeVcodeModal() {
-  document.getElementById('vcode-modal').classList.remove('show');
-  activeVcode = null;
-}
-
-function updateVcodeDots(usedCount) {
-  for (let i = 1; i <= 3; i++) {
-    const dot = document.getElementById('vcd' + i);
-    if (!dot) continue;
-    dot.className = 'quiz-dot ' + (i <= usedCount ? 'used' : 'active');
-  }
-}
-
-async function submitVerifyCode() {
-  if (!activeVcode) return;
-  const code = document.getElementById('vcode-inp').value.trim();
-  if (!code) { showVcodeMsg('err', 'Pehle code likhein!'); return; }
-  const btn = document.getElementById('vcode-submit-btn');
-  btn.disabled = true; btn.textContent = '⏳ Check ho raha...';
-  try {
-    const res = await api('/api/tasks/verify-code', 'POST', { task_id: activeVcode.id, code });
-    if (res.success) {
-      updateVcodeDots(0);
-      showVcodeMsg('suc', '🎉 Sahi code! +' + res.earned + ' Points milay!');
-      doneTasks.add(activeVcode.id);
-      const card = document.getElementById('tc-' + activeVcode.id);
-      if (card) { card.classList.add('done'); const b = card.querySelector('.tbtn'); if (b) { b.className = 'tbtn dbtn'; b.textContent = '✅ Done'; } }
-      spawnCoin(); spawnCoin();
-      setTimeout(() => { closeVcodeModal(); refreshMe(); toast('✅ +' + res.earned + ' Points earned!'); }, 1800);
-    } else {
-      activeVcode.attempts = (activeVcode.attempts || 0) + 1;
-      updateVcodeDots(activeVcode.attempts);
-      if (res.failed) {
-        showVcodeMsg('err', '❌ ' + (res.message || '3 baar fail. Dobara task karo.'));
-        btn.textContent = '🔄 Dobara Shuru';
-        btn.disabled = false;
-        btn.onclick = async () => {
-          btn.disabled = true; btn.textContent = '⏳...';
-          await api('/api/tasks/verify-reset', 'POST', { task_id: activeVcode.id });
-          closeVcodeModal();
-          toast('🔄 Reset ho gaya. Dobara task karen!');
-        };
-      } else {
-        showVcodeMsg('err', '❌ ' + (res.message || 'Galat code!'));
-        document.getElementById('vcode-inp').value = '';
-        btn.disabled = false; btn.textContent = '✅ Verify Karo';
-        document.getElementById('vcode-inp').focus();
-      }
-    }
-  } catch(e) {
-    showVcodeMsg('err', e.message || 'Error aaya. Try karo.');
-    btn.disabled = false; btn.textContent = '✅ Verify Karo';
-  }
-}
-
-function showVcodeMsg(type, msg) {
-  const el = document.getElementById('vcode-msg');
-  el.className = 'vcode-msg ' + type + ' show';
-  el.textContent = msg;
-}
-
-// Enter key for vcode modal
-document.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && document.getElementById('vcode-modal').classList.contains('show')) {
-    submitVerifyCode();
-  }
-});
-
-
-let activeQuiz = null;
-
-function openQuizModal(id, title, pts, question) {
-  activeQuiz = { id, title, pts, attempts: 0 };
-  setText('quiz-task-title', title);
-  document.getElementById('quiz-pts').textContent = '+' + pts + ' Points';
-  document.getElementById('quiz-question').textContent = question || 'Sawal load nahi hua...';
-  document.getElementById('quiz-answer-inp').value = '';
-  document.getElementById('quiz-submit-btn').disabled = false;
-  const msg = document.getElementById('quiz-msg');
-  msg.className = 'quiz-msg'; msg.textContent = '';
-  updateQuizDots(0);
-  document.getElementById('quiz-modal').classList.add('show');
-  setTimeout(() => document.getElementById('quiz-answer-inp').focus(), 300);
-}
-
-function closeQuizModal() {
-  document.getElementById('quiz-modal').classList.remove('show');
-  activeQuiz = null;
-}
-
-function updateQuizDots(usedCount) {
-  for (let i = 1; i <= 3; i++) {
-    const dot = document.getElementById('qd' + i);
-    if (!dot) continue;
-    dot.className = 'quiz-dot ' + (i <= usedCount ? 'used' : 'active');
-  }
-}
-
-async function submitQuizAnswer() {
-  if (!activeQuiz) return;
-  const ans = document.getElementById('quiz-answer-inp').value.trim();
-  if (!ans) { showQuizMsg('err', 'Pehle jawab likhein!'); return; }
-  const btn = document.getElementById('quiz-submit-btn');
-  btn.disabled = true; btn.textContent = '⏳ Check ho raha...';
-  try {
-    const res = await api('/api/tasks/quiz-verify', 'POST', { task_id: activeQuiz.id, answer: ans });
-    if (res.success) {
-      updateQuizDots(0);
-      showQuizMsg('suc', '🎉 Sahi jawab! +' + res.earned + ' Points milay!');
-      doneTasks.add(activeQuiz.id);
-      const card = document.getElementById('tc-' + activeQuiz.id);
-      if (card) { card.classList.add('done'); const b = card.querySelector('.tbtn'); if (b) { b.className = 'tbtn dbtn'; b.textContent = '✅ Done'; } }
-      spawnCoin(); spawnCoin();
-      setTimeout(() => { closeQuizModal(); refreshMe(); toast('✅ +' + res.earned + ' Points earned!'); }, 1800);
-    } else {
-      activeQuiz.attempts = (activeQuiz.attempts || 0) + 1;
-      updateQuizDots(activeQuiz.attempts);
-      if (res.failed) {
-        showQuizMsg('err', '❌ ' + (res.message || '3 baar fail. Dobara koshish karo.'));
-        btn.textContent = '🔄 Dobara Shuru';
-        btn.disabled = false;
-        btn.onclick = async () => {
-          btn.disabled = true; btn.textContent = '⏳...';
-          await api('/api/tasks/quiz-reset', 'POST', { task_id: activeQuiz.id });
-          closeQuizModal();
-          toast('🔄 Quiz reset ho gaya. Dobara try karen!');
-        };
-      } else {
-        showQuizMsg('err', '❌ ' + (res.message || 'Galat jawab!'));
-        document.getElementById('quiz-answer-inp').value = '';
-        btn.disabled = false; btn.textContent = '✅ Jawab Den';
-        document.getElementById('quiz-answer-inp').focus();
-      }
-    }
-  } catch(e) {
-    showQuizMsg('err', e.message || 'Error aaya. Try karo.');
-    btn.disabled = false; btn.textContent = '✅ Jawab Den';
-  }
-}
-
-function showQuizMsg(type, msg) {
-  const el = document.getElementById('quiz-msg');
-  el.className = 'quiz-msg ' + type + ' show';
-  el.textContent = msg;
-}
-
-// Enter key support for quiz
-document.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && document.getElementById('quiz-modal').classList.contains('show')) {
-    submitQuizAnswer();
-  }
-});
-
-// ============================================
-// HELPERS
-// ============================================
-function toggleMenu() { const m=document.getElementById('hmenu'),b=document.getElementById('hmbtn'),o=document.getElementById('hmoverlay');m.classList.toggle('open');b.classList.toggle('open');o.classList.toggle('open'); }
-function closeMenu() { const m=document.getElementById('hmenu'),b=document.getElementById('hmbtn'),o=document.getElementById('hmoverlay');m?.classList.remove('open');b?.classList.remove('open');o?.classList.remove('open'); }
 function showE(m) { const el=document.getElementById('emsg');el.textContent=m;el.classList.add('show'); }
 function showS(m) { const el=document.getElementById('smsg');el.textContent=m;el.classList.add('show'); }
 function clrMsg() { document.getElementById('emsg').classList.remove('show');document.getElementById('smsg').classList.remove('show'); }
-
-
 </script>
 
 <script src="ads.js"></script>
