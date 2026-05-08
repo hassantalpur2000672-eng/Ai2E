@@ -1,7 +1,7 @@
 // ============================================
 // AirDrop Zone — Cloudflare Pages Function
 // Database: Turso (LibSQL)
-// Updated: Secure PBKDF2 password hashing
+// Updated: Secure PBKDF2 password hashing (100k iterations)
 // ============================================
 
 const CORS = {
@@ -84,7 +84,7 @@ async function verifyToken(token, env) {
   } catch { return null; }
 }
 
-// ── Password hashing (NEW: PBKDF2, per-user random salt) ─
+// ── Password hashing (NEW: PBKDF2, per-user random salt, max 100k iter) ─
 async function legacyHash(password) {
   // Old method (for migration only)
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password + 'ADZ_SALT_2025'));
@@ -98,7 +98,7 @@ async function hashPassword(password) {
     'raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']
   );
   const derived = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt, iterations: 210000, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },  // Cloudflare limit
     keyMaterial, 256
   );
   const hashArray = Array.from(new Uint8Array(derived));
@@ -123,7 +123,7 @@ async function verifyPassword(password, storedHash) {
     'raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']
   );
   const derived = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt, iterations: 210000, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },  // Cloudflare limit
     keyMaterial, 256
   );
   const newHash = Array.from(new Uint8Array(derived))
@@ -167,7 +167,7 @@ export async function onRequest({ request, env }) {
       const uExists = await dbFirst(env, 'SELECT id FROM users WHERE username = ?', [username.toLowerCase()]);
       if (uExists) return err('Username taken');
 
-      const hashed = await hashPassword(password); // new secure hash
+      const hashed = await hashPassword(password); // new secure hash (100k iter)
       const myRef = 'ADZ' + Math.random().toString(36).substr(2, 7).toUpperCase();
       const id = crypto.randomUUID();
       const cfg = await dbFirst(env, "SELECT value FROM settings WHERE key = 'welcome_bonus'");
