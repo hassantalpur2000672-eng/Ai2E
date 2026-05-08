@@ -249,6 +249,26 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 /* QUIZ MODAL */
 #quiz-modal{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(12px);display:none;align-items:center;justify-content:center;z-index:8500;padding:20px}
 #quiz-modal.show{display:flex}
+
+/* VERIFY CODE MODAL */
+#vcode-modal{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(12px);display:none;align-items:center;justify-content:center;z-index:8400;padding:20px}
+#vcode-modal.show{display:flex}
+.vcode-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:26px 22px;width:100%;max-width:360px}
+.vcode-title{font-size:16px;font-weight:800;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.vcode-sub{font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.5}
+.vcode-pts{font-family:'Space Mono',monospace;font-size:12px;color:var(--accent);background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.2);border-radius:99px;padding:3px 10px;margin-bottom:14px;display:inline-block}
+.vcode-hint{font-size:12px;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.2);border-radius:8px;padding:10px 12px;margin-bottom:14px;color:#c4b5fd;line-height:1.5}
+.vcode-inp{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:11px 14px;color:var(--text);font-family:'Space Mono',monospace;font-size:15px;outline:none;transition:border-color .2s;margin-bottom:10px;letter-spacing:2px;text-transform:uppercase}
+.vcode-inp:focus{border-color:var(--accent)}
+.vcode-chances{font-size:11px;color:var(--muted);margin-bottom:14px;display:flex;align-items:center;gap:6px}
+.vcode-msg{font-size:12px;border-radius:8px;padding:8px 12px;margin-bottom:12px;display:none}
+.vcode-msg.err{background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.3);color:var(--danger)}
+.vcode-msg.suc{background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.2);color:var(--accent)}
+.vcode-msg.show{display:block}
+.vcode-actions{display:flex;gap:8px}
+.vcode-submit{flex:1;padding:12px;background:var(--accent);color:#030712;border:none;border-radius:8px;font-family:'Outfit',sans-serif;font-size:14px;font-weight:700;cursor:pointer}
+.vcode-submit:disabled{opacity:.5;cursor:not-allowed}
+.vcode-cancel{padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);font-family:'Outfit',sans-serif;font-size:14px;cursor:pointer}
 .quiz-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px 22px;width:100%;max-width:360px}
 .quiz-title{font-size:16px;font-weight:800;margin-bottom:6px;display:flex;align-items:center;gap:8px}
 .quiz-pts{font-family:'Space Mono',monospace;font-size:12px;color:var(--accent);background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.2);border-radius:99px;padding:3px 10px;margin-bottom:14px;display:inline-block}
@@ -573,6 +593,27 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
     <button class="nbtn" onclick="nav('profile',this)"><div class="nbico">👤</div>PROFILE</button>
     <button class="nbtn" onclick="nav('road',this)"><div class="nbico">📍</div>ROAD</button>
   </nav>
+</div>
+
+<!-- VERIFY CODE MODAL -->
+<div id="vcode-modal">
+  <div class="vcode-box">
+    <div class="vcode-title">🔐 <span id="vcode-task-title">Task Verify</span></div>
+    <div class="vcode-pts" id="vcode-pts">+100 Points</div>
+    <div class="vcode-hint" id="vcode-hint">💡 Task complete karo, phir wahan diya gaya secret code yahan enter karo.</div>
+    <input class="vcode-inp" type="text" id="vcode-inp" placeholder="CODE YAHAN LIKHEIN" autocomplete="off" autocapitalize="characters"/>
+    <div class="vcode-chances" id="vcode-chances">
+      <span>Maukay:</span>
+      <span class="quiz-dot active" id="vcd1"></span>
+      <span class="quiz-dot active" id="vcd2"></span>
+      <span class="quiz-dot active" id="vcd3"></span>
+    </div>
+    <div class="vcode-msg" id="vcode-msg"></div>
+    <div class="vcode-actions">
+      <button class="vcode-cancel" onclick="closeVcodeModal()">❌ Cancel</button>
+      <button class="vcode-submit" id="vcode-submit-btn" onclick="submitVerifyCode()">✅ Verify Karo</button>
+    </div>
+  </div>
 </div>
 
 <!-- QUIZ MODAL -->
@@ -1129,12 +1170,15 @@ function renderTasks(tasks) {
       btn = `<button class="tbtn go" onclick="startAd('${t.id}','${esc(t.ad_url || t.url || '')}',${t.timer_seconds || 15},${t.points_reward})">▶ Watch</button>`;
     } else if (t.task_type === 'quiz') {
       btn = `<button class="tbtn go" style="background:var(--accent2);color:white" onclick="openQuizModal('${t.id}','${esc(t.title)}',${t.points_reward},'${esc(t.quiz_question||'')}')">🧠 Quiz</button>`;
+    } else if (t.verify_code) {
+      btn = `<button class="tbtn go" onclick="doTaskWithCode('${t.id}','${esc(t.url || '')}',${t.points_reward},'${esc(t.title)}')">▶ Go & Verify</button>`;
     } else {
       btn = `<button class="tbtn go" onclick="doTask('${t.id}','${esc(t.url || '')}',${t.points_reward})">▶ Visit</button>`;
     }
+    const badge = t.verify_code ? ' <span style="font-size:9px;background:rgba(124,58,237,.2);color:#c4b5fd;border-radius:4px;padding:1px 5px;margin-left:4px">🔐 Code</span>' : '';
     return `<div class="tcard ${d ? 'done' : ''}" id="tc-${t.id}">
       <div class="tico">${t.icon || '🎯'}</div>
-      <div class="tinfo"><div class="ttitle">${esc(t.title)}</div><div class="tsub">+${t.points_reward} Points${t.task_type === 'quiz' ? ' • Quiz' : t.timer_seconds ? ' • ' + t.timer_seconds + 's' : ''}</div></div>
+      <div class="tinfo"><div class="ttitle">${esc(t.title)}${badge}</div><div class="tsub">+${t.points_reward} Points${t.task_type === 'quiz' ? ' • Quiz' : t.verify_code ? ' • Code required' : t.timer_seconds ? ' • ' + t.timer_seconds + 's' : ''}</div></div>
       ${btn}
     </div>`;
   }).join('');
@@ -1333,8 +1377,101 @@ function closeLoginMenu() {
   if (o) o.style.display = 'none';
 }
 // ============================================
-// QUIZ
+// VERIFY CODE (task pe jaake code dhundho)
 // ============================================
+let activeVcode = null;
+
+function doTaskWithCode(id, url, pts, title) {
+  if (doneTasks.has(id)) return;
+  if (url) window.open(url, '_blank');
+  // Small delay then show code modal
+  setTimeout(() => openVcodeModal(id, title, pts), 1500);
+}
+
+function openVcodeModal(id, title, pts) {
+  activeVcode = { id, title, pts, attempts: 0 };
+  setText('vcode-task-title', title);
+  document.getElementById('vcode-pts').textContent = '+' + pts + ' Points';
+  document.getElementById('vcode-inp').value = '';
+  document.getElementById('vcode-submit-btn').disabled = false;
+  document.getElementById('vcode-submit-btn').textContent = '✅ Verify Karo';
+  document.getElementById('vcode-submit-btn').onclick = submitVerifyCode;
+  const msg = document.getElementById('vcode-msg');
+  msg.className = 'vcode-msg'; msg.textContent = '';
+  updateVcodeDots(0);
+  document.getElementById('vcode-modal').classList.add('show');
+  setTimeout(() => document.getElementById('vcode-inp').focus(), 300);
+}
+
+function closeVcodeModal() {
+  document.getElementById('vcode-modal').classList.remove('show');
+  activeVcode = null;
+}
+
+function updateVcodeDots(usedCount) {
+  for (let i = 1; i <= 3; i++) {
+    const dot = document.getElementById('vcd' + i);
+    if (!dot) continue;
+    dot.className = 'quiz-dot ' + (i <= usedCount ? 'used' : 'active');
+  }
+}
+
+async function submitVerifyCode() {
+  if (!activeVcode) return;
+  const code = document.getElementById('vcode-inp').value.trim();
+  if (!code) { showVcodeMsg('err', 'Pehle code likhein!'); return; }
+  const btn = document.getElementById('vcode-submit-btn');
+  btn.disabled = true; btn.textContent = '⏳ Check ho raha...';
+  try {
+    const res = await api('/api/tasks/verify-code', 'POST', { task_id: activeVcode.id, code });
+    if (res.success) {
+      updateVcodeDots(0);
+      showVcodeMsg('suc', '🎉 Sahi code! +' + res.earned + ' Points milay!');
+      doneTasks.add(activeVcode.id);
+      const card = document.getElementById('tc-' + activeVcode.id);
+      if (card) { card.classList.add('done'); const b = card.querySelector('.tbtn'); if (b) { b.className = 'tbtn dbtn'; b.textContent = '✅ Done'; } }
+      spawnCoin(); spawnCoin();
+      setTimeout(() => { closeVcodeModal(); refreshMe(); toast('✅ +' + res.earned + ' Points earned!'); }, 1800);
+    } else {
+      activeVcode.attempts = (activeVcode.attempts || 0) + 1;
+      updateVcodeDots(activeVcode.attempts);
+      if (res.failed) {
+        showVcodeMsg('err', '❌ ' + (res.message || '3 baar fail. Dobara task karo.'));
+        btn.textContent = '🔄 Dobara Shuru';
+        btn.disabled = false;
+        btn.onclick = async () => {
+          btn.disabled = true; btn.textContent = '⏳...';
+          await api('/api/tasks/verify-reset', 'POST', { task_id: activeVcode.id });
+          closeVcodeModal();
+          toast('🔄 Reset ho gaya. Dobara task karen!');
+        };
+      } else {
+        showVcodeMsg('err', '❌ ' + (res.message || 'Galat code!'));
+        document.getElementById('vcode-inp').value = '';
+        btn.disabled = false; btn.textContent = '✅ Verify Karo';
+        document.getElementById('vcode-inp').focus();
+      }
+    }
+  } catch(e) {
+    showVcodeMsg('err', e.message || 'Error aaya. Try karo.');
+    btn.disabled = false; btn.textContent = '✅ Verify Karo';
+  }
+}
+
+function showVcodeMsg(type, msg) {
+  const el = document.getElementById('vcode-msg');
+  el.className = 'vcode-msg ' + type + ' show';
+  el.textContent = msg;
+}
+
+// Enter key for vcode modal
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('vcode-modal').classList.contains('show')) {
+    submitVerifyCode();
+  }
+});
+
+
 let activeQuiz = null;
 
 function openQuizModal(id, title, pts, question) {
