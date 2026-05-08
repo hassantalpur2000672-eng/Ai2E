@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<title>Partners — AirDrop Zone</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+:root{--bg:#030712;--surface:#0d1117;--surface2:#161b22;--border:#21262d;--accent:#00ff88;--accent2:#7c3aed;--accent3:#f59e0b;--gold:#fbbf24;--text:#e6edf3;--muted:#7d8590;--danger:#f85149;--success:#3fb950}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;min-height:100vh;overflow-x:hidden}
+
+/* NAV */
+.topnav{position:fixed;top:0;left:0;right:0;z-index:200;background:rgba(3,7,18,.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between}
+.nav-logo{font-family:'Space Mono',monospace;font-size:13px;color:var(--accent);letter-spacing:4px;text-transform:uppercase;text-decoration:none}
+.back-btn{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13px;font-weight:500;text-decoration:none;padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);transition:all .2s}
+.back-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+/* PAGE */
+.page{max-width:720px;margin:0 auto;padding:80px 16px 60px}
+
+/* HERO */
+.hero{text-align:center;padding:48px 24px 36px;position:relative}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.2);border-radius:100px;padding:6px 16px;font-size:11px;font-weight:700;color:var(--accent);letter-spacing:2px;text-transform:uppercase;margin-bottom:20px}
+.hero-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:blink 1.4s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.hero-title{font-size:clamp(26px,6vw,42px);font-weight:800;line-height:1.15;margin-bottom:14px;background:linear-gradient(135deg,#fff 30%,var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero-sub{color:var(--muted);font-size:14px;line-height:1.7;max-width:480px;margin:0 auto 32px}
+
+/* STATS ROW */
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:40px}
+.stat-box{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 12px;text-align:center}
+.stat-num{font-family:'Space Mono',monospace;font-size:22px;font-weight:700;color:var(--accent);margin-bottom:4px}
+.stat-lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
+
+/* SECTION TITLE */
+.sec-title{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:2px;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.sec-title::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* CATEGORY TABS */
+.cat-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:28px}
+.cat-tab{padding:7px 16px;border-radius:100px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;font-family:'Outfit',sans-serif}
+.cat-tab.active,.cat-tab:hover{border-color:var(--accent);color:var(--accent);background:rgba(0,255,136,.07)}
+
+/* PARTNER CARDS */
+.partners-grid{display:flex;flex-direction:column;gap:14px;margin-bottom:40px}
+
+.pcard{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;display:flex;align-items:center;gap:16px;transition:all .25s;position:relative;overflow:hidden}
+.pcard::before{content:'';position:absolute;inset:0;opacity:0;transition:opacity .3s}
+.pcard:hover{border-color:rgba(0,255,136,.3);transform:translateY(-1px);box-shadow:0 8px 32px rgba(0,255,136,.06)}
+.pcard:hover::before{opacity:1}
+
+/* Status variants */
+.pcard.live{border-left:3px solid var(--accent)}
+.pcard.progress{border-left:3px solid var(--accent3)}
+.pcard.upcoming{border-left:3px solid var(--accent2)}
+
+.p-logo{width:52px;height:52px;border-radius:14px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;position:relative}
+.p-logo img{width:36px;height:36px;object-fit:contain;border-radius:6px}
+
+.p-info{flex:1;min-width:0}
+.p-name{font-size:15px;font-weight:700;color:var(--text);margin-bottom:3px;display:flex;align-items:center;gap:8px}
+.p-cat{font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px}
+.p-desc{font-size:12px;color:var(--muted);line-height:1.5}
+
+.p-badge{padding:4px 10px;border-radius:100px;font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;flex-shrink:0;align-self:flex-start;margin-top:2px}
+.badge-live{background:rgba(63,185,80,.12);border:1px solid rgba(63,185,80,.25);color:var(--success)}
+.badge-progress{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);color:var(--accent3)}
+.badge-upcoming{background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.25);color:#a78bfa}
+.badge-soon{background:rgba(125,133,144,.1);border:1px solid rgba(125,133,144,.2);color:var(--muted)}
+
+/* PROGRESS BAR inside card */
+.p-progress-wrap{margin-top:10px}
+.p-prog-label{display:flex;justify-content:space-between;margin-bottom:5px}
+.p-prog-label span{font-size:10px;color:var(--muted);font-weight:600}
+.p-prog-label span:last-child{color:var(--accent3)}
+.p-progbar{height:4px;border-radius:100px;background:var(--surface2);overflow:hidden;border:1px solid var(--border)}
+.p-progbar-fill{height:100%;border-radius:100px;background:linear-gradient(90deg,var(--accent3),#fb923c);transition:width .8s ease}
+
+/* EXCHANGE SECTION */
+.ex-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:40px}
+.ex-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;display:flex;align-items:center;gap:12px;transition:all .2s;position:relative}
+.ex-card.live{border-left:3px solid var(--accent)}
+.ex-card.progress{border-left:3px solid var(--accent3)}
+.ex-card:hover{border-color:rgba(0,255,136,.25);transform:translateY(-1px)}
+.ex-icon{width:40px;height:40px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.ex-name{font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px}
+.ex-type{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+.ex-badge{position:absolute;top:10px;right:10px;padding:3px 8px;border-radius:100px;font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase}
+
+/* APPLY SECTION */
+.apply-box{background:linear-gradient(135deg,rgba(0,255,136,.05),rgba(124,58,237,.05));border:1px solid rgba(0,255,136,.15);border-radius:18px;padding:28px 24px;text-align:center}
+.apply-title{font-size:18px;font-weight:700;margin-bottom:10px;background:linear-gradient(135deg,#fff,var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.apply-sub{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:20px}
+.apply-btn{display:inline-flex;align-items:center;gap:8px;padding:12px 28px;background:var(--accent);color:#030712;border-radius:10px;font-weight:700;font-size:14px;text-decoration:none;transition:all .2s}
+.apply-btn:hover{background:#00e67a;transform:translateY(-1px);box-shadow:0 8px 24px rgba(0,255,136,.25)}
+
+/* NOTICE */
+.notice{background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:12px;padding:14px 16px;font-size:12px;color:var(--accent3);line-height:1.6;margin-bottom:28px;display:flex;gap:10px;align-items:flex-start}
+.notice-icon{font-size:15px;flex-shrink:0;margin-top:1px}
+
+@keyframes spin{to{transform:rotate(360deg)}}
+@media(max-width:480px){.stats-row{grid-template-columns:repeat(3,1fr)}.ex-grid{grid-template-columns:1fr}.pcard{flex-wrap:wrap}.p-badge{align-self:auto}}
+</style>
+</head>
+<body>
+
+<!-- TOP NAV -->
+<nav class="topnav">
+  <a href="/" class="nav-logo">ADZ ⛏</a>
+  <a href="/" class="back-btn">← Back</a>
+</nav>
+
+<div class="page">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-badge"><span class="dot"></span>Ecosystem Partners</div>
+    <h1 class="hero-title">Building Web3's<br/>Mining Future Together</h1>
+    <p class="hero-sub">AirDrop Zone is actively growing its partner network across blockchain infrastructure, DeFi protocols, and leading exchanges. Partnerships are in various stages of onboarding.</p>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-row">
+    <div class="stat-box">
+      <div class="stat-num">12+</div>
+      <div class="stat-lbl">Integrations</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num">6</div>
+      <div class="stat-lbl">In Progress</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num">4</div>
+      <div class="stat-lbl">Exchanges</div>
+    </div>
+  </div>
+
+  <!-- NOTICE -->
+  <div class="notice">
+    <span class="notice-icon">⚠️</span>
+    <span>Partner integrations are at different stages. Listings marked <strong>In Progress</strong> reflect active negotiations and technical onboarding. Final confirmation will be announced on our official channels.</span>
+  </div>
+
+  <!-- WEB3 PARTNERS -->
+  <div class="sec-title">Web3 & Blockchain Partners</div>
+  <div class="partners-grid" id="partners-list">
+
+    <!-- Chainlink -->
+    <div class="pcard live">
+      <div class="p-logo">🔗</div>
+      <div class="p-info">
+        <div class="p-name">Chainlink <span style="font-size:10px;color:var(--muted);font-weight:400">LINK</span></div>
+        <div class="p-cat">Oracle Network · Data Infrastructure</div>
+        <div class="p-desc">Integrating Chainlink VRF for provably fair reward distribution and secure on-chain data feeds for ADZ token pricing.</div>
+      </div>
+      <div class="p-badge badge-live">Live</div>
+    </div>
+
+    <!-- Polygon -->
+    <div class="pcard progress">
+      <div class="p-logo">🟣</div>
+      <div class="p-info">
+        <div class="p-name">Polygon <span style="font-size:10px;color:var(--muted);font-weight:400">MATIC</span></div>
+        <div class="p-cat">Layer 2 Blockchain</div>
+        <div class="p-desc">ADZ token deployment on Polygon for ultra-low gas fees and fast settlement. Smart contract audit in final stage.</div>
+        <div class="p-progress-wrap">
+          <div class="p-prog-label"><span>Onboarding Progress</span><span>78%</span></div>
+          <div class="p-progbar"><div class="p-progbar-fill" style="width:78%"></div></div>
+        </div>
+      </div>
+      <div class="p-badge badge-progress">In Progress</div>
+    </div>
+
+    <!-- The Graph -->
+    <div class="pcard progress">
+      <div class="p-logo">📊</div>
+      <div class="p-info">
+        <div class="p-name">The Graph <span style="font-size:10px;color:var(--muted);font-weight:400">GRT</span></div>
+        <div class="p-cat">Indexing Protocol</div>
+        <div class="p-desc">Building a custom subgraph for ADZ to enable real-time leaderboard and mining data on-chain, accessible by any dApp.</div>
+        <div class="p-progress-wrap">
+          <div class="p-prog-label"><span>Development Progress</span><span>55%</span></div>
+          <div class="p-progbar"><div class="p-progbar-fill" style="width:55%"></div></div>
+        </div>
+      </div>
+      <div class="p-badge badge-progress">In Progress</div>
+    </div>
+
+    <!-- Uniswap -->
+    <div class="pcard upcoming">
+      <div class="p-logo">🦄</div>
+      <div class="p-info">
+        <div class="p-name">Uniswap <span style="font-size:10px;color:var(--muted);font-weight:400">UNI</span></div>
+        <div class="p-cat">Decentralized Exchange · DeFi</div>
+        <div class="p-desc">ADZ/USDC liquidity pool planned on Uniswap V3. Miners will be able to swap earned points directly post-TGE.</div>
+      </div>
+      <div class="p-badge badge-upcoming">Upcoming</div>
+    </div>
+
+    <!-- Ethereum Foundation -->
+    <div class="pcard live">
+      <div class="p-logo">💎</div>
+      <div class="p-info">
+        <div class="p-name">Ethereum Foundation</div>
+        <div class="p-cat">Blockchain Infrastructure</div>
+        <div class="p-desc">ADZ core architecture is built on Ethereum-compatible standards (ERC-20), ensuring full interoperability with the broader ecosystem.</div>
+      </div>
+      <div class="p-badge badge-live">Compatible</div>
+    </div>
+
+    <!-- WalletConnect -->
+    <div class="pcard progress">
+      <div class="p-logo">🔐</div>
+      <div class="p-info">
+        <div class="p-name">WalletConnect <span style="font-size:10px;color:var(--muted);font-weight:400">v2</span></div>
+        <div class="p-cat">Wallet Infrastructure</div>
+        <div class="p-desc">Enabling seamless multi-wallet connectivity for ADZ users. WalletConnect v2 integration ensures secure sign-in across 300+ wallets.</div>
+        <div class="p-progress-wrap">
+          <div class="p-prog-label"><span>Integration Progress</span><span>90%</span></div>
+          <div class="p-progbar"><div class="p-progbar-fill" style="width:90%"></div></div>
+        </div>
+      </div>
+      <div class="p-badge badge-progress">In Progress</div>
+    </div>
+
+    <!-- Solana -->
+    <div class="pcard upcoming">
+      <div class="p-logo">⚡</div>
+      <div class="p-info">
+        <div class="p-name">Solana <span style="font-size:10px;color:var(--muted);font-weight:400">SOL</span></div>
+        <div class="p-cat">High-Speed Blockchain</div>
+        <div class="p-desc">Cross-chain bridge to Solana network under evaluation. Would allow ADZ holders to benefit from Solana's high-throughput ecosystem.</div>
+      </div>
+      <div class="p-badge badge-upcoming">Exploring</div>
+    </div>
+
+    <!-- Alchemy -->
+    <div class="pcard live">
+      <div class="p-logo">⚗️</div>
+      <div class="p-info">
+        <div class="p-name">Alchemy</div>
+        <div class="p-cat">Web3 Developer Platform</div>
+        <div class="p-desc">ADZ backend infrastructure powered by Alchemy's reliable node network, ensuring 99.9% uptime for all on-chain operations.</div>
+      </div>
+      <div class="p-badge badge-live">Active</div>
+    </div>
+
+  </div>
+
+  <!-- EXCHANGES -->
+  <div class="sec-title">Exchange Listings</div>
+  <div class="ex-grid">
+
+    <div class="ex-card progress">
+      <div class="ex-icon">🟡</div>
+      <div>
+        <div class="ex-name">Binance</div>
+        <div class="ex-type">CEX · Tier 1</div>
+      </div>
+      <div class="ex-badge badge-progress" style="position:absolute;top:10px;right:10px;padding:3px 8px;border-radius:100px;font-size:9px;font-weight:700;letter-spacing:.5px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);color:var(--accent3)">In Talks</div>
+    </div>
+
+    <div class="ex-card progress">
+      <div class="ex-icon">🔵</div>
+      <div>
+        <div class="ex-name">Coinbase</div>
+        <div class="ex-type">CEX · Tier 1</div>
+      </div>
+      <div class="ex-badge" style="position:absolute;top:10px;right:10px;padding:3px 8px;border-radius:100px;font-size:9px;font-weight:700;letter-spacing:.5px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);color:var(--accent3)">In Talks</div>
+    </div>
+
+    <div class="ex-card progress">
+      <div class="ex-icon">🌊</div>
+      <div>
+        <div class="ex-name">KuCoin</div>
+        <div class="ex-type">CEX · Tier 2</div>
+      </div>
+      <div class="ex-badge" style="position:absolute;top:10px;right:10px;padding:3px 8px;border-radius:100px;font-size:9px;font-weight:700;letter-spacing:.5px;background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.2);color:var(--success)">Advanced</div>
+    </div>
+
+    <div class="ex-card progress">
+      <div class="ex-icon">🦊</div>
+      <div>
+        <div class="ex-name">Gate.io</div>
+        <div class="ex-type">CEX · Tier 2</div>
+      </div>
+      <div class="ex-badge" style="position:absolute;top:10px;right:10px;padding:3px 8px;border-radius:100px;font-size:9px;font-weight:700;letter-spacing:.5px;background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.2);color:var(--success)">Advanced</div>
+    </div>
+
+    <div class="ex-card" style="border-left:3px solid var(--accent2)">
+      <div class="ex-icon">🔴</div>
+      <div>
+        <div class="ex-name">OKX</div>
+        <div class="ex-type">CEX · Tier 1</div>
+      </div>
+      <div class="ex-badge" style="position:absolute;top:10px;right:10px;padding:3px 8px;border-radius:100px;font-size:9px;font-weight:700;letter-spacing:.5px;background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.25);color:#a78bfa">Upcoming</div>
+    </div>
+
+    <div class="ex-card" style="border-left:3px solid var(--accent2)">
+      <div class="ex-icon">🐙</div>
+      <div>
+        <div class="ex-name">MEXC Global</div>
+        <div class="ex-type">CEX · Tier 2</div>
+      </div>
+      <div class="ex-badge" style="position:absolute;top:10px;right:10px;padding:3px 8px;border-radius:100px;font-size:9px;font-weight:700;letter-spacing:.5px;background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.25);color:#a78bfa">Upcoming</div>
+    </div>
+
+  </div>
+
+  <!-- LEGEND -->
+  <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:36px;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:12px">
+    <div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.8px;width:100%;margin-bottom:4px">Legend</div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text)"><span style="width:10px;height:10px;border-radius:50%;background:var(--success);display:inline-block"></span> Live / Active — Fully integrated</div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text)"><span style="width:10px;height:10px;border-radius:50%;background:var(--accent3);display:inline-block"></span> In Progress — Negotiations or tech onboarding underway</div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text)"><span style="width:10px;height:10px;border-radius:50%;background:#a78bfa;display:inline-block"></span> Upcoming — Planned post-TGE</div>
+  </div>
+
+  <!-- APPLY BOX -->
+  <div class="apply-box">
+    <div class="apply-title">🤝 Become a Partner</div>
+    <p class="apply-sub">Are you a Web3 project, exchange, or infrastructure provider? We're actively onboarding strategic partners ahead of our Token Generation Event. Let's build together.</p>
+    <a href="mailto:partners@airdropzone.io" class="apply-btn">📩 Apply for Partnership</a>
+  </div>
+
+</div>
+
+</body>
+</html>
