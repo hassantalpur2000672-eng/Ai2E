@@ -864,7 +864,6 @@ function renderUser() {
   const p = Math.floor(me.points || 0).toLocaleString();
   const name = me.username || 'Miner';
   setText('musr', '@' + name);
-  // Show confirmed server balance — startTicker adds live session earn on top for display
   setText('mbal', p); setText('hbal', p);
   setText('mpow', '⚡ ' + (me.mining_power || 1).toFixed(1) + 'x Power');
   setText('stm', Math.floor(me.total_mined || 0).toLocaleString());
@@ -1002,26 +1001,22 @@ function updateMineUI() {
   setText('mrated', '+' + ratePerHr + '/hr');
 }
 
+// Refresh me object from DB and re-render everything
+async function refreshMe() {
+  try {
+    me = await api('/api/me');
+    localStorage.setItem('adz_user', JSON.stringify(me));
+    renderUser();
+    updateMineUI();
+  } catch(e) {}
+}
+
 function startTicker() {
   clearInterval(mInt);
-  mInt = setInterval(() => {
-    if (me) {
-      const isClaimed = (me.mining_claimed == 1 || me.mining_claimed === true);
-      const hasSession = !!(me.last_mining_start && me.last_mining_start !== 'null' && me.last_mining_start !== '');
-      updateMineUI();
-      // DISPLAY ONLY: never mutate me.points here — me.points = server confirmed balance
-      if (!isClaimed && hasSession) {
-        const e = Math.min(Date.now() - new Date(me.last_mining_start).getTime(), getDur());
-        const sessionEarn = Math.floor(getCPMS() * e);
-        const displayBal = Math.floor((me.points || 0) + sessionEarn);
-        setText('mbal', displayBal.toLocaleString());
-        setText('hbal', displayBal.toLocaleString());
-      } else {
-        setText('mbal', Math.floor(me.points || 0).toLocaleString());
-        setText('hbal', Math.floor(me.points || 0).toLocaleString());
-      }
-    }
-  }, 5000);
+  // Every 30s: sync balance from server (DB is truth)
+  mInt = setInterval(() => { refreshMe(); }, 30000);
+  // Also update mining progress bar every 5s (UI only, no balance mutation)
+  setInterval(() => { if (me) updateMineUI(); }, 5000);
 }
 
 function startAnimalLoop() {
@@ -1050,10 +1045,8 @@ async function handleMineBtn() {
 async function startMining() {
   try {
     await api('/api/mine/start', 'POST');
-    me.last_mining_start = new Date().toISOString();
-    me.mining_claimed = 0;
-    localStorage.setItem('adz_user', JSON.stringify(me));
-    updateMineUI(); toast('⛏️ Mining started! Come back in 24h.'); spawnCoin();
+    toast('⛏️ Mining started! Come back in 24h.'); spawnCoin();
+    await refreshMe(); // Pull fresh state from DB
   } catch(e) { toast('❌ ' + (e.message || 'Failed to start')); }
 }
 
@@ -1062,28 +1055,14 @@ async function claimMining() {
   btn.disabled = true; btn.textContent = '⌛ Claiming...';
   try {
     const data = await api('/api/mine/claim', 'POST');
-    const earned = data.earned;
-    // Set flags immediately for smooth UI
-    me.mining_claimed = 1;
-    me.last_mining_start = null; // Clear session so UI resets cleanly
-    // Use server-returned new_balance if available (most accurate), else add earned
-    if (data && typeof data.new_balance !== 'undefined') {
-      me.points = data.new_balance;
-    } else if (data && typeof data.points !== 'undefined') {
-      me.points = data.points;
-    } else {
-      me.points = (me.points || 0) + earned;
-    }
-    me.total_mined = (me.total_mined || 0) + earned;
-    localStorage.setItem('adz_user', JSON.stringify(me));
-    // Hide status box on claim
+    const earned = data.earned || 0;
+    // Hide status box immediately
     const msb = document.getElementById('mining-status-box');
     if (msb) msb.classList.remove('show', 'claim-ready');
-    updateMineUI(); renderUser();
     toast('🏆 Claimed ' + earned.toLocaleString() + ' Points!');
     for (let i = 0; i < 5; i++) setTimeout(spawnCoin, i * 200);
-    // Always refresh from server after claim — this is the source of truth
-    try { me = await api('/api/me'); localStorage.setItem('adz_user', JSON.stringify(me)); updateMineUI(); renderUser(); } catch(e2) {}
+    // Always pull fresh balance from DB — never calculate locally
+    await refreshMe();
   } catch(e) {
     toast('❌ ' + (e.message || 'Claim failed'));
     btn.disabled = false; updateMineUI();
@@ -1117,22 +1096,14 @@ async function doTask(id, url, pts) {
 async function finTask(id, pts) {
   if (doneTasks.has(id)) return;
   try {
-    const data = await api('/api/tasks/complete', 'POST', { task_id: id });
+    await api('/api/tasks/complete', 'POST', { task_id: id });
     doneTasks.add(id);
-    // Use server-returned points if available, otherwise add to confirmed base
-    if (data && typeof data.points !== 'undefined') {
-      me.points = data.points; // server truth — most accurate
-    } else {
-      me.points = (me.points || 0) + pts;
-    }
-    me.total_tasks_completed = (me.total_tasks_completed || 0) + 1;
-    localStorage.setItem('adz_user', JSON.stringify(me));
-    renderUser();
+    // Mark card done in UI immediately
     const card = document.getElementById('tc-' + id);
     if (card) { card.classList.add('done'); const b = card.querySelector('.tbtn'); if (b) { b.className = 'tbtn dbtn'; b.textContent = '✅ Done'; } }
     toast('✅ +' + pts + ' Points earned!'); spawnCoin();
-    // Silently refresh from server to stay in sync
-    try { const fresh = await api('/api/me'); me.points = fresh.points; me.total_mined = fresh.total_mined; localStorage.setItem('adz_user', JSON.stringify(me)); renderUser(); } catch(e2) {}
+    // Pull fresh balance from DB — no local math
+    await refreshMe();
   } catch(e) { toast('❌ ' + (e.message || 'Error')); }
 }
 
