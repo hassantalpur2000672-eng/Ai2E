@@ -555,10 +555,10 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
         <button class="rlbtn" onclick="shareRef()">🔗 Share Referral Link</button>
       </div>
       <div class="rperks">
-        <div class="rperk"><div class="rpi">🪙</div><div class="rpv" id="rpb">500</div><div class="rpl">Points per referral</div></div>
-        <div class="rperk"><div class="rpi">⚡</div><div class="rpv">+10%</div><div class="rpl">power per active ref</div></div>
-        <div class="rperk"><div class="rpi">🔥</div><div class="rpv" id="rpa">0</div><div class="rpl">active referrals</div></div>
-        <div class="rperk"><div class="rpi">⚡</div><div class="rpv" id="rpp">1.0x</div><div class="rpl">your current power</div></div>
+        <div class="rperk"><div class="rpi">⛏️</div><div class="rpv">10%</div><div class="rpl">har claim ka refer ko</div></div>
+        <div class="rperk"><div class="rpi">🌿</div><div class="rpv">1%</div><div class="rpl">refer ka refer (L2)</div></div>
+        <div class="rperk"><div class="rpi">🔥</div><div class="rpv" id="rpa">0</div><div class="rpl">active miners</div></div>
+        <div class="rperk"><div class="rpi">⚡</div><div class="rpv" id="rpp">1.0x</div><div class="rpl">aapki mining power</div></div>
       </div>
       <div class="sec-head">My Referrals</div>
       <div id="reflist"><div style="color:var(--muted);font-size:13px;padding:8px 0">No referrals yet. Share your link!</div></div>
@@ -1421,7 +1421,9 @@ async function loadRefs() {
     c.innerHTML = data.map(r => {
       const a = (r.total_mined || 0) > 0;
       const name = r.username || (r.wallet_address ? r.wallet_address.slice(0,6)+'...'+r.wallet_address.slice(-4) : 'miner');
-      return `<div class="rli"><div class="rdot ${a?'on':'off'}"></div><div style="flex:1;font-size:13px">@${esc(name)}</div><div style="font-size:10px;color:${a?'var(--accent)':'var(--muted)'}">${a?'⚡ Active':'💤 Inactive'}</div></div>`;
+      const mined = parseInt(r.total_mined || 0);
+      const myEarn = Math.floor(mined * 0.10);
+      return `<div class="rli"><div class="rdot ${a?'on':'off'}"></div><div style="flex:1;font-size:13px">@${esc(name)}<br><span style="font-size:10px;color:var(--muted)">${a?'⚡ Active — Mined: '+mined.toLocaleString()+' pts':'💤 Inactive — mining nahi ki abhi'}</span></div><div style="font-size:11px;color:var(--accent);text-align:right">+${myEarn.toLocaleString()}<br><span style="font-size:9px;color:var(--muted)">aapki 10%</span></div></div>`;
     }).join('');
   } catch(e) {}
 }
@@ -1449,7 +1451,7 @@ async function loadTxH() {
     const c = document.getElementById('txlist');
     if (!c) return;
     if (!data || !data.length) { c.innerHTML = '<div style="color:var(--muted);font-size:13px">No transactions yet.</div>'; return; }
-    const ic = {mining_claim:'⛏️',task_complete:'✅',ad_watch:'📺',welcome_bonus:'🎉',referral_bonus:'👥',active_referral_bonus:'🔥'};
+    const ic = {mining_claim:'⛏️',task_complete:'✅',ad_watch:'📺',welcome_bonus:'🎉',referral_bonus:'👥',active_referral_bonus:'🔥',refer_mining_10pct:'💰',refer_mining_1pct:'🌿'};
     c.innerHTML = data.map(t => `<div class="txitem"><div class="txico">${ic[t.type]||'💰'}</div><div class="txinfo"><div class="txd">${esc(t.description||t.type)}</div><div class="txdt">${new Date(t.created_at).toLocaleDateString('en',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</div></div><div class="txamt">+${(t.amount||0).toLocaleString()}</div></div>`).join('');
   } catch(e) {}
 }
