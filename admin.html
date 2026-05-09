@@ -118,7 +118,7 @@
 
 <div id="admin-app">
   <div class="admin-header">
-    <div class="admin-logo">⛏️ ADZ Admin</div>
+    <div class="admin-logo">⛏️ TOKEN Admin</div>
     <div style="display:flex;align-items:center;gap:12px;">
       <span style="font-size:12px;color:var(--muted);" id="a-live-time"></span>
       <button class="btn btn-sm btn-danger" onclick="adminLogout()">Logout</button>
@@ -145,7 +145,7 @@
         <div class="panel-head"><div class="panel-title">📊 Dashboard</div><button class="btn btn-sm btn-primary" onclick="loadDashboard()">↻ Refresh</button></div>
         <div class="stats-row">
           <div class="stat-box"><div class="stat-box-val" id="d-users">—</div><div class="stat-box-lbl">Total Users</div></div>
-          <div class="stat-box"><div class="stat-box-val" id="d-mined">—</div><div class="stat-box-lbl">ADZ Mined</div></div>
+          <div class="stat-box"><div class="stat-box-val" id="d-mined">—</div><div class="stat-box-lbl">TOKEN Mined</div></div>
           <div class="stat-box"><div class="stat-box-val" id="d-tasks">—</div><div class="stat-box-lbl">Active Tasks</div></div>
           <div class="stat-box"><div class="stat-box-val" id="d-sessions">—</div><div class="stat-box-lbl">Mining Sessions</div></div>
         </div>
@@ -762,7 +762,7 @@ async function deleteBlog(id) {
 // SETTINGS
 // ============================================
 const SETTING_LABELS = {
-  welcome_bonus:'Welcome Bonus (ADZ)', referral_bonus:'Referral Bonus (ADZ)',
+  welcome_bonus:'Welcome Bonus (TOKEN)', referral_bonus:'Referral Bonus (TOKEN)',
   active_referral_bonus:'Active Referral Bonus', mining_coins_per_hour:'Mining Rate (coins/hr at 1x)',
   mining_duration_hours:'Mining Cycle (hours)', referral_power_per_ref:'Power per active referral (0.1=+10%)',
   max_mining_power:'Max Mining Power', maintenance_mode:'Maintenance Mode (true/false)',
