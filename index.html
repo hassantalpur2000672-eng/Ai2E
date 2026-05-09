@@ -325,7 +325,13 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
   <div class="glow-orb"></div><div class="glow-orb2"></div>
   <div class="login-wrap">
     <div class="brand">
-      <div class="brand-icon"><div class="brand-icon-inner">⛏️</div></div>
+      <div class="brand-icon"><div class="brand-icon-inner">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="var(--accent)" opacity="0.4"/>
+          <path d="M2 17L12 22L22 17M2 12L12 17L22 12" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="12" cy="12" r="2" fill="var(--accent2)"/>
+        </svg>
+      </div></div>
       <div class="brand-logo">AirDrop Zone</div>
       <div class="brand-title">Mine. Earn. Own.</div>
       <div class="brand-sub">Free mining platform. Earn daily. Real crypto launch on Solana.</div>
@@ -350,7 +356,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
         <div class="fg"><label>Display Name</label><input type="text" id="su-n" placeholder="Satoshi"/></div>
         <div class="fg"><label>Email</label><input type="email" id="su-e" placeholder="you@example.com"/></div>
         <div class="fg"><label>Password</label><input type="password" id="su-p" placeholder="Min 6 characters"/></div>
-        <div class="fg"><label>Referral Code (optional)</label><input type="text" id="su-r" placeholder="ADZ123456" style="text-transform:uppercase"/></div>
+        <div class="fg"><label>Referral Code (optional)</label><input type="text" id="su-r" placeholder="TOKEN123456" style="text-transform:uppercase"/></div>
         <button class="btn-p" id="bsu" onclick="doSignUp()">Create Account →</button>
       </div>
 
@@ -429,7 +435,13 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 <div id="app-screen">
   <div id="ann-bar"></div>
   <div class="header">
-    <div class="hlogo">⛏️ AirDrop Zone</div>
+    <div class="hlogo">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:inline-block;vertical-align:middle;margin-right:6px">
+        <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="currentColor" opacity="0.4"/>
+        <path d="M2 17L12 22L22 17M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      AirDrop Zone
+    </div>
     <div class="hright">
       <div class="hbal"><span id="hbal">0</span> Pts</div>
       <button class="avbtn" onclick="nav('profile',document.querySelectorAll('.nbtn')[3])"><span id="avltr">👤</span></button>
@@ -440,8 +452,8 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
   <div class="hmoverlay" id="hmoverlay" onclick="closeMenu()"></div>
   <div class="hmenu" id="hmenu">
     <div class="hm-lbl">Navigate</div>
-    <button class="hm-item" onclick="nav('mine',document.querySelectorAll('.nbtn')[0]);closeMenu()"><span class="hm-icon">⛏️</span>Mine Points</button>
-    <button class="hm-item" onclick="nav('top',document.querySelectorAll('.nbtn')[1]);closeMenu()"><span class="hm-icon">🏆</span>Leaderboard</button>
+    <button class="hm-item" onclick="nav('mine',document.querySelectorAll('.nbtn')[0]);closeMenu()"><span class="hm-icon">⚙️</span>Mine Points</button>
+    <button class="hm-item" onclick="nav('top',document.querySelectorAll('.nbtn')[1]);closeMenu()"><span class="hm-icon">🎯</span>Leaderboard</button>
     <button class="hm-item" onclick="nav('ref',document.querySelectorAll('.nbtn')[2]);closeMenu()"><span class="hm-icon">👥</span>Refer & Earn</button>
     <button class="hm-item" onclick="nav('profile',document.querySelectorAll('.nbtn')[3]);closeMenu()"><span class="hm-icon">👤</span>My Profile</button>
     <button class="hm-item" onclick="nav('road',document.querySelectorAll('.nbtn')[4]);closeMenu()"><span class="hm-icon">📍</span>Roadmap</button>
@@ -482,7 +494,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
         <!-- MINING STATUS BOX -->
         <div id="mining-status-box">
           <div class="msb-header">
-            <div class="msb-title"><span>⛏️</span><span id="msb-title-txt">Mining Active</span></div>
+            <div class="msb-title"><span>⚙️</span><span id="msb-title-txt">Mining Active</span></div>
             <div class="msb-live"><div class="msb-dot"></div><span id="msb-live-txt">LIVE</span></div>
           </div>
           <div class="msb-grid">
@@ -587,8 +599,8 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
   </div>
 
   <nav class="bnav">
-    <button class="nbtn active" onclick="nav('mine',this)"><div class="nbico">⛏️</div>MINE</button>
-    <button class="nbtn" onclick="nav('top',this)"><div class="nbico">🏆</div>TOP</button>
+    <button class="nbtn active" onclick="nav('mine',this)"><div class="nbico">⚙️</div>MINE</button>
+    <button class="nbtn" onclick="nav('top',this)"><div class="nbico">🎯</div>TOP</button>
     <button class="nbtn" onclick="nav('ref',this)"><div class="nbico">👥</div>REFER</button>
     <button class="nbtn" onclick="nav('profile',this)"><div class="nbico">👤</div>PROFILE</button>
     <button class="nbtn" onclick="nav('road',this)"><div class="nbico">📍</div>ROAD</button>
@@ -700,8 +712,8 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   loadStats();
 
-  const savedToken = localStorage.getItem('adz_token');
-  const savedUser = localStorage.getItem('adz_user');
+  const savedToken = localStorage.getItem('app_token');
+  const savedUser = localStorage.getItem('app_user');
 
   if (savedToken && savedUser) {
     token = savedToken;
@@ -709,12 +721,12 @@ window.addEventListener('DOMContentLoaded', async () => {
     setL('LOADING MINER...');
     try {
       me = await api('/api/me');
-      localStorage.setItem('adz_user', JSON.stringify(me));
+      localStorage.setItem('app_user', JSON.stringify(me));
       await finishLogin();
       return;
     } catch(e) {
-      localStorage.removeItem('adz_token');
-      localStorage.removeItem('adz_user');
+      localStorage.removeItem('app_token');
+      localStorage.removeItem('app_user');
       token = null; me = null;
     }
   }
@@ -876,8 +888,8 @@ async function connectPhantom() {
 }
 
 function saveSession() {
-  localStorage.setItem('adz_token', token);
-  localStorage.setItem('adz_user', JSON.stringify(me));
+  localStorage.setItem('app_token', token);
+  localStorage.setItem('app_user', JSON.stringify(me));
 }
 
 async function finishLogin() {
@@ -1045,7 +1057,7 @@ function updateMineUI() {
   }
 
   if (el >= dur) {
-    btn.className = 'claim'; btn.textContent = '🏆 Claim ' + earn.toLocaleString() + ' ADZ'; btn.disabled = false;
+    btn.className = 'claim'; btn.textContent = '🎁 Claim ' + earn.toLocaleString() + ' Tokens'; btn.disabled = false;
     pw.style.display = 'block';
     document.getElementById('mpfill').style.width = '100%';
     setText('mplbl', 'Mining complete!'); setText('mptime', 'Ready!');
@@ -1054,7 +1066,7 @@ function updateMineUI() {
     return;
   }
   if (canClaim) {
-    btn.className = 'claim'; btn.textContent = '🏆 Claim ' + earn.toLocaleString() + ' ADZ (Early)'; btn.disabled = false;
+    btn.className = 'claim'; btn.textContent = '🎁 Claim ' + earn.toLocaleString() + ' Tokens (Early)'; btn.disabled = false;
   } else {
     btn.className = 'mining'; btn.textContent = '⏳ Mining... need ' + MIN_CLAIM + ' pts (' + earn + ' so far)'; btn.disabled = false;
   }
@@ -1069,7 +1081,7 @@ function updateMineUI() {
 async function refreshMe() {
   try {
     me = await api('/api/me');
-    localStorage.setItem('adz_user', JSON.stringify(me));
+    localStorage.setItem('app_user', JSON.stringify(me));
     renderUser();
     updateMineUI();
   } catch(e) {}
@@ -1121,7 +1133,7 @@ async function claimMining() {
     const earned = data.earned || 0;
     const msb = document.getElementById('mining-status-box');
     if (msb) msb.classList.remove('show', 'claim-ready');
-    toast('🏆 Claimed ' + earned.toLocaleString() + ' Points!');
+    toast('🎁 Claimed ' + earned.toLocaleString() + ' Points!');
     for (let i = 0; i < 5; i++) setTimeout(spawnCoin, i * 200);
     await refreshMe();
   } catch(e) {
@@ -1473,8 +1485,8 @@ function tphase(h) {
 // ============================================
 async function doLogout() {
   clearInterval(mInt);
-  localStorage.removeItem('adz_token');
-  localStorage.removeItem('adz_user');
+  localStorage.removeItem('app_token');
+  localStorage.removeItem('app_user');
   token = null; me = null;
   document.getElementById('app-screen').classList.remove('show');
   window.location.reload();
