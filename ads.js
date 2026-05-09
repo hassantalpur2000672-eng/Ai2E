@@ -30,7 +30,9 @@ const SOCIAL_BAR_SCRIPT = `
 
 const NATIVE_BANNER_SCRIPT = `
 
-<!-- YAHAN NATIVE BANNER SCRIPT PASTE KARO -->
+<script async="async" data-cfasync="false" src="https://pl29342088.profitablecpmratenetwork.com/f060f56d36d7ed6e6c8161b8f7ec4599/invoke.js"></script>
+<div id="container-f060f56d36d7ed6e6c8161b8f7ec4599"></div>
+
 
 
 
