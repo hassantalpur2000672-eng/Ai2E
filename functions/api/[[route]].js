@@ -492,11 +492,8 @@ export async function onRequest({ request, env }) {
       return json({ users: parseInt(uc?.c || 0), total_mined: parseInt(tm?.s || 0) });
     }
 
-    // ── ADS ───────────────────────────────────────
-    if (path === '/api/ads' && request.method === 'GET') {
-      const results = await dbAll(env, 'SELECT * FROM ads WHERE is_active = 1 ORDER BY created_at DESC');
-      return json(results.map(a => ({...a, pages: a.pages ? a.pages.split(',') : ['index','blog','policies','vision']})));
-    }
+    // ── ADS ── Ab ads.js mein manual hain, DB se nahi aate
+    // /api/ads removed — ads directly ads.js mein hardcode karo
 
     // ── ADMIN ─────────────────────────────────────
     if (path.startsWith('/api/admin/')) {
