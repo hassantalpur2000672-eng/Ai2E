@@ -1,5 +1,5 @@
 // ============================================
-// AirDrop Zone — Cloudflare Pages Function
+// Ai2E (Artificial Intelligence to Earn) — Cloudflare Pages Function
 // Database: Turso (LibSQL)
 // Updated: Secure PBKDF2 password hashing (100k iterations)
 // ============================================
@@ -87,7 +87,7 @@ async function verifyToken(token, env) {
 // ── Password hashing (NEW: PBKDF2, per-user random salt, max 100k iter) ─
 async function legacyHash(password) {
   // Old method (for migration only)
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password + 'ADZ_SALT_2025'));
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password + 'AI2E_SALT_2025'));
   return btoa(String.fromCharCode(...new Uint8Array(buf)));
 }
 
@@ -168,7 +168,7 @@ export async function onRequest({ request, env }) {
       if (uExists) return err('Username taken');
 
       const hashed = await hashPassword(password); // new secure hash (100k iter)
-      const myRef = 'ADZ' + Math.random().toString(36).substr(2, 7).toUpperCase();
+      const myRef = 'AI2E' + Math.random().toString(36).substr(2, 6).toUpperCase();
       const id = crypto.randomUUID();
       const cfg = await dbFirst(env, "SELECT value FROM settings WHERE key = 'welcome_bonus'");
       const bonus = parseInt(cfg?.value || '1000');
@@ -228,7 +228,7 @@ export async function onRequest({ request, env }) {
       if (!user) {
         const id = crypto.randomUUID();
         const username = 'w_' + wallet_address.slice(2, 10).toLowerCase();
-        const myRef = 'ADZ' + Math.random().toString(36).substr(2, 7).toUpperCase();
+        const myRef = 'AI2E' + Math.random().toString(36).substr(2, 6).toUpperCase();
         const cfg = await dbFirst(env, "SELECT value FROM settings WHERE key = 'welcome_bonus'");
         const bonus = parseInt(cfg?.value || '1000');
 
@@ -456,7 +456,12 @@ export async function onRequest({ request, env }) {
     }
 
     if (path === '/api/leaderboard' && request.method === 'GET') {
-      const results = await dbAll(env, 'SELECT username,wallet_address,wallet_type,total_mined,mining_power,active_referral_count FROM users ORDER BY total_mined DESC LIMIT 25');
+      const results = await dbAll(env,
+        `SELECT u.username, u.wallet_address, u.wallet_type, u.total_mined, u.mining_power,
+                (SELECT COUNT(*) FROM users r WHERE r.referred_by = u.referral_code) AS total_referrals,
+                (SELECT COUNT(*) FROM users r WHERE r.referred_by = u.referral_code AND r.total_mined > 0) AS active_referrals
+         FROM users u ORDER BY u.total_mined DESC LIMIT 25`
+      );
       return json(results);
     }
 
