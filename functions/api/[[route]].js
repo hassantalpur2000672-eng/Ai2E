@@ -184,20 +184,15 @@ export async function onRequest({ request, env }) {
         [crypto.randomUUID(), id, 'welcome_bonus', bonus, '🎉 Welcome bonus']
       );
 
+      // Refer system: registration pe sirf count badhe — asli faida mining claim par (10% + 1% tree)
       if (ref_code) {
         const refUser = await dbFirst(env, 'SELECT * FROM users WHERE referral_code = ?', [ref_code]);
         if (refUser && refUser.id !== id) {
-          const cfgR = await dbFirst(env, "SELECT value FROM settings WHERE key = 'referral_bonus'");
-          const rb = parseInt(cfgR?.value || '500');
-          await dbRun(env, 'UPDATE users SET points = points + ?, referral_count = referral_count + 1 WHERE id = ?', [rb, refUser.id]);
-          await dbRun(env,
-            "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",
-            [crypto.randomUUID(), refUser.id, 'referral_bonus', rb, '👥 New referral: @' + username]
-          );
+          await dbRun(env, 'UPDATE users SET referral_count = referral_count + 1 WHERE id = ?', [refUser.id]);
         }
       }
 
-      const token = await makeToken(id, env);
+            const token = await makeToken(id, env);
       const user = await dbFirst(env, 'SELECT * FROM users WHERE id = ?', [id]);
       return json({ token, user });
     }
@@ -248,15 +243,14 @@ export async function onRequest({ request, env }) {
           [crypto.randomUUID(), id, 'welcome_bonus', bonus, '🎉 Welcome bonus']
         );
 
+        // Refer: sirf count update
         if (ref_code) {
           const refUser = await dbFirst(env, 'SELECT * FROM users WHERE referral_code = ?', [ref_code]);
           if (refUser) {
-            const cfgR = await dbFirst(env, "SELECT value FROM settings WHERE key = 'referral_bonus'");
-            const rb = parseInt(cfgR?.value || '500');
-            await dbRun(env, 'UPDATE users SET points = points + ?, referral_count = referral_count + 1 WHERE id = ?', [rb, refUser.id]);
+            await dbRun(env, 'UPDATE users SET referral_count = referral_count + 1 WHERE id = ?', [refUser.id]);
           }
         }
-        user = await dbFirst(env, 'SELECT * FROM users WHERE id = ?', [id]);
+                user = await dbFirst(env, 'SELECT * FROM users WHERE id = ?', [id]);
       }
 
       if (user.is_banned == 1) return err('Account banned');
@@ -312,18 +306,36 @@ export async function onRequest({ request, env }) {
       await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, 'mining_claim', earned, '⛏️ Mining claim']);
       await dbRun(env, "UPDATE mining_sessions SET claimed_at = datetime('now'), coins_earned = ?, is_claimed = 1 WHERE user_id = ? AND is_claimed = 0", [earned, user.id]);
 
-      if (user.referred_by && newMined === earned) {
-        const refUser = await dbFirst(env, 'SELECT * FROM users WHERE referral_code = ?', [user.referred_by]);
-        if (refUser) {
-          const cfgPPR = await dbFirst(env, "SELECT value FROM settings WHERE key = 'referral_power_per_ref'");
-          const cfgMaxP = await dbFirst(env, "SELECT value FROM settings WHERE key = 'max_mining_power'");
-          const cfgARB = await dbFirst(env, "SELECT value FROM settings WHERE key = 'active_referral_bonus'");
-          const ppr = parseFloat(cfgPPR?.value || '0.1'), maxP = parseFloat(cfgMaxP?.value || '10.0');
-          const newAR = parseInt(refUser.active_referral_count || 0) + 1;
-          const newPow = Math.min(1.0 + newAR * ppr, maxP);
-          const arb = parseInt(cfgARB?.value || '200');
-          await dbRun(env, 'UPDATE users SET active_referral_count = ?, mining_power = ?, points = points + ? WHERE id = ?', [newAR, newPow, arb, refUser.id]);
-          await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), refUser.id, 'active_referral_bonus', arb, '🔥 @' + user.username + ' started mining!']);
+      // ── Refer Mining Tree (har claim par chale, sirf ek baar nahi) ──────────────
+      if (user.referred_by) {
+        // Level 1: Direct parent — 10% of earned points
+        const L1 = await dbFirst(env, 'SELECT * FROM users WHERE referral_code = ?', [user.referred_by]);
+        if (L1) {
+          const l1Bonus = Math.floor(earned * 0.10);
+          if (l1Bonus > 0) {
+            // Power system: count active referrals and recalculate power for L1
+            const cfgPPR = await dbFirst(env, "SELECT value FROM settings WHERE key = 'referral_power_per_ref'");
+            const cfgMaxP = await dbFirst(env, "SELECT value FROM settings WHERE key = 'max_mining_power'");
+            const ppr = parseFloat(cfgPPR?.value || '0.1');
+            const maxP = parseFloat(cfgMaxP?.value || '10.0');
+            const activeRefsL1 = await dbFirst(env, 'SELECT COUNT(*) as c FROM users WHERE referred_by = ? AND total_mined > 0', [L1.referral_code]);
+            const arCountL1 = parseInt(activeRefsL1?.c || 0);
+            const newPowL1 = Math.min(1.0 + arCountL1 * ppr, maxP);
+            await dbRun(env, 'UPDATE users SET points = points + ?, mining_power = ?, active_referral_count = ? WHERE id = ?', [l1Bonus, newPowL1, arCountL1, L1.id]);
+            await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), L1.id, 'refer_mining_10pct', l1Bonus, '⛏️ 10% refer mining: @' + user.username]);
+
+            // Level 2: Grandparent — 1% of earned points
+            if (L1.referred_by) {
+              const L2 = await dbFirst(env, 'SELECT * FROM users WHERE referral_code = ?', [L1.referred_by]);
+              if (L2) {
+                const l2Bonus = Math.floor(earned * 0.01);
+                if (l2Bonus > 0) {
+                  await dbRun(env, 'UPDATE users SET points = points + ? WHERE id = ?', [l2Bonus, L2.id]);
+                  await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), L2.id, 'refer_mining_1pct', l2Bonus, '🌿 1% L2 refer mining: @' + user.username]);
+                }
+              }
+            }
+          }
         }
       }
       return json({ success: true, earned });
