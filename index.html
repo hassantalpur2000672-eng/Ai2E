@@ -694,9 +694,50 @@ const ANIMALS = ['🐹','🦫','🦦','🦝','🐿️','🦙','🐰','🦔'];
 let aidx = 0;
 
 // ============================================
-// API HELPER
+// API HELPER + LOCAL CACHE (Turso reads bachao)
 // ============================================
+
+// Cache TTLs (milliseconds)
+const CACHE_TTL = {
+  '/api/stats':       30 * 60 * 1000,  // 30 min — public counter, fast enough
+  '/api/settings':    60 * 60 * 1000,  // 1 hour — admin rarely changes these
+  '/api/tasks':       15 * 60 * 1000,  // 15 min — tasks don't change often
+  '/api/leaderboard':  5 * 60 * 1000,  // 5 min — leaderboard refresh
+  '/api/referrals':   10 * 60 * 1000,  // 10 min
+  '/api/transactions': 5 * 60 * 1000,  // 5 min
+};
+
+function cacheKey(path) { return 'c_' + path.replace(/\//g, '_'); }
+
+function cacheGet(path) {
+  try {
+    const raw = localStorage.getItem(cacheKey(path));
+    if (!raw) return null;
+    const { ts, data } = JSON.parse(raw);
+    const ttl = CACHE_TTL[path];
+    if (!ttl || Date.now() - ts > ttl) { localStorage.removeItem(cacheKey(path)); return null; }
+    return data;
+  } catch { return null; }
+}
+
+function cacheSet(path, data) {
+  try {
+    const ttl = CACHE_TTL[path];
+    if (!ttl) return;
+    localStorage.setItem(cacheKey(path), JSON.stringify({ ts: Date.now(), data }));
+  } catch {}
+}
+
+function cacheClear(path) {
+  try { localStorage.removeItem(cacheKey(path)); } catch {}
+}
+
 async function api(path, method = 'GET', body = null) {
+  // GET requests: cache check pehle
+  if (method === 'GET' && !body) {
+    const cached = cacheGet(path);
+    if (cached !== null) return cached;
+  }
   const opts = {
     method,
     headers: { 'Content-Type': 'application/json' }
@@ -706,6 +747,8 @@ async function api(path, method = 'GET', body = null) {
   const res = await fetch(API + path, opts);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Request failed');
+  // Cache save karo GET results
+  if (method === 'GET' && !body) cacheSet(path, data);
   return data;
 }
 
@@ -723,19 +766,29 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   const savedToken = localStorage.getItem('app_token');
   const savedUser = localStorage.getItem('app_user');
+  const lastSync = parseInt(localStorage.getItem('app_last_sync') || '0');
+  const SYNC_TTL = 3 * 60 * 1000; // 3 min mein ek baar DB se sync
 
   if (savedToken && savedUser) {
     token = savedToken;
     me = JSON.parse(savedUser);
     setL('LOADING MINER...');
     try {
+      // Agar 3 min se kam time hua hai — local data se kaam chalao, DB read bachao
+      if (Date.now() - lastSync < SYNC_TTL) {
+        await finishLogin();
+        return;
+      }
+      // 3 min baad fresh DB read
       me = await api('/api/me');
       localStorage.setItem('app_user', JSON.stringify(me));
+      localStorage.setItem('app_last_sync', String(Date.now()));
       await finishLogin();
       return;
     } catch(e) {
       localStorage.removeItem('app_token');
       localStorage.removeItem('app_user');
+      localStorage.removeItem('app_last_sync');
       token = null; me = null;
     }
   }
@@ -772,7 +825,8 @@ async function doSignIn() {
     const data = await api('/api/auth/login', 'POST', { email, password });
     token = data.token; me = data.user;
     saveSession();
-    await finishLogin();
+    localStorage.setItem('app_last_sync', String(Date.now()));
+    await finishLogin(true);
   } catch(e) {
     showE(e.message || 'Sign in failed');
     btn.disabled = false; btn.textContent = 'Sign In →';
@@ -793,7 +847,8 @@ async function doSignUp() {
     const data = await api('/api/auth/register', 'POST', { username, email, password, ref_code: ref_code || null });
     token = data.token; me = data.user;
     saveSession();
-    await finishLogin();
+    localStorage.setItem('app_last_sync', String(Date.now()));
+    await finishLogin(true);
   } catch(e) {
     showE(e.message || 'Registration failed');
     btn.disabled = false; btn.textContent = 'Create Account →';
@@ -835,7 +890,8 @@ async function connectWallet(type) {
 
     token = data.token; me = data.user;
     saveSession();
-    await finishLogin();
+    localStorage.setItem('app_last_sync', String(Date.now()));
+    await finishLogin(true);
 
   } catch(e) {
     document.getElementById('loader').style.display = 'none';
@@ -901,11 +957,13 @@ function saveSession() {
   localStorage.setItem('app_user', JSON.stringify(me));
 }
 
-async function finishLogin() {
+async function finishLogin(freshLogin = false) {
   setL('LOADING DATA...');
   document.getElementById('loader').style.display = 'flex';
   document.getElementById('login-screen').classList.remove('show');
   try {
+    // freshLogin=true (naya login/register): cache skip karo, DB se lo
+    if (freshLogin) { cacheClear('/api/settings'); cacheClear('/api/tasks'); }
     const [settings, taskData] = await Promise.all([
       api('/api/settings'),
       api('/api/tasks')
@@ -988,7 +1046,7 @@ function renderUser() {
 
 async function loadMyRank() {
   try {
-    const lb = await api('/api/leaderboard');
+    const lb = await api('/api/leaderboard'); // cached 5 min
     const r = lb.findIndex(u => u.username === me?.username) + 1;
     if (r > 0) { setText('srank', '#' + r); setText('pprank', '#' + r); }
   } catch(e) {}
@@ -1087,10 +1145,19 @@ function updateMineUI() {
   setText('mrated', '+' + ratePerHr + '/hr');
 }
 
-async function refreshMe() {
+async function refreshMe(forceDB = false) {
   try {
+    // forceDB=false: sirf timer wala call — local data se kaam chalao
+    // forceDB=true: claim/start/task ke baad — DB se fresh data lo
+    if (!forceDB) {
+      // Mining progress sirf local calculation se update karo (no DB read)
+      renderUser();
+      updateMineUI();
+      return;
+    }
     me = await api('/api/me');
     localStorage.setItem('app_user', JSON.stringify(me));
+    localStorage.setItem('app_last_sync', String(Date.now()));
     renderUser();
     updateMineUI();
   } catch(e) {}
@@ -1098,7 +1165,7 @@ async function refreshMe() {
 
 function startTicker() {
   clearInterval(mInt);
-  mInt = setInterval(() => { refreshMe(); }, 30000);
+  mInt = setInterval(() => { refreshMe(); }, 5 * 60 * 1000); // 26a1 5 min 2014 DB reads bachao
   setInterval(() => { if (me) updateMineUI(); }, 5000);
 }
 
@@ -1130,7 +1197,7 @@ async function startMining() {
   try {
     await api('/api/mine/start', 'POST');
     toast('⛏️ Mining started! Come back in 24h.'); spawnCoin();
-    await refreshMe();
+    await refreshMe(true);
   } catch(e) { toast('❌ ' + (e.message || 'Failed to start')); }
 }
 
@@ -1138,13 +1205,14 @@ async function claimMining() {
   const btn = document.getElementById('mine-btn');
   btn.disabled = true; btn.textContent = '⌛ Claiming...';
   try {
-    const data = await api('/api/mine/claim', 'POST');
-    const earned = data.earned || 0;
+    cacheClear('/api/me');
+    const claimRes = await api('/api/mine/claim', 'POST');
+    const earned = claimRes.earned || 0;
     const msb = document.getElementById('mining-status-box');
     if (msb) msb.classList.remove('show', 'claim-ready');
     toast('🎁 Claimed ' + earned.toLocaleString() + ' Points!');
     for (let i = 0; i < 5; i++) setTimeout(spawnCoin, i * 200);
-    await refreshMe();
+    await refreshMe(true);
   } catch(e) {
     toast('❌ ' + (e.message || 'Claim failed'));
     btn.disabled = false; updateMineUI();
@@ -1196,7 +1264,7 @@ async function finTask(id, pts) {
     const card = document.getElementById('tc-' + id);
     if (card) { card.classList.add('done'); const b = card.querySelector('.tbtn'); if (b) { b.className = 'tbtn dbtn'; b.textContent = '✅ Done'; } }
     toast('✅ +' + pts + ' Points earned!'); spawnCoin();
-    await refreshMe();
+    cacheClear('/api/me'); await refreshMe(true);
   } catch(e) { toast('❌ ' + (e.message || 'Error')); }
 }
 
@@ -1281,7 +1349,7 @@ async function submitVerifyCode() {
       const card = document.getElementById('tc-' + activeVcode.id);
       if (card) { card.classList.add('done'); const b = card.querySelector('.tbtn'); if (b) { b.className = 'tbtn dbtn'; b.textContent = '✅ Done'; } }
       spawnCoin(); spawnCoin();
-      setTimeout(() => { closeVcodeModal(); refreshMe(); toast('✅ +' + res.earned + ' Points earned!'); }, 1800);
+      setTimeout(() => { closeVcodeModal(); refreshMe(true); toast('✅ +' + res.earned + ' Points earned!'); }, 1800);
     } else {
       activeVcode.attempts = (activeVcode.attempts || 0) + 1;
       updateVcodeDots(activeVcode.attempts);
@@ -1361,7 +1429,7 @@ async function submitQuizAnswer() {
       const card = document.getElementById('tc-' + activeQuiz.id);
       if (card) { card.classList.add('done'); const b = card.querySelector('.tbtn'); if (b) { b.className = 'tbtn dbtn'; b.textContent = '✅ Done'; } }
       spawnCoin(); spawnCoin();
-      setTimeout(() => { closeQuizModal(); refreshMe(); toast('✅ +' + res.earned + ' Points earned!'); }, 1800);
+      setTimeout(() => { closeQuizModal(); refreshMe(true); toast('✅ +' + res.earned + ' Points earned!'); }, 1800);
     } else {
       activeQuiz.attempts = (activeQuiz.attempts || 0) + 1;
       updateQuizDots(activeQuiz.attempts);
@@ -1498,6 +1566,9 @@ async function doLogout() {
   clearInterval(mInt);
   localStorage.removeItem('app_token');
   localStorage.removeItem('app_user');
+  localStorage.removeItem('app_last_sync');
+  // Cache bhi clear karo
+  ['_api_stats','_api_settings','_api_tasks','_api_leaderboard','_api_referrals','_api_transactions'].forEach(k => localStorage.removeItem('c' + k));
   token = null; me = null;
   document.getElementById('app-screen').classList.remove('show');
   window.location.reload();
