@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0"/>
-<title>AirDrop Zone — Mine & Earn Free Crypto</title>
+<title>Ai2E — Artificial Intelligence to Earn</title>
 <meta name="description" content="Mine free crypto rewards daily. Refer friends for more power. Real token launch on Solana."/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
@@ -303,7 +303,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 
 <!-- LOGIN TOP NAV -->
 <div id="login-nav" style="position:fixed;top:0;left:0;right:0;z-index:200;background:rgba(3,7,18,.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between">
-  <div style="font-family:'Space Mono',monospace;font-size:13px;color:var(--accent);font-weight:700">⛏️ AirDrop Zone</div>
+  <div style="font-family:'Space Mono',monospace;font-size:13px;color:var(--accent);font-weight:700">⛏️ Ai2E</div>
   <button class="hmbtn" id="ln-hmbtn" onclick="toggleLoginMenu()" style="background:none;border:none;cursor:pointer;padding:6px;display:flex;flex-direction:column;gap:5px">
     <span style="display:block;width:22px;height:2px;background:var(--text);border-radius:2px"></span>
     <span style="display:block;width:22px;height:2px;background:var(--text);border-radius:2px"></span>
@@ -332,7 +332,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
           <circle cx="12" cy="12" r="2" fill="var(--accent2)"/>
         </svg>
       </div></div>
-      <div class="brand-logo">AirDrop Zone</div>
+      <div class="brand-logo">Ai2E</div>
       <div class="brand-title">Mine. Earn. Own.</div>
       <div class="brand-sub">Free mining platform. Earn daily. Real crypto launch on Solana.</div>
     </div>
@@ -440,7 +440,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
         <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="currentColor" opacity="0.4"/>
         <path d="M2 17L12 22L22 17M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
-      AirDrop Zone
+      Ai2E
     </div>
     <div class="hright">
       <div class="hbal"><span id="hbal">0</span> Pts</div>
@@ -550,18 +550,18 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
     <div id="page-ref" class="page">
       <div class="rhero">
         <div style="font-size:20px;font-weight:800;margin-bottom:4px">👥 Refer & Earn</div>
-        <div style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.5">Each active referral boosts your mining power by +10%.<br/>More referrals = more rewards. Max 10x!</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.5">Earn 10% of your direct referral's mining. Earn 1% of their referral's mining. More active referrals = higher mining power!</div>
         <div class="rcode" onclick="copyRef()"><div class="rcodeval" id="rcode">——</div><div>📋</div></div>
         <button class="rlbtn" onclick="shareRef()">🔗 Share Referral Link</button>
       </div>
       <div class="rperks">
-        <div class="rperk"><div class="rpi">⛏️</div><div class="rpv">10%</div><div class="rpl">har claim ka refer ko</div></div>
+        <div class="rperk"><div class="rpi">⛏️</div><div class="rpv">10%</div><div class="rpl">10% of every mining claim</div></div>
         <div class="rperk"><div class="rpi">🌿</div><div class="rpv">1%</div><div class="rpl">refer ka refer (L2)</div></div>
         <div class="rperk"><div class="rpi">🔥</div><div class="rpv" id="rpa">0</div><div class="rpl">active miners</div></div>
-        <div class="rperk"><div class="rpi">⚡</div><div class="rpv" id="rpp">1.0x</div><div class="rpl">aapki mining power</div></div>
+        <div class="rperk"><div class="rpi">⚡</div><div class="rpv" id="rpp">1.0x</div><div class="rpl">your mining power</div></div>
       </div>
       <div class="sec-head">My Referrals</div>
-      <div id="reflist"><div style="color:var(--muted);font-size:13px;padding:8px 0">No referrals yet. Share your link!</div></div>
+      <div id="reflist"><div style="color:var(--muted);font-size:13px;padding:8px 0">No referrals yet. Share your link to start earning!</div></div>
     </div>
 
     <!-- PROFILE -->
@@ -1401,7 +1401,7 @@ async function loadLB() {
         <div class="lbrank ${['gold','silver','bronze'][i]||''}">${i < 3 ? em[i] : '#'+(i+1)}</div>
         <div class="lbinfo">
           <div class="lbname">${esc(name)} ${isMe ? '<span style="color:var(--accent);font-size:10px">(you)</span>' : ''}</div>
-          <div class="lbsub">⚡ ${(u.mining_power||1).toFixed(1)}x • 👥 ${u.active_referral_count||0} refs</div>
+          <div class="lbsub">⚡ ${(u.mining_power||1).toFixed(1)}x • 👥 ${u.active_referrals||0}/${u.total_referrals||0} active refs</div>
         </div>
         <div class="lbpts">${Math.floor(u.total_mined||0).toLocaleString()}</div>
       </div>`;
@@ -1417,13 +1417,13 @@ async function loadRefs() {
     const data = await api('/api/referrals');
     const c = document.getElementById('reflist');
     if (!c) return;
-    if (!data || !data.length) { c.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:8px 0">No referrals yet. Share your link!</div>'; return; }
+    if (!data || !data.length) { c.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:8px 0">No referrals yet. Share your link to start earning!</div>'; return; }
     c.innerHTML = data.map(r => {
       const a = (r.total_mined || 0) > 0;
       const name = r.username || (r.wallet_address ? r.wallet_address.slice(0,6)+'...'+r.wallet_address.slice(-4) : 'miner');
       const mined = parseInt(r.total_mined || 0);
       const myEarn = Math.floor(mined * 0.10);
-      return `<div class="rli"><div class="rdot ${a?'on':'off'}"></div><div style="flex:1;font-size:13px">@${esc(name)}<br><span style="font-size:10px;color:var(--muted)">${a?'⚡ Active — Mined: '+mined.toLocaleString()+' pts':'💤 Inactive — mining nahi ki abhi'}</span></div><div style="font-size:11px;color:var(--accent);text-align:right">+${myEarn.toLocaleString()}<br><span style="font-size:9px;color:var(--muted)">aapki 10%</span></div></div>`;
+      return `<div class="rli"><div class="rdot ${a?'on':'off'}"></div><div style="flex:1;font-size:13px">@${esc(name)}<br><span style="font-size:10px;color:var(--muted)">${a?'⚡ Active • Mined: '+mined.toLocaleString()+' pts':'💤 Inactive • Has not mined yet'}</span></div><div style="font-size:11px;color:var(--accent);text-align:right">+${myEarn.toLocaleString()}<br><span style="font-size:9px;color:var(--muted)">your 10%</span></div></div>`;
     }).join('');
   } catch(e) {}
 }
@@ -1437,8 +1437,8 @@ function copyRef() {
 function shareRef() {
   if (!me?.referral_code) return;
   const u = APP_URL + '?ref=' + me.referral_code;
-  const t = 'Join AirDrop Zone! Use my code: ' + me.referral_code + '\n' + u;
-  if (navigator.share) navigator.share({title: 'AirDrop Zone', text: t, url: u}).catch(() => {});
+  const t = 'Join Ai2E (AI to Earn)! Use my code: ' + me.referral_code + '\n' + u;
+  if (navigator.share) navigator.share({title: 'Ai2E — Artificial Intelligence to Earn', text: t, url: u}).catch(() => {});
   else { navigator.clipboard?.writeText(t); toast('🔗 Link copied!'); }
 }
 
