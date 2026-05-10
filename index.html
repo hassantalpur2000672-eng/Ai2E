@@ -363,14 +363,13 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
         <button class="btn-p" id="bsu" onclick="doSignUp()">Create Account →</button>
       </div>
 
-      <div class="divider">or connect wallet</div>
-
-      <!-- WALLET BUTTONS -->
+      <!-- WALLET HIDDEN -->
+      <!-- <div class="divider">or connect wallet</div>
       <button class="btn-wallet" onclick="showWalletModal()">
         <span style="font-size:20px">👛</span>
         <span>Connect Web3 Wallet</span>
         <span style="font-size:11px;color:var(--muted);margin-left:auto">MetaMask, Trust & 300+</span>
-      </button>
+      </button> -->
 
       <div class="stats-row">
         <div class="stat-pill"><div class="spv" id="su-ct">—</div><div class="spl">Miners</div></div>
@@ -381,8 +380,8 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
   </div>
 </div>
 
-<!-- WALLET SELECTOR MODAL -->
-<div id="wallet-modal">
+<!-- WALLET SELECTOR MODAL - HIDDEN -->
+<div id="wallet-modal" style="display:none!important">
   <div class="wallet-sheet">
     <div class="wallet-sheet-title">👛 Connect Wallet</div>
     <div class="wallet-sheet-sub">Choose your wallet. If the mobile app is installed, it will open directly.</div>
@@ -677,8 +676,8 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 // ============================================
 // CONFIG
 // ============================================
-const API = 'https://ai2e.pages.dev';
-const APP_URL = 'https://ai2e.pages.dev';
+const API = 'https://ai2e.space';
+const APP_URL = 'https://ai2e.space';
 
 // ============================================
 // STATE
