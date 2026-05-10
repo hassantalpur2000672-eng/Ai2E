@@ -4,8 +4,6 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0"/>
 <title>Ai2E — Artificial Intelligence to Earn</title>
-<link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
-<link rel="apple-touch-icon" href="/favicon.svg"/>
 <meta name="description" content="Mine free crypto rewards daily. Refer friends for more power. Real token launch on Solana."/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
@@ -59,12 +57,6 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 .btn-wallet{width:100%;padding:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:14px;font-weight:500;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:8px}
 .btn-wallet:hover{border-color:var(--accent);background:rgba(0,255,136,.05)}
 .btn-wallet:active{transform:scale(.98)}
-.btn-google{width:100%;padding:12px;background:#fff;border:1px solid #dadce0;border-radius:8px;color:#3c4043;font-family:'Outfit',sans-serif;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;margin-top:0;transition:all .2s}
-.btn-google:hover{background:#f8f9fa;box-shadow:0 1px 3px rgba(0,0,0,.2)}
-.btn-google:active{transform:scale(.98)}
-.sup-fab{position:fixed;bottom:90px;right:16px;width:48px;height:48px;background:var(--accent2);border:none;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;z-index:500;box-shadow:0 4px 16px rgba(124,58,237,.4);transition:all .2s}
-.sup-fab:hover{transform:scale(1.1)}
-.sup-badge{position:absolute;top:-4px;right:-4px;background:var(--danger);color:white;border-radius:50%;width:16px;height:16px;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;display:none}
 .err{background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.3);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--danger);margin-bottom:14px;display:none}
 .err.show{display:block}
 .suc{background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.2);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--accent);margin-bottom:14px;display:none}
@@ -313,14 +305,8 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 </div>
 
 <!-- LOGIN TOP NAV -->
-<div id="login-nav" style="position:fixed;top:0;left:0;right:0;z-index:200;background:rgba(3,7,18,.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;justify-content:space-between">
-  <div style="display:flex;align-items:center;gap:8px">
-    <img src="/favicon.svg" width="32" height="32" style="border-radius:9px;flex-shrink:0" alt="Ai2E"/>
-    <div>
-      <div style="background:linear-gradient(90deg,#fff 20%,#00ff88 60%,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:2px;font-size:16px;font-weight:700;font-family:'Space Mono',monospace">Ai2E</div>
-      <div style="font-size:8px;color:#7d8590;letter-spacing:1.5px;text-transform:uppercase;margin-top:-1px;font-family:'Outfit',sans-serif">Mine · Earn · Own</div>
-    </div>
-  </div>
+<div id="login-nav" style="position:fixed;top:0;left:0;right:0;z-index:200;background:rgba(3,7,18,.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between">
+  <div style="font-family:'Space Mono',monospace;font-size:13px;color:var(--accent);font-weight:700">⛏️ Ai2E</div>
   <button class="hmbtn" id="ln-hmbtn" onclick="toggleLoginMenu()" style="background:none;border:none;cursor:pointer;padding:6px;display:flex;flex-direction:column;gap:5px">
     <span style="display:block;width:22px;height:2px;background:var(--text);border-radius:2px"></span>
     <span style="display:block;width:22px;height:2px;background:var(--text);border-radius:2px"></span>
@@ -352,22 +338,6 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
       <div class="brand-logo">Ai2E</div>
       <div class="brand-title">Mine. Earn. Own.</div>
       <div class="brand-sub">Free mining platform. Earn daily. Real crypto launch on Solana.</div>
-      <div style="margin:18px 0 4px;display:flex;flex-direction:column;gap:8px;width:100%">
-        <div style="display:flex;align-items:center;gap:10px;background:rgba(0,255,136,0.06);border:1px solid rgba(0,255,136,0.15);border-radius:10px;padding:10px 14px">
-          <span style="font-size:18px">⚡</span>
-          <div>
-            <div style="font-size:12px;font-weight:700;color:var(--accent);letter-spacing:.5px">EARN DAILY REWARDS</div>
-            <div style="font-size:11px;color:var(--muted);margin-top:1px">Mine Ai2E tokens for free — no hardware needed</div>
-          </div>
-        </div>
-        <div style="display:flex;align-items:center;gap:10px;background:rgba(124,58,237,0.06);border:1px solid rgba(124,58,237,0.15);border-radius:10px;padding:10px 14px">
-          <span style="font-size:18px">🚀</span>
-          <div>
-            <div style="font-size:12px;font-weight:700;color:var(--accent2);letter-spacing:.5px">SOLANA TOKEN LAUNCH</div>
-            <div style="font-size:11px;color:var(--muted);margin-top:1px">Real crypto — early miners earn the most</div>
-          </div>
-        </div>
-      </div>
     </div>
     <div class="card">
       <div class="tabs">
@@ -380,20 +350,8 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
       <!-- SIGN IN -->
       <div id="fin">
         <div class="fg"><label>Email</label><input type="email" id="si-e" placeholder="you@example.com" autocomplete="email"/></div>
-        <div class="fg">
-          <label style="display:flex;align-items:center;justify-content:space-between">
-            Password
-            <span onclick="showForgot()" style="color:var(--accent);font-size:11px;cursor:pointer;font-weight:600;text-transform:none;letter-spacing:0">Forgot password?</span>
-          </label>
-          <input type="password" id="si-p" placeholder="••••••••" autocomplete="current-password"/>
-        </div>
+        <div class="fg"><label>Password</label><input type="password" id="si-p" placeholder="••••••••" autocomplete="current-password"/></div>
         <button class="btn-p" id="bsi" onclick="doSignIn()">Sign In →</button>
-        <div class="divider" style="margin:14px 0">or connect wallet</div>
-        <button class="btn-wallet" onclick="showWalletModal()">
-          <span style="font-size:20px">👛</span>
-          <span>Connect Web3 Wallet</span>
-          <span style="font-size:11px;color:var(--muted);margin-left:auto">MetaMask, Trust & 300+</span>
-        </button>
       </div>
 
       <!-- REGISTER -->
@@ -403,80 +361,22 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
         <div class="fg"><label>Password</label><input type="password" id="su-p" placeholder="Min 6 characters"/></div>
         <div class="fg"><label>Referral Code (optional)</label><input type="text" id="su-r" placeholder="TOKEN123456" style="text-transform:uppercase"/></div>
         <button class="btn-p" id="bsu" onclick="doSignUp()">Create Account →</button>
-        <div class="divider" style="margin:14px 0">or connect wallet</div>
-        <button class="btn-wallet" onclick="showWalletModal()">
-          <span style="font-size:20px">👛</span>
-          <span>Connect Web3 Wallet</span>
-          <span style="font-size:11px;color:var(--muted);margin-left:auto">MetaMask, Trust & 300+</span>
-        </button>
       </div>
+
+      <div class="divider">or connect wallet</div>
+
+      <!-- WALLET BUTTONS -->
+      <button class="btn-wallet" onclick="showWalletModal()">
+        <span style="font-size:20px">👛</span>
+        <span>Connect Web3 Wallet</span>
+        <span style="font-size:11px;color:var(--muted);margin-left:auto">MetaMask, Trust & 300+</span>
+      </button>
 
       <div class="stats-row">
         <div class="stat-pill"><div class="spv" id="su-ct">—</div><div class="spl">Miners</div></div>
         <div class="stat-pill"><div class="spv" id="su-mn">—</div><div class="spl">Mined</div></div>
         <div class="stat-pill"><div class="spv">FREE</div><div class="spl">To Join</div></div>
       </div>
-    </div>
-  </div>
-</div>
-
-<!-- FORGOT PASSWORD MODAL -->
-<div id="forgot-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(12px);z-index:9000;align-items:flex-end;justify-content:center">
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:20px 20px 0 0;padding:28px 20px 40px;width:100%;max-width:480px;animation:slideUp .3s ease">
-    <div style="font-size:18px;font-weight:800;text-align:center;margin-bottom:4px">🔑 Forgot Password</div>
-    <div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:18px">Answer the verify question so admin knows you are real.</div>
-
-    <!-- Step 1: Email -->
-    <div id="frg-step1">
-      <div class="fg" style="margin-bottom:12px">
-        <label>Your Email</label>
-        <input type="email" id="frg-email" placeholder="you@example.com" autocomplete="email"/>
-      </div>
-      <button class="btn-p" id="frg-next-btn" onclick="doForgotStep1()">Next →</button>
-      <button onclick="hideForgot()" style="width:100%;padding:12px;background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;margin-top:8px">Cancel</button>
-    </div>
-
-    <!-- Step 2: Verify question -->
-    <div id="frg-step2" style="display:none">
-      <div style="background:rgba(0,255,136,.06);border:1px solid rgba(0,255,136,.15);border-radius:10px;padding:12px 14px;margin-bottom:14px">
-        <div style="font-size:11px;color:var(--accent);font-weight:700;margin-bottom:4px">VERIFY QUESTION</div>
-        <div id="frg-question" style="font-size:14px;color:var(--text)"></div>
-      </div>
-      <div class="fg" style="margin-bottom:12px">
-        <label>Your Answer</label>
-        <input type="text" id="frg-answer" placeholder="Type your answer..."/>
-      </div>
-      <div class="fg" style="margin-bottom:16px">
-        <label>Reason (optional)</label>
-        <input type="text" id="frg-reason" placeholder="e.g. lost access"/>
-      </div>
-      <div id="frg-msg" style="display:none;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px"></div>
-      <button class="btn-p" id="frg-btn" onclick="doForgotRequest()">Send Reset Request →</button>
-      <button onclick="hideForgot()" style="width:100%;padding:12px;background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;margin-top:8px">Cancel</button>
-    </div>
-  </div>
-</div>
-
-<!-- SUPPORT MODAL -->
-<div id="support-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(12px);z-index:9000;align-items:flex-end;justify-content:center">
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:20px 20px 0 0;padding:24px 20px 36px;width:100%;max-width:480px;animation:slideUp .3s ease;max-height:80vh;display:flex;flex-direction:column">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-      <div style="font-size:17px;font-weight:800">💬 Support</div>
-      <button onclick="hideSupport()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:4px">✕</button>
-    </div>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:16px">1 message per 24 hours per account</div>
-    <!-- Messages list -->
-    <div id="sup-msgs" style="flex:1;overflow-y:auto;margin-bottom:16px;min-height:120px;display:flex;flex-direction:column;gap:8px">
-      <div style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">Loading messages...</div>
-    </div>
-    <!-- Send box -->
-    <div id="sup-send-area">
-      <div class="fg" style="margin-bottom:8px">
-        <label>Your Message</label>
-        <textarea id="sup-text" placeholder="Describe your issue..." rows="3" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:11px 14px;color:var(--text);font-family:'Outfit',sans-serif;font-size:14px;outline:none;resize:none;transition:border-color .2s" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"></textarea>
-      </div>
-      <div id="sup-msg-status" style="display:none;padding:8px 12px;border-radius:8px;font-size:12px;margin-bottom:8px"></div>
-      <button class="btn-p" id="sup-send-btn" onclick="sendSupport()">Send Message →</button>
     </div>
   </div>
 </div>
@@ -530,14 +430,6 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
         <small>All ETH Wallets</small>
       </button>
     </div>
-    <div style="margin:4px 16px 0;border-top:1px solid var(--border);padding-top:14px">
-      <div style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:10px;letter-spacing:.5px">OR PASTE WALLET ADDRESS</div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">If you registered with a wallet address, paste it here to sign in. New users can also paste an address to register.</div>
-      <div style="display:flex;gap:8px">
-        <input type="text" id="wallet-addr-input" placeholder="Paste wallet address (0x... or Solana)" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:'Space Mono',monospace;font-size:11px;outline:none" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"/>
-        <button onclick="connectByAddress()" style="padding:10px 14px;background:var(--accent);color:#030712;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">Go →</button>
-      </div>
-    </div>
     <button class="wallet-cancel" onclick="closeWalletModal()">Cancel</button>
   </div>
 </div>
@@ -547,10 +439,16 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
   <div id="ann-bar"></div>
   <div class="header">
     <div class="hlogo">
-      <img src="/favicon.svg" width="34" height="34" style="border-radius:9px;flex-shrink:0" alt="Ai2E"/>
+      <div class="hlogo-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z" fill="rgba(3,7,18,.6)"/>
+          <path d="M9 12l2 2 4-4" stroke="#00ff88" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="12" cy="12" r="1.5" fill="#fff" opacity=".6"/>
+        </svg>
+      </div>
       <div>
-        <span class="hlogo-text" id="hlogo-username">Ai2E</span>
-        <span class="hlogo-sub">Mine · Earn · Own</span>
+        <span class="hlogo-text">Ai2E</span>
+        <span class="hlogo-sub">AI to Earn</span>
       </div>
     </div>
     <div class="hright">
@@ -709,12 +607,6 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
     </div>
   </div>
 
-  <!-- SUPPORT FAB -->
-  <button class="sup-fab" onclick="showSupport()" title="Support">
-    💬
-    <span class="sup-badge" id="sup-badge">1</span>
-  </button>
-
   <nav class="bnav">
     <button class="nbtn active" onclick="nav('mine',this)"><div class="nbico">⚙️</div>MINE</button>
     <button class="nbtn" onclick="nav('top',this)"><div class="nbico">🎯</div>TOP</button>
@@ -864,16 +756,11 @@ async function api(path, method = 'GET', body = null) {
 // INIT
 // ============================================
 window.addEventListener('DOMContentLoaded', async () => {
-  // Domain migration: purana pages.dev token/cache clear karo
-  if (localStorage.getItem('ai2e_domain_ver') !== 'ai2e.space.v1') {
-    localStorage.clear();
-    localStorage.setItem('ai2e_domain_ver', 'ai2e.space.v1');
+  // New domain — purany pages.dev tokens clear karo
+  if (localStorage.getItem('ai2e_dv') !== 'v2') {
+    ['app_token','app_user','app_last_sync'].forEach(k => localStorage.removeItem(k));
+    localStorage.setItem('ai2e_dv', 'v2');
   }
-
-  window._safetyTimer = setTimeout(() => {
-    document.getElementById('loader').style.display = 'none';
-    document.getElementById('login-screen').classList.add('show');
-  }, 6000);
   const ref = new URLSearchParams(window.location.search).get('ref');
   if (ref) {
     const el = document.getElementById('su-r');
@@ -974,150 +861,7 @@ async function doSignUp() {
 }
 
 // ============================================
-// SUPPORT SYSTEM
-function showSupport() {
-  document.getElementById('support-modal').style.display = 'flex';
-  loadSupportMsgs();
-}
-function hideSupport() {
-  document.getElementById('support-modal').style.display = 'none';
-}
-async function loadSupportMsgs() {
-  const el = document.getElementById('sup-msgs');
-  try {
-    const data = await api('/api/support/my-messages');
-    if (!data || !data.length) {
-      el.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">No messages yet. Send us a message!</div>';
-      return;
-    }
-    el.innerHTML = data.map(m => `
-      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px">
-        <div style="font-size:13px;color:var(--text);margin-bottom:6px">${esc(m.message)}</div>
-        <div style="display:flex;align-items:center;justify-content:space-between">
-          <span style="font-size:10px;color:var(--muted)">${new Date(m.created_at).toLocaleString()}</span>
-          <span style="font-size:10px;padding:2px 8px;border-radius:99px;${
-            m.status==='open' ? 'background:rgba(251,191,36,.1);color:#fbbf24;border:1px solid rgba(251,191,36,.3)' :
-            m.status==='replied' ? 'background:rgba(0,255,136,.1);color:#00ff88;border:1px solid rgba(0,255,136,.2)' :
-            'background:rgba(124,58,237,.1);color:#a78bfa;border:1px solid rgba(124,58,237,.3)'
-          }">${m.status.toUpperCase()}</span>
-        </div>
-        ${m.admin_reply ? `<div style="margin-top:8px;padding:8px 10px;background:rgba(0,255,136,.05);border:1px solid rgba(0,255,136,.15);border-radius:7px;font-size:12px;color:var(--accent)">💬 Admin: ${esc(m.admin_reply)}</div>` : ''}
-      </div>`).join('');
-  } catch(e) {
-    el.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">Could not load messages.</div>';
-  }
-}
-async function sendSupport() {
-  const text = document.getElementById('sup-text').value.trim();
-  const status = document.getElementById('sup-msg-status');
-  const btn = document.getElementById('sup-send-btn');
-  if (!text) {
-    status.textContent = 'Please write a message.';
-    status.style.cssText = 'display:block;background:rgba(248,81,73,.1);color:var(--danger);border:1px solid rgba(248,81,73,.3);padding:8px 12px;border-radius:8px;font-size:12px;margin-bottom:8px';
-    return;
-  }
-  btn.textContent = 'Sending...'; btn.disabled = true;
-  try {
-    await api('/api/support/send', 'POST', { message: text });
-    document.getElementById('sup-text').value = '';
-    status.textContent = '✅ Message sent! We will reply soon.';
-    status.style.cssText = 'display:block;background:rgba(0,255,136,.08);color:var(--accent);border:1px solid rgba(0,255,136,.2);padding:8px 12px;border-radius:8px;font-size:12px;margin-bottom:8px';
-    loadSupportMsgs();
-  } catch(e) {
-    status.textContent = e.message || 'Failed. Try again.';
-    status.style.cssText = 'display:block;background:rgba(248,81,73,.1);color:var(--danger);border:1px solid rgba(248,81,73,.3);padding:8px 12px;border-radius:8px;font-size:12px;margin-bottom:8px';
-  }
-  btn.textContent = 'Send Message →'; btn.disabled = false;
-}
-
-// FORGOT PASSWORD
-const VERIFY_QUESTIONS = [
-  'What city were you born in?',
-  'What was your first pet's name?',
-  'What is your mother's first name?',
-  'What primary school did you attend?',
-  'What year did you create this account?'
-];
-let frgQuestion = '';
-
-function showForgot() {
-  document.getElementById('forgot-modal').style.display = 'flex';
-  document.getElementById('frg-step1').style.display = 'block';
-  document.getElementById('frg-step2').style.display = 'none';
-  document.getElementById('frg-email').value = document.getElementById('si-e')?.value || '';
-}
-function hideForgot() {
-  document.getElementById('forgot-modal').style.display = 'none';
-}
-async function doForgotStep1() {
-  const email = document.getElementById('frg-email').value.trim();
-  if (!email) { toast('❌ Enter your email'); return; }
-  const btn = document.getElementById('frg-next-btn');
-  btn.textContent = 'Checking...'; btn.disabled = true;
-  try {
-    await api('/api/auth/forgot-check', 'POST', { email });
-    frgQuestion = VERIFY_QUESTIONS[Math.floor(Math.random() * VERIFY_QUESTIONS.length)];
-    document.getElementById('frg-question').textContent = frgQuestion;
-    document.getElementById('frg-step1').style.display = 'none';
-    document.getElementById('frg-step2').style.display = 'block';
-    document.getElementById('frg-answer').value = '';
-    document.getElementById('frg-reason').value = '';
-    document.getElementById('frg-msg').style.display = 'none';
-  } catch(e) {
-    toast('❌ ' + (e.message || 'Email not found'));
-  }
-  btn.textContent = 'Next →'; btn.disabled = false;
-}
-async function doForgotRequest() {
-  const email = document.getElementById('frg-email').value.trim();
-  const answer = document.getElementById('frg-answer').value.trim();
-  const reason = document.getElementById('frg-reason').value.trim();
-  const msg = document.getElementById('frg-msg');
-  const btn = document.getElementById('frg-btn');
-  if (!answer) {
-    msg.textContent = 'Please answer the verify question.';
-    msg.style.cssText = 'display:block;background:rgba(248,81,73,.1);color:var(--danger);border:1px solid rgba(248,81,73,.3);padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px';
-    return;
-  }
-  btn.textContent = 'Sending...'; btn.disabled = true;
-  try {
-    await api('/api/auth/forgot-password', 'POST', { email, answer, question: frgQuestion, reason });
-    msg.textContent = '✅ Request sent! Admin will verify and reset your password.';
-    msg.style.cssText = 'display:block;background:rgba(0,255,136,.08);color:var(--accent);border:1px solid rgba(0,255,136,.2);padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px';
-    btn.textContent = 'Request Sent ✓';
-  } catch(e) {
-    msg.textContent = e.message || 'Failed. Try again.';
-    msg.style.cssText = 'display:block;background:rgba(248,81,73,.1);color:var(--danger);border:1px solid rgba(248,81,73,.3);padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px';
-    btn.textContent = 'Send Reset Request →'; btn.disabled = false;
-  }
-}
-
 // WEB3 WALLET LOGIN
-
-async function connectByAddress() {
-  const addr = document.getElementById('wallet-addr-input').value.trim();
-  if (!addr || addr.length < 20) { toast('❌ Please paste a valid wallet address'); return; }
-
-  const ref = document.getElementById('su-r')?.value?.trim()?.toUpperCase() || '';
-  closeWalletModal();
-  setL('CONNECTING...');
-  document.getElementById('loader').style.display = 'flex';
-
-  try {
-    const data = await api('/api/auth/wallet', 'POST', {
-      wallet_address: addr,
-      wallet_type: addr.startsWith('0x') ? 'evm' : 'solana',
-      ref_code: ref || null
-    });
-    token = data.token; me = data.user;
-    saveSession();
-    localStorage.setItem('app_last_sync', String(Date.now()));
-    await finishLogin(true);
-  } catch(e) {
-    document.getElementById('loader').style.display = 'none';
-    toast('❌ ' + (e.message || 'Failed. Check address and try again.'));
-  }
-}
 // ============================================
 function showWalletModal() { document.getElementById('wallet-modal').classList.add('show'); }
 function closeWalletModal() { document.getElementById('wallet-modal').classList.remove('show'); }
@@ -1223,12 +967,11 @@ async function finishLogin(freshLogin = false) {
   document.getElementById('loader').style.display = 'flex';
   document.getElementById('login-screen').classList.remove('show');
   try {
-    // freshLogin=true (naya login/register): cache skip karo, DB se lo
     if (freshLogin) { cacheClear('/api/settings'); cacheClear('/api/tasks'); }
-    const [settings, taskData] = await Promise.all([
-      api('/api/settings'),
-      api('/api/tasks')
-    ]);
+    // Settings aur tasks alag alag lo — ek fail ho to doosra rok na sake
+    let settings = {}, taskData = { tasks: [], done: [] };
+    try { settings = await api('/api/settings'); } catch(e) { console.warn('settings:', e); }
+    try { taskData = await api('/api/tasks'); } catch(e) { console.warn('tasks:', e); }
     cfg = settings;
     if (cfg.announcement) {
       const b = document.getElementById('ann-bar');
@@ -1241,21 +984,23 @@ async function finishLogin(freshLogin = false) {
     }
     doneTasks = new Set(taskData.done || []);
     renderTasks(taskData.tasks || []);
-    await loadRoadmap();
+    try { await loadRoadmap(); } catch(e) { console.warn('roadmap:', e); }
     renderUser();
     updateMineUI();
     startTicker();
     startAnimalLoop();
     showApp();
   } catch(e) {
-    console.error('finishLogin:', e);
+    console.error('finishLogin error:', e);
+    // Token invalid — logout karke login dikhao
+    localStorage.removeItem('app_token');
+    localStorage.removeItem('app_user');
+    localStorage.removeItem('app_last_sync');
     showLogin();
-    showE('Error loading. Please refresh.');
   }
 }
 
 function showApp() {
-  try { clearTimeout(window._safetyTimer); } catch {}
   document.getElementById('loader').style.display = 'none';
   document.getElementById('app-screen').classList.add('show');
   const ln = document.getElementById('login-nav');
@@ -1263,7 +1008,6 @@ function showApp() {
 }
 
 function showLogin() {
-  try { clearTimeout(window._safetyTimer); } catch {}
   document.getElementById('loader').style.display = 'none';
   document.getElementById('login-screen').classList.add('show');
   const ln = document.getElementById('login-nav');
@@ -1278,8 +1022,6 @@ function renderUser() {
   const p = Math.floor(me.points || 0).toLocaleString();
   const name = me.username || 'Miner';
   setText('musr', '@' + name);
-  const hlu = document.getElementById('hlogo-username');
-  if (hlu) { hlu.textContent = '@' + name; }
   setText('mbal', p); setText('hbal', p);
   setText('mpow', '⚡ ' + (me.mining_power || 1).toFixed(1) + 'x Power');
   setText('stm', Math.floor(me.total_mined || 0).toLocaleString());
@@ -1737,12 +1479,12 @@ async function loadLB() {
     if (!c || !data) return;
     const em = ['🥇','🥈','🥉'];
     c.innerHTML = data.map((u, i) => {
-      const displayName = u.username ? '@' + u.username : (u.wallet_address ? u.wallet_address.slice(0,6)+'...'+u.wallet_address.slice(-4) : 'miner');
+      const name = u.username || (u.wallet_address ? u.wallet_address.slice(0,6)+'...'+u.wallet_address.slice(-4) : 'miner');
       const isMe = u.username === me?.username;
       return `<div class="lbitem" style="${isMe ? 'border-color:rgba(0,255,136,.3);background:rgba(0,255,136,.03);' : ''}">
         <div class="lbrank ${['gold','silver','bronze'][i]||''}">${i < 3 ? em[i] : '#'+(i+1)}</div>
         <div class="lbinfo">
-          <div class="lbname">${esc(displayName)} ${isMe ? '<span style="color:var(--accent);font-size:10px">(you)</span>' : ''}</div>
+          <div class="lbname">${esc(name)} ${isMe ? '<span style="color:var(--accent);font-size:10px">(you)</span>' : ''}</div>
           <div class="lbsub">⚡ ${(u.mining_power||1).toFixed(1)}x • 👥 ${u.active_referrals||0}/${u.total_referrals||0} active refs</div>
         </div>
         <div class="lbpts">${Math.floor(u.total_mined||0).toLocaleString()}</div>
