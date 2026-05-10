@@ -864,11 +864,16 @@ async function api(path, method = 'GET', body = null) {
 // INIT
 // ============================================
 window.addEventListener('DOMContentLoaded', async () => {
-  // Safety net — agar kuch bhi fail ho to 8 sec baad login show karo
-  const safetyTimer = setTimeout(() => {
+  // Domain migration: purana pages.dev token/cache clear karo
+  if (localStorage.getItem('ai2e_domain_ver') !== 'ai2e.space.v1') {
+    localStorage.clear();
+    localStorage.setItem('ai2e_domain_ver', 'ai2e.space.v1');
+  }
+
+  window._safetyTimer = setTimeout(() => {
     document.getElementById('loader').style.display = 'none';
     document.getElementById('login-screen').classList.add('show');
-  }, 8000);
+  }, 6000);
   const ref = new URLSearchParams(window.location.search).get('ref');
   if (ref) {
     const el = document.getElementById('su-r');
@@ -1250,7 +1255,7 @@ async function finishLogin(freshLogin = false) {
 }
 
 function showApp() {
-  if (typeof safetyTimer !== 'undefined') clearTimeout(safetyTimer);
+  try { clearTimeout(window._safetyTimer); } catch {}
   document.getElementById('loader').style.display = 'none';
   document.getElementById('app-screen').classList.add('show');
   const ln = document.getElementById('login-nav');
@@ -1258,7 +1263,7 @@ function showApp() {
 }
 
 function showLogin() {
-  if (typeof safetyTimer !== 'undefined') clearTimeout(safetyTimer);
+  try { clearTimeout(window._safetyTimer); } catch {}
   document.getElementById('loader').style.display = 'none';
   document.getElementById('login-screen').classList.add('show');
   const ln = document.getElementById('login-nav');
