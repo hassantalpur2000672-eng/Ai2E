@@ -530,6 +530,14 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
         <small>All ETH Wallets</small>
       </button>
     </div>
+    <div style="margin:4px 16px 0;border-top:1px solid var(--border);padding-top:14px">
+      <div style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:10px;letter-spacing:.5px">OR PASTE WALLET ADDRESS</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">If you registered with a wallet address, paste it here to sign in. New users can also paste an address to register.</div>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="wallet-addr-input" placeholder="Paste wallet address (0x... or Solana)" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:'Space Mono',monospace;font-size:11px;outline:none" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"/>
+        <button onclick="connectByAddress()" style="padding:10px 14px;background:var(--accent);color:#030712;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">Go →</button>
+      </div>
+    </div>
     <button class="wallet-cancel" onclick="closeWalletModal()">Cancel</button>
   </div>
 </div>
@@ -777,7 +785,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 // ============================================
 // CONFIG
 // ============================================
-const API = 'https://ai2e.space';
+const API = '';
 const APP_URL = 'https://ai2e.space';
 
 // ============================================
@@ -856,6 +864,11 @@ async function api(path, method = 'GET', body = null) {
 // INIT
 // ============================================
 window.addEventListener('DOMContentLoaded', async () => {
+  // Safety net — agar kuch bhi fail ho to 8 sec baad login show karo
+  const safetyTimer = setTimeout(() => {
+    document.getElementById('loader').style.display = 'none';
+    document.getElementById('login-screen').classList.add('show');
+  }, 8000);
   const ref = new URLSearchParams(window.location.search).get('ref');
   if (ref) {
     const el = document.getElementById('su-r');
@@ -1075,6 +1088,31 @@ async function doForgotRequest() {
 }
 
 // WEB3 WALLET LOGIN
+
+async function connectByAddress() {
+  const addr = document.getElementById('wallet-addr-input').value.trim();
+  if (!addr || addr.length < 20) { toast('❌ Please paste a valid wallet address'); return; }
+
+  const ref = document.getElementById('su-r')?.value?.trim()?.toUpperCase() || '';
+  closeWalletModal();
+  setL('CONNECTING...');
+  document.getElementById('loader').style.display = 'flex';
+
+  try {
+    const data = await api('/api/auth/wallet', 'POST', {
+      wallet_address: addr,
+      wallet_type: addr.startsWith('0x') ? 'evm' : 'solana',
+      ref_code: ref || null
+    });
+    token = data.token; me = data.user;
+    saveSession();
+    localStorage.setItem('app_last_sync', String(Date.now()));
+    await finishLogin(true);
+  } catch(e) {
+    document.getElementById('loader').style.display = 'none';
+    toast('❌ ' + (e.message || 'Failed. Check address and try again.'));
+  }
+}
 // ============================================
 function showWalletModal() { document.getElementById('wallet-modal').classList.add('show'); }
 function closeWalletModal() { document.getElementById('wallet-modal').classList.remove('show'); }
@@ -1212,6 +1250,7 @@ async function finishLogin(freshLogin = false) {
 }
 
 function showApp() {
+  if (typeof safetyTimer !== 'undefined') clearTimeout(safetyTimer);
   document.getElementById('loader').style.display = 'none';
   document.getElementById('app-screen').classList.add('show');
   const ln = document.getElementById('login-nav');
@@ -1219,6 +1258,7 @@ function showApp() {
 }
 
 function showLogin() {
+  if (typeof safetyTimer !== 'undefined') clearTimeout(safetyTimer);
   document.getElementById('loader').style.display = 'none';
   document.getElementById('login-screen').classList.add('show');
   const ln = document.getElementById('login-nav');
