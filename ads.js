@@ -12,7 +12,7 @@
 
 /*const SOCIAL_BAR_SCRIPT = `
 <script src="https://pl29342089.profitablecpmratenetwork.com/e4/3b/9b/e43b9ba24a13948e1891c795dcb6715b.js"></script>
-`;
+`;*/
 
 
 // ====================================================================
@@ -21,10 +21,10 @@
 //  Page ke footer mein show hogi
 // ====================================================================
 
-const NATIVE_BANNER_SCRIPT = `
+/*const NATIVE_BANNER_SCRIPT = `
 <script async="async" data-cfasync="false" src="https://pl29342088.profitablecpmratenetwork.com/f060f56d36d7ed6e6c8161b8f7ec4599/invoke.js"></script>
 <div id="container-f060f56d36d7ed6e6c8161b8f7ec4599"></div>
-`;
+`;*/
 
 
 // ============================================================
