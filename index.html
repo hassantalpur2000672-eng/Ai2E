@@ -1020,7 +1020,7 @@ async function doForgotRequest() {
   btn.textContent = 'Sending...'; btn.disabled = true;
   try {
     await api('/api/auth/forgot-password', 'POST', { email, answer, question: _frgQ, new_password: newpw });
-    msg.textContent = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Request sent! Admin will verify and reset your password.';
+    msg.innerHTML = '✓ Request sent! Admin will verify and reset your password.';
     msg.style.cssText = 'display:block;background:rgba(0,255,136,.08);color:var(--accent);border:1px solid rgba(0,255,136,.2);padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px';
     btn.textContent = 'Sent ✓';
   } catch(e) {
@@ -1067,7 +1067,7 @@ async function sendSupport() {
   try {
     await api('/api/support/send', 'POST', { message: text });
     document.getElementById('sup-text').value = '';
-    status.textContent = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Message sent successfully!';
+    status.innerHTML = '✓ Message sent successfully!';
     status.style.cssText = 'display:block;background:rgba(0,255,136,.08);color:var(--accent);border:1px solid rgba(0,255,136,.2);padding:8px 12px;border-radius:8px;font-size:12px;margin-bottom:8px';
     loadSupportMsgs();
   } catch(e) {
@@ -1281,7 +1281,7 @@ function renderUser() {
   setText('rpa', me.active_referral_count || 0);
   setText('rpp', (me.mining_power || 1).toFixed(1) + 'x');
   const al = document.getElementById('avltr');
-  if (al) al.textContent = name[0]?.toUpperCase() || '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
+  if (al) al.textContent = name[0]?.toUpperCase() || '?';
 
   const wb = document.getElementById('pwallet-badge');
   if (wb && me.wallet_address) {
@@ -1321,7 +1321,7 @@ function updateMineUI() {
   const isClaimed = (me.mining_claimed == 1 || me.mining_claimed === true);
   const hasSession = !!(me.last_mining_start && me.last_mining_start !== 'null' && me.last_mining_start !== '');
   if (isClaimed || !hasSession) {
-    btn.className = 'start'; btn.textContent = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 10-8.5 8.5c-.83.83-.83 2.17 0 3 .83.83 2.17.83 3 0L17 13"/><path d="M14 10 9 5l2-2 5 5"/><path d="m16 8 3-3 2 2-3 3"/></svg> Start Mining'; btn.disabled = false;
+    btn.className = 'start'; btn.textContent = '⚒ Start Mining'; btn.disabled = false;
     pw.style.display = 'none'; pe.style.display = 'none';
     an.classList.remove('mactive'); setText('mrated', 'IDLE');
     if (msb) msb.classList.remove('show', 'claim-ready');
@@ -1374,7 +1374,7 @@ function updateMineUI() {
   }
 
   if (el >= dur) {
-    btn.className = 'claim'; btn.textContent = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 12 20 22 4 22 4 12"/><rect width="20" height="5" x="2" y="7"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg> Claim ' + earn.toLocaleString() + ' Tokens'; btn.disabled = false;
+    btn.className = 'claim'; btn.textContent = '✦ Claim ' + earn.toLocaleString() + ' Tokens'; btn.disabled = false;
     pw.style.display = 'block';
     document.getElementById('mpfill').style.width = '100%';
     setText('mplbl', 'Mining complete!'); setText('mptime', 'Ready!');
@@ -1383,7 +1383,7 @@ function updateMineUI() {
     return;
   }
   if (canClaim) {
-    btn.className = 'claim'; btn.textContent = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 12 20 22 4 22 4 12"/><rect width="20" height="5" x="2" y="7"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg> Claim ' + earn.toLocaleString() + ' Tokens (Early)'; btn.disabled = false;
+    btn.className = 'claim'; btn.textContent = '✦ Claim ' + earn.toLocaleString() + ' Tokens (Early)'; btn.disabled = false;
   } else {
     btn.className = 'mining'; btn.textContent = '⏳ Mining... need ' + MIN_CLAIM + ' pts (' + earn + ' so far)'; btn.disabled = false;
   }
@@ -1512,7 +1512,7 @@ async function finTask(id, pts) {
     await api('/api/tasks/complete', 'POST', { task_id: id });
     doneTasks.add(id);
     const card = document.getElementById('tc-' + id);
-    if (card) { card.classList.add('done'); const b = card.querySelector('.tbtn'); if (b) { b.className = 'tbtn dbtn'; b.textContent = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Done'; } }
+    if (card) { card.classList.add('done'); const b = card.querySelector('.tbtn'); if (b) { b.className = 'tbtn dbtn'; b.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Done'; } }
     toast('<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> +' + pts + ' Points earned!'); spawnCoin();
     cacheClear('/api/me'); await refreshMe(true);
   } catch(e) { toast('❌ ' + (e.message || 'Error')); }
@@ -1562,7 +1562,7 @@ function openVcodeModal(id, title, pts) {
   document.getElementById('vcode-pts').textContent = '+' + pts + ' Points';
   document.getElementById('vcode-inp').value = '';
   document.getElementById('vcode-submit-btn').disabled = false;
-  document.getElementById('vcode-submit-btn').textContent = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Verify';
+  document.getElementById('vcode-submit-btn').innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Verify';
   document.getElementById('vcode-submit-btn').onclick = submitVerifyCode;
   const msg = document.getElementById('vcode-msg');
   msg.className = 'vcode-msg'; msg.textContent = '';
@@ -1597,7 +1597,7 @@ async function submitVerifyCode() {
       showVcodeMsg('suc', '🎉 Correct code! +' + res.earned + ' Points earned!');
       doneTasks.add(activeVcode.id);
       const card = document.getElementById('tc-' + activeVcode.id);
-      if (card) { card.classList.add('done'); const b = card.querySelector('.tbtn'); if (b) { b.className = 'tbtn dbtn'; b.textContent = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Done'; } }
+      if (card) { card.classList.add('done'); const b = card.querySelector('.tbtn'); if (b) { b.className = 'tbtn dbtn'; b.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Done'; } }
       spawnCoin(); spawnCoin();
       setTimeout(() => { closeVcodeModal(); refreshMe(true); toast('<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> +' + res.earned + ' Points earned!'); }, 1800);
     } else {
@@ -1616,13 +1616,13 @@ async function submitVerifyCode() {
       } else {
         showVcodeMsg('err', '❌ ' + (res.message || 'Incorrect code!'));
         document.getElementById('vcode-inp').value = '';
-        btn.disabled = false; btn.textContent = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Verify';
+        btn.disabled = false; btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Verify';
         document.getElementById('vcode-inp').focus();
       }
     }
   } catch(e) {
     showVcodeMsg('err', e.message || 'Error occurred. Please try again.');
-    btn.disabled = false; btn.textContent = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Verify';
+    btn.disabled = false; btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Verify';
   }
 }
 
@@ -1677,7 +1677,7 @@ async function submitQuizAnswer() {
       showQuizMsg('suc', '🎉 Correct answer! +' + res.earned + ' Points earned!');
       doneTasks.add(activeQuiz.id);
       const card = document.getElementById('tc-' + activeQuiz.id);
-      if (card) { card.classList.add('done'); const b = card.querySelector('.tbtn'); if (b) { b.className = 'tbtn dbtn'; b.textContent = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Done'; } }
+      if (card) { card.classList.add('done'); const b = card.querySelector('.tbtn'); if (b) { b.className = 'tbtn dbtn'; b.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Done'; } }
       spawnCoin(); spawnCoin();
       setTimeout(() => { closeQuizModal(); refreshMe(true); toast('<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> +' + res.earned + ' Points earned!'); }, 1800);
     } else {
@@ -1696,13 +1696,13 @@ async function submitQuizAnswer() {
       } else {
         showQuizMsg('err', '❌ ' + (res.message || 'Wrong answer!'));
         document.getElementById('quiz-answer-inp').value = '';
-        btn.disabled = false; btn.textContent = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Submit';
+        btn.disabled = false; btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Submit';
         document.getElementById('quiz-answer-inp').focus();
       }
     }
   } catch(e) {
     showQuizMsg('err', e.message || 'Error occurred. Please try again.');
-    btn.disabled = false; btn.textContent = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Submit';
+    btn.disabled = false; btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Submit';
   }
 }
 
