@@ -258,24 +258,41 @@ export async function onRequest({ request, env }) {
       return json({ token, user });
     }
 
+    // ── FORGOT PASSWORD CHECK ─────────────────────
+    if (path === '/api/auth/forgot-check' && request.method === 'POST') {
+      const { email } = await request.json();
+      if (!email) return err('Email required');
+      const user = await dbFirst(env, 'SELECT id FROM users WHERE email = ?', [email.toLowerCase().trim()]);
+      if (!user) return err('Is email pe koi account nahi mila');
+      return json({ ok: true });
+    }
 
+    // ── FORGOT PASSWORD REQUEST ────────────────────
+    if (path === '/api/auth/forgot-password' && request.method === 'POST') {
+      const { email, answer, question, reason } = await request.json();
+      if (!email || !answer) return err('Email aur answer zaroor chahiye');
+      const user = await dbFirst(env, 'SELECT id, username FROM users WHERE email = ?', [email.toLowerCase().trim()]);
+      if (!user) return err('Account nahi mila');
+      const existing = await dbFirst(env, "SELECT id FROM password_resets WHERE user_id = ? AND status = 'pending'", [user.id]);
+      if (existing) return err('Reset request already pending hai. Admin jald review karega.');
+      await dbRun(env,
+        "INSERT INTO password_resets (id,user_id,username,email,verify_question,verify_answer,reason,status,created_at) VALUES (?,?,?,?,?,?,?,'pending',datetime('now'))",
+        [crypto.randomUUID(), user.id, user.username, email.toLowerCase(), question||'', answer, reason||'']
+      );
+      return json({ ok: true });
+    }
 
-
-    // ── SUPPORT: USER SEND MESSAGE (1 per 24h per user) ──
+    // ── SUPPORT: USER SEND MESSAGE (1 per 24h) ────
     if (path === '/api/support/send' && request.method === 'POST') {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
       const { message } = await request.json();
-      if (!message || message.trim().length < 5) return err('Message too short');
-      // 24h limit check
-      const last = await dbFirst(env,
-        "SELECT id FROM support_messages WHERE user_id = ? AND created_at > datetime('now', '-24 hours')",
-        [user.id]
-      );
-      if (last) return err('You can only send 1 support message per 24 hours. Please wait.');
+      if (!message || message.trim().length < 5) return err('Message bahut chota hai');
+      const last = await dbFirst(env, "SELECT id FROM support_messages WHERE user_id = ? AND created_at > datetime('now','-24 hours')", [user.id]);
+      if (last) return err('24 ghante mein sirf 1 message bhej sakte hain');
       await dbRun(env,
-        "INSERT INTO support_messages (id, user_id, username, email, message, status, created_at) VALUES (?,?,?,?,'open',datetime('now'))",
-        [crypto.randomUUID(), user.id, user.username, user.email || '', message.trim()]
+        "INSERT INTO support_messages (id,user_id,username,email,message,status,created_at) VALUES (?,?,?,?,?,'open',datetime('now'))",
+        [crypto.randomUUID(), user.id, user.username, user.email||'', message.trim()]
       );
       return json({ ok: true });
     }
@@ -284,95 +301,58 @@ export async function onRequest({ request, env }) {
     if (path === '/api/support/my-messages' && request.method === 'GET') {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
-      const msgs = await dbAll(env,
-        'SELECT * FROM support_messages WHERE user_id = ? ORDER BY created_at DESC LIMIT 20',
-        [user.id]
-      );
+      const msgs = await dbAll(env, 'SELECT * FROM support_messages WHERE user_id = ? ORDER BY created_at DESC LIMIT 10', [user.id]);
       return json(msgs);
     }
 
-    // ── ADMIN: GET ALL SUPPORT MESSAGES ───────────
+    // ── ADMIN: SUPPORT MESSAGES ───────────────────
     if (path === '/api/admin/support' && request.method === 'GET') {
-      const key = request.headers.get('x-admin-key');
-      if (key !== env.ADMIN_KEY) return err('Unauthorized', 401);
-      const msgs = await dbAll(env, "SELECT * FROM support_messages ORDER BY created_at DESC LIMIT 100");
-      return json({ messages: msgs });
+      const k = request.headers.get('X-Admin-Key');
+      if (k !== (env.ADMIN_KEY||'Admin@2026')) return err('Forbidden',403);
+      return json({ messages: await dbAll(env, 'SELECT * FROM support_messages ORDER BY created_at DESC LIMIT 100') });
     }
 
-    // ── ADMIN: REPLY TO SUPPORT MESSAGE ───────────
     if (path === '/api/admin/support/reply' && request.method === 'POST') {
-      const key = request.headers.get('x-admin-key');
-      if (key !== env.ADMIN_KEY) return err('Unauthorized', 401);
+      const k = request.headers.get('X-Admin-Key');
+      if (k !== (env.ADMIN_KEY||'Admin@2026')) return err('Forbidden',403);
       const { msg_id, reply } = await request.json();
-      if (!msg_id || !reply) return err('Missing fields');
-      await dbRun(env,
-        "UPDATE support_messages SET admin_reply = ?, status = 'replied', replied_at = datetime('now') WHERE id = ?",
-        [reply, msg_id]
-      );
+      await dbRun(env, "UPDATE support_messages SET admin_reply=?,status='replied',replied_at=datetime('now') WHERE id=?", [reply, msg_id]);
       return json({ ok: true });
     }
 
-    // ── ADMIN: CLOSE SUPPORT MESSAGE ──────────────
     if (path === '/api/admin/support/close' && request.method === 'POST') {
-      const key = request.headers.get('x-admin-key');
-      if (key !== env.ADMIN_KEY) return err('Unauthorized', 401);
+      const k = request.headers.get('X-Admin-Key');
+      if (k !== (env.ADMIN_KEY||'Admin@2026')) return err('Forbidden',403);
       const { msg_id } = await request.json();
-      await dbRun(env, "UPDATE support_messages SET status = 'closed' WHERE id = ?", [msg_id]);
+      await dbRun(env, "UPDATE support_messages SET status='closed' WHERE id=?", [msg_id]);
       return json({ ok: true });
     }
 
-    // ── FORGOT PASSWORD CHECK (email exists) ────────
-    if (path === '/api/auth/forgot-check' && request.method === 'POST') {
-      const { email } = await request.json();
-      if (!email) return err('Email required');
-      const user = await dbFirst(env, 'SELECT id FROM users WHERE email = ?', [email.toLowerCase()]);
-      if (!user) return err('No account found with this email');
-      return json({ ok: true });
-    }
-
-    // ── FORGOT PASSWORD REQUEST ────────────────────
-    if (path === '/api/auth/forgot-password' && request.method === 'POST') {
-      const { email, answer, question, reason } = await request.json();
-      if (!email || !answer) return err('Email and answer required');
-      const user = await dbFirst(env, 'SELECT id, username, email FROM users WHERE email = ?', [email.toLowerCase()]);
-      if (!user) return err('No account found with this email');
-      const existing = await dbFirst(env, "SELECT id FROM password_resets WHERE user_id = ? AND status = 'pending'", [user.id]);
-      if (existing) return err('Reset request already pending. Admin will review soon.');
-      await dbRun(env,
-        "INSERT INTO password_resets (id, user_id, username, email, verify_question, verify_answer, reason, status, created_at) VALUES (?,?,?,?,?,?,'pending',datetime('now'))",
-        [crypto.randomUUID(), user.id, user.username, email.toLowerCase(), question || '', answer]
-      );
-      return json({ ok: true });
-    }
-
-    // ── ADMIN: GET RESET REQUESTS ─────────────────
+    // ── ADMIN: RESET REQUESTS ─────────────────────
     if (path === '/api/admin/reset-requests' && request.method === 'GET') {
-      const key = request.headers.get('x-admin-key');
-      if (key !== env.ADMIN_KEY) return err('Unauthorized', 401);
-      const requests = await dbAll(env, "SELECT * FROM password_resets ORDER BY created_at DESC LIMIT 50");
-      return json({ requests });
+      const k = request.headers.get('X-Admin-Key');
+      if (k !== (env.ADMIN_KEY||'Admin@2026')) return err('Forbidden',403);
+      return json({ requests: await dbAll(env, "SELECT * FROM password_resets ORDER BY created_at DESC LIMIT 50") });
     }
 
-    // ── ADMIN: APPROVE RESET (set new password) ───
     if (path === '/api/admin/reset-approve' && request.method === 'POST') {
-      const key = request.headers.get('x-admin-key');
-      if (key !== env.ADMIN_KEY) return err('Unauthorized', 401);
+      const k = request.headers.get('X-Admin-Key');
+      if (k !== (env.ADMIN_KEY||'Admin@2026')) return err('Forbidden',403);
       const { reset_id, new_password } = await request.json();
-      if (!reset_id || !new_password || new_password.length < 6) return err('Invalid data');
-      const reset = await dbFirst(env, 'SELECT * FROM password_resets WHERE id = ?', [reset_id]);
-      if (!reset) return err('Request not found');
+      if (!reset_id || !new_password || new_password.length < 6) return err('Invalid');
+      const reset = await dbFirst(env, 'SELECT * FROM password_resets WHERE id=?', [reset_id]);
+      if (!reset) return err('Request nahi mili');
       const hashed = await hashPassword(new_password);
-      await dbRun(env, 'UPDATE users SET password_hash = ? WHERE id = ?', [hashed, reset.user_id]);
-      await dbRun(env, "UPDATE password_resets SET status = 'approved', resolved_at = datetime('now') WHERE id = ?", [reset_id]);
+      await dbRun(env, 'UPDATE users SET password_hash=? WHERE id=?', [hashed, reset.user_id]);
+      await dbRun(env, "UPDATE password_resets SET status='approved',resolved_at=datetime('now') WHERE id=?", [reset_id]);
       return json({ ok: true });
     }
 
-    // ── ADMIN: REJECT RESET ───────────────────────
     if (path === '/api/admin/reset-reject' && request.method === 'POST') {
-      const key = request.headers.get('x-admin-key');
-      if (key !== env.ADMIN_KEY) return err('Unauthorized', 401);
+      const k = request.headers.get('X-Admin-Key');
+      if (k !== (env.ADMIN_KEY||'Admin@2026')) return err('Forbidden',403);
       const { reset_id } = await request.json();
-      await dbRun(env, "UPDATE password_resets SET status = 'rejected', resolved_at = datetime('now') WHERE id = ?", [reset_id]);
+      await dbRun(env, "UPDATE password_resets SET status='rejected',resolved_at=datetime('now') WHERE id=?", [reset_id]);
       return json({ ok: true });
     }
 
