@@ -90,16 +90,62 @@
     .ad-type-badge.native{background:rgba(0,204,255,.1);color:#00ccff;}
     .ad-type-badge.social{background:rgba(248,81,73,.1);color:var(--danger);}
     .ad-type-badge.smartlink{background:rgba(124,58,237,.15);color:var(--accent2);}
+    /* ── HAMBURGER MENU ── */
+    .mob-menu-btn{display:none;background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;padding:4px 8px;line-height:1;}
+    .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:199;}
+    .sidebar-overlay.open{display:block;}
+
     @media(max-width:900px){
-      .stats-row{grid-template-columns:1fr 1fr;}
-      .sidebar{width:100%;min-height:auto;display:flex;flex-wrap:wrap;gap:4px;padding:8px;border-right:none;border-bottom:1px solid var(--border);}
-      .sidebar-btn{padding:6px 10px;font-size:11px;flex:1;min-width:80px;text-align:center;}
-      .sidebar-section{display:none;}
+      /* Header */
+      .admin-header{padding:10px 14px;}
+      .admin-logo{font-size:12px;}
+      .mob-menu-btn{display:block;}
+
+      /* Sidebar — drawer from left */
       .admin-body{flex-direction:column;}
-      .main-content{padding:12px;}
+      .sidebar{
+        position:fixed;top:0;left:-220px;width:220px;height:100vh;
+        z-index:200;background:var(--surface);border-right:1px solid var(--border);
+        padding:16px 0;overflow-y:auto;
+        transition:left .25s ease;
+      }
+      .sidebar.open{left:0;}
+      .sidebar-btn{padding:12px 18px;font-size:13px;width:100%;text-align:left;}
+      .sidebar-section{display:block;}
+
+      /* Main panel */
+      .main-panel{padding:12px;width:100%;}
+
+      /* Stats grid */
+      .stats-row{grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;}
+      .stat-box{padding:12px;}
+      .stat-box-val{font-size:18px;}
+
+      /* Panel header */
       .panel-head{flex-direction:column;gap:8px;align-items:flex-start;}
-      .table-wrap{overflow-x:auto;}
-      table{min-width:500px;}
+      .panel-title{font-size:15px;}
+
+      /* Tables — horizontal scroll */
+      .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+      table{min-width:520px;}
+
+      /* Modals */
+      .modal-box{padding:16px;margin:0 4px;}
+      .modal-overlay{padding:10px;}
+
+      /* Settings */
+      .setting-row{flex-direction:column;align-items:flex-start;}
+      .setting-key{width:100%;}
+
+      /* Toast */
+      #a-toast{bottom:16px;right:12px;left:12px;text-align:center;}
+    }
+
+    @media(max-width:480px){
+      .stats-row{grid-template-columns:1fr 1fr;gap:6px;}
+      .stat-box-val{font-size:16px;}
+      .btn-sm{padding:5px 10px;font-size:11px;}
+      .main-panel{padding:10px;}
     }
   </style>
 </head>
@@ -118,15 +164,20 @@
 
 <div id="admin-app">
   <div class="admin-header">
-    <div class="admin-logo">⛏️ TOKEN Admin</div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <button class="mob-menu-btn" onclick="toggleSidebar()" aria-label="Menu">☰</button>
+      <div class="admin-logo">⛏️ TOKEN Admin</div>
+    </div>
     <div style="display:flex;align-items:center;gap:12px;">
       <span style="font-size:12px;color:var(--muted);" id="a-live-time"></span>
       <button class="btn btn-sm btn-danger" onclick="adminLogout()">Logout</button>
     </div>
   </div>
 
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
   <div class="admin-body">
-    <div class="sidebar">
+    <div class="sidebar" id="sidebar">
       <button class="sidebar-btn active" onclick="showPanel('dashboard',this)">📊 Dashboard</button>
       <button class="sidebar-btn" onclick="showPanel('tasks',this)">🎯 Tasks</button>
       <button class="sidebar-btn" onclick="showPanel('users',this)">👥 Users</button>
@@ -411,7 +462,7 @@
 // ============================================
 // CONFIG — APNA WORKER URL YAHAN LIKHO
 // ============================================
-const API = 'https://ai2e.pages.dev';
+const API = ''; // Relative URL — works on any domain
 const ADMIN_KEY = 'Admin@2026'; // ← same jo Worker mein set kiya
 
 // ============================================
@@ -525,6 +576,18 @@ function adminLogout() {
   document.getElementById('admin-app').style.display = 'none';
 }
 
+function toggleSidebar() {
+  const sb = document.getElementById('sidebar');
+  const ov = document.getElementById('sidebar-overlay');
+  sb.classList.toggle('open');
+  ov.classList.toggle('open');
+}
+
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('open');
+}
+
 function startClock() {
   const el = document.getElementById('a-live-time');
   setInterval(() => { el.textContent = new Date().toLocaleTimeString(); }, 1000);
@@ -540,6 +603,7 @@ function showPanel(name, btn) {
   if (btn) btn.classList.add('active');
   const loaders = { tasks:loadTasks, users:loadUsers, mining:loadMining, transactions:loadTx, blog:loadBlog, settings:loadSettings, dashboard:loadDashboard, ads:loadAds };
   if (loaders[name]) loaders[name]();
+  closeSidebar(); // auto-close drawer on mobile
 }
 
 // ============================================
