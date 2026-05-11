@@ -290,6 +290,10 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 .quiz-submit:disabled{opacity:.5;cursor:not-allowed}
 .quiz-cancel{padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);font-family:'Outfit',sans-serif;font-size:14px;cursor:pointer}
 
+/* SUPPORT FAB */
+.sup-fab{position:fixed;bottom:90px;right:16px;width:48px;height:48px;background:var(--accent2);border:none;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;z-index:500;box-shadow:0 4px 16px rgba(124,58,237,.4);transition:transform .2s}
+.sup-fab:active{transform:scale(.92)}
+
 /* TOAST */
 #toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--surface2);border:1px solid var(--border);padding:9px 18px;border-radius:99px;font-size:13px;font-weight:500;white-space:nowrap;z-index:9999;opacity:0;transition:all .3s;pointer-events:none;max-width:90vw}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -305,8 +309,14 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 </div>
 
 <!-- LOGIN TOP NAV -->
-<div id="login-nav" style="position:fixed;top:0;left:0;right:0;z-index:200;background:rgba(3,7,18,.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between">
-  <div style="font-family:'Space Mono',monospace;font-size:13px;color:var(--accent);font-weight:700">⛏️ Ai2E</div>
+<div id="login-nav" style="position:fixed;top:0;left:0;right:0;z-index:200;background:rgba(3,7,18,.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;justify-content:space-between">
+  <div style="display:flex;align-items:center;gap:8px">
+    <img src="/favicon.svg" width="32" height="32" style="border-radius:9px;flex-shrink:0" alt="Ai2E"/>
+    <div>
+      <div style="background:linear-gradient(90deg,#fff 20%,#00ff88 60%,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:2px;font-size:16px;font-weight:700;font-family:'Space Mono',monospace">Ai2E</div>
+      <div style="font-size:8px;color:#7d8590;letter-spacing:1.5px;text-transform:uppercase;margin-top:-1px">Mine · Earn · Own</div>
+    </div>
+  </div>
   <button class="hmbtn" id="ln-hmbtn" onclick="toggleLoginMenu()" style="background:none;border:none;cursor:pointer;padding:6px;display:flex;flex-direction:column;gap:5px">
     <span style="display:block;width:22px;height:2px;background:var(--text);border-radius:2px"></span>
     <span style="display:block;width:22px;height:2px;background:var(--text);border-radius:2px"></span>
@@ -338,6 +348,22 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
       <div class="brand-logo">Ai2E</div>
       <div class="brand-title">Mine. Earn. Own.</div>
       <div class="brand-sub">Free mining platform. Earn daily. Real crypto launch on Solana.</div>
+      <div style="margin:16px 0 4px;display:flex;flex-direction:column;gap:8px;width:100%">
+        <div style="display:flex;align-items:center;gap:10px;background:rgba(0,255,136,0.06);border:1px solid rgba(0,255,136,0.15);border-radius:10px;padding:10px 14px">
+          <span style="font-size:18px">⚡</span>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--accent);letter-spacing:.5px">EARN DAILY REWARDS</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:1px">Mine Ai2E tokens for free — no hardware needed</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;background:rgba(124,58,237,0.06);border:1px solid rgba(124,58,237,0.15);border-radius:10px;padding:10px 14px">
+          <span style="font-size:18px">🚀</span>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--accent2);letter-spacing:.5px">SOLANA TOKEN LAUNCH</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:1px">Real crypto — early miners earn the most</div>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="card">
       <div class="tabs">
@@ -350,7 +376,12 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
       <!-- SIGN IN -->
       <div id="fin">
         <div class="fg"><label>Email</label><input type="email" id="si-e" placeholder="you@example.com" autocomplete="email"/></div>
-        <div class="fg"><label>Password</label><input type="password" id="si-p" placeholder="••••••••" autocomplete="current-password"/></div>
+        <div class="fg">
+          <label style="display:flex;align-items:center;justify-content:space-between">Password
+            <span onclick="showForgot()" style="color:var(--accent);font-size:11px;cursor:pointer;font-weight:600;text-transform:none;letter-spacing:0">Forgot password?</span>
+          </label>
+          <input type="password" id="si-p" placeholder="••••••••" autocomplete="current-password"/>
+        </div>
         <button class="btn-p" id="bsi" onclick="doSignIn()">Sign In →</button>
       </div>
 
@@ -378,6 +409,50 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
         <div class="stat-pill"><div class="spv">FREE</div><div class="spl">To Join</div></div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- FORGOT PASSWORD MODAL -->
+<div id="forgot-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(12px);z-index:9000;align-items:flex-end;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:20px 20px 0 0;padding:28px 20px 40px;width:100%;max-width:480px;animation:slideUp .3s ease">
+    <div style="font-size:18px;font-weight:800;text-align:center;margin-bottom:4px">🔑 Forgot Password</div>
+    <div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:18px">Verify karo k account tumhara hai — phir admin reset karega.</div>
+    <div id="frg-step1">
+      <div class="fg" style="margin-bottom:12px"><label>Your Email</label><input type="email" id="frg-email" placeholder="you@example.com"/></div>
+      <button class="btn-p" id="frg-next-btn" onclick="doForgotStep1()">Next →</button>
+      <button onclick="hideForgot()" style="width:100%;padding:12px;background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;margin-top:8px">Cancel</button>
+    </div>
+    <div id="frg-step2" style="display:none">
+      <div style="background:rgba(0,255,136,.06);border:1px solid rgba(0,255,136,.15);border-radius:10px;padding:12px 14px;margin-bottom:14px">
+        <div style="font-size:11px;color:var(--accent);font-weight:700;margin-bottom:4px">VERIFY QUESTION</div>
+        <div id="frg-question" style="font-size:14px;color:var(--text)"></div>
+      </div>
+      <div class="fg" style="margin-bottom:12px"><label>Your Answer</label><input type="text" id="frg-answer" placeholder="Jawab likho..."/></div>
+      <div class="fg" style="margin-bottom:16px"><label>Reason (optional)</label><input type="text" id="frg-reason" placeholder="e.g. lost access"/></div>
+      <div id="frg-msg" style="display:none;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px"></div>
+      <button class="btn-p" id="frg-btn" onclick="doForgotRequest()">Send Reset Request →</button>
+      <button onclick="hideForgot()" style="width:100%;padding:12px;background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;margin-top:8px">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- SUPPORT MODAL -->
+<div id="support-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(12px);z-index:9000;align-items:flex-end;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:20px 20px 0 0;padding:24px 20px 36px;width:100%;max-width:480px;animation:slideUp .3s ease;max-height:80vh;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <div style="font-size:17px;font-weight:800">💬 Support</div>
+      <button onclick="hideSupport()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:14px">24 ghante mein sirf 1 message — har account pe</div>
+    <div id="sup-msgs" style="flex:1;overflow-y:auto;margin-bottom:14px;min-height:100px;display:flex;flex-direction:column;gap:8px">
+      <div style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">Loading...</div>
+    </div>
+    <div class="fg" style="margin-bottom:8px">
+      <label>Message</label>
+      <textarea id="sup-text" placeholder="Apna masla likhein..." rows="3" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:11px 14px;color:var(--text);font-family:'Outfit',sans-serif;font-size:14px;outline:none;resize:none" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"></textarea>
+    </div>
+    <div id="sup-status" style="display:none;padding:8px 12px;border-radius:8px;font-size:12px;margin-bottom:8px"></div>
+    <button class="btn-p" id="sup-btn" onclick="sendSupport()">Send Message →</button>
   </div>
 </div>
 
@@ -430,6 +505,14 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
         <small>All ETH Wallets</small>
       </button>
     </div>
+    <div style="margin:4px 16px 0;border-top:1px solid var(--border);padding-top:14px">
+      <div style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:8px;letter-spacing:.5px">YA WALLET ADDRESS PASTE KAREN</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Agar pehle wallet address se register kiya hai to wahi paste karen. Naye users bhi address dal kar register kar sakte hain.</div>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="wallet-addr-input" placeholder="0x... ya Solana address paste karen" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:'Space Mono',monospace;font-size:11px;outline:none" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"/>
+        <button onclick="connectByAddress()" style="padding:10px 14px;background:var(--accent);color:#030712;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">Go →</button>
+      </div>
+    </div>
     <button class="wallet-cancel" onclick="closeWalletModal()">Cancel</button>
   </div>
 </div>
@@ -439,15 +522,9 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
   <div id="ann-bar"></div>
   <div class="header">
     <div class="hlogo">
-      <div class="hlogo-icon">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z" fill="rgba(3,7,18,.6)"/>
-          <path d="M9 12l2 2 4-4" stroke="#00ff88" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <circle cx="12" cy="12" r="1.5" fill="#fff" opacity=".6"/>
-        </svg>
-      </div>
+      <img src="/favicon.svg" width="34" height="34" style="border-radius:9px;flex-shrink:0" alt="Ai2E"/>
       <div>
-        <span class="hlogo-text">Ai2E</span>
+        <span class="hlogo-text" id="hlogo-username">Ai2E</span>
         <span class="hlogo-sub">AI to Earn</span>
       </div>
     </div>
@@ -607,6 +684,9 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
     </div>
   </div>
 
+  <!-- SUPPORT FAB -->
+  <button class="sup-fab" onclick="showSupport()">💬</button>
+
   <nav class="bnav">
     <button class="nbtn active" onclick="nav('mine',this)"><div class="nbico">⚙️</div>MINE</button>
     <button class="nbtn" onclick="nav('top',this)"><div class="nbico">🎯</div>TOP</button>
@@ -756,11 +836,13 @@ async function api(path, method = 'GET', body = null) {
 // INIT
 // ============================================
 window.addEventListener('DOMContentLoaded', async () => {
-  // New domain — purany pages.dev tokens clear karo
+  // Purana pages.dev token clear karo
   if (localStorage.getItem('ai2e_dv') !== 'v2') {
     ['app_token','app_user','app_last_sync'].forEach(k => localStorage.removeItem(k));
     localStorage.setItem('ai2e_dv', 'v2');
   }
+  // Safety — 7 sec baad bhi loader ho to login dikhao
+  window._st = setTimeout(() => { showLogin(); }, 7000);
   const ref = new URLSearchParams(window.location.search).get('ref');
   if (ref) {
     const el = document.getElementById('su-r');
@@ -861,6 +943,114 @@ async function doSignUp() {
 }
 
 // ============================================
+// FORGOT PASSWORD
+// ============================================
+const _FRG_Q = [
+  'Ap kis sheher mein paide hue?',
+  'Apke pehle pet ka naam kya tha?',
+  'Apki ammi ka pehla naam kya hai?',
+  'Apne kon si primary school mein parha?',
+  'Apka favorite childhood movie konsa tha?'
+];
+let _frgQ = '';
+
+function showForgot() {
+  document.getElementById('forgot-modal').style.display = 'flex';
+  document.getElementById('frg-step1').style.display = 'block';
+  document.getElementById('frg-step2').style.display = 'none';
+  const email = document.getElementById('si-e');
+  if (email) document.getElementById('frg-email').value = email.value || '';
+}
+function hideForgot() { document.getElementById('forgot-modal').style.display = 'none'; }
+
+async function doForgotStep1() {
+  const email = document.getElementById('frg-email').value.trim();
+  if (!email) { toast('❌ Email daalo'); return; }
+  const btn = document.getElementById('frg-next-btn');
+  btn.textContent = 'Checking...'; btn.disabled = true;
+  try {
+    await api('/api/auth/forgot-check', 'POST', { email });
+    _frgQ = _FRG_Q[Math.floor(Math.random() * _FRG_Q.length)];
+    document.getElementById('frg-question').textContent = _frgQ;
+    document.getElementById('frg-step1').style.display = 'none';
+    document.getElementById('frg-step2').style.display = 'block';
+    document.getElementById('frg-answer').value = '';
+    document.getElementById('frg-msg').style.display = 'none';
+  } catch(e) { toast('❌ ' + (e.message || 'Email nahi mila')); }
+  btn.textContent = 'Next →'; btn.disabled = false;
+}
+
+async function doForgotRequest() {
+  const email = document.getElementById('frg-email').value.trim();
+  const answer = document.getElementById('frg-answer').value.trim();
+  const reason = document.getElementById('frg-reason').value.trim();
+  const msg = document.getElementById('frg-msg');
+  const btn = document.getElementById('frg-btn');
+  if (!answer) {
+    msg.textContent = 'Jawab zaroor daalo.';
+    msg.style.cssText = 'display:block;background:rgba(248,81,73,.1);color:var(--danger);border:1px solid rgba(248,81,73,.3);padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px';
+    return;
+  }
+  btn.textContent = 'Sending...'; btn.disabled = true;
+  try {
+    await api('/api/auth/forgot-password', 'POST', { email, answer, question: _frgQ, reason });
+    msg.textContent = '✅ Request send ho gayi! Admin verify karke password reset karega.';
+    msg.style.cssText = 'display:block;background:rgba(0,255,136,.08);color:var(--accent);border:1px solid rgba(0,255,136,.2);padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px';
+    btn.textContent = 'Sent ✓';
+  } catch(e) {
+    msg.textContent = e.message || 'Failed. Try again.';
+    msg.style.cssText = 'display:block;background:rgba(248,81,73,.1);color:var(--danger);border:1px solid rgba(248,81,73,.3);padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px';
+    btn.textContent = 'Send Reset Request →'; btn.disabled = false;
+  }
+}
+
+// SUPPORT
+// ============================================
+function showSupport() {
+  document.getElementById('support-modal').style.display = 'flex';
+  loadSupportMsgs();
+}
+function hideSupport() { document.getElementById('support-modal').style.display = 'none'; }
+
+async function loadSupportMsgs() {
+  const el = document.getElementById('sup-msgs');
+  try {
+    const data = await api('/api/support/my-messages');
+    if (!data || !data.length) {
+      el.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">Koi message nahi — hamein likho!</div>';
+      return;
+    }
+    el.innerHTML = data.map(m => `
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px">
+        <div style="font-size:13px;color:var(--text);margin-bottom:6px">${esc(m.message)}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:10px;color:var(--muted)">${new Date(m.created_at).toLocaleString()}</span>
+          <span style="font-size:10px;padding:2px 8px;border-radius:99px;${m.status==='open'?'background:rgba(251,191,36,.1);color:#fbbf24;border:1px solid rgba(251,191,36,.3)':m.status==='replied'?'background:rgba(0,255,136,.1);color:#00ff88;border:1px solid rgba(0,255,136,.2)':'background:rgba(100,100,100,.1);color:#888;border:1px solid rgba(100,100,100,.2)'}">${(m.status||'open').toUpperCase()}</span>
+        </div>
+        ${m.admin_reply ? `<div style="margin-top:8px;padding:8px 10px;background:rgba(0,255,136,.05);border:1px solid rgba(0,255,136,.15);border-radius:7px;font-size:12px;color:var(--accent)">💬 Admin: ${esc(m.admin_reply)}</div>` : ''}
+      </div>`).join('');
+  } catch { el.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">Load nahi hua.</div>'; }
+}
+
+async function sendSupport() {
+  const text = document.getElementById('sup-text').value.trim();
+  const status = document.getElementById('sup-status');
+  const btn = document.getElementById('sup-btn');
+  if (!text) { toast('❌ Message likho'); return; }
+  btn.textContent = 'Sending...'; btn.disabled = true;
+  try {
+    await api('/api/support/send', 'POST', { message: text });
+    document.getElementById('sup-text').value = '';
+    status.textContent = '✅ Message send ho gaya!';
+    status.style.cssText = 'display:block;background:rgba(0,255,136,.08);color:var(--accent);border:1px solid rgba(0,255,136,.2);padding:8px 12px;border-radius:8px;font-size:12px;margin-bottom:8px';
+    loadSupportMsgs();
+  } catch(e) {
+    status.textContent = e.message || 'Failed.';
+    status.style.cssText = 'display:block;background:rgba(248,81,73,.1);color:var(--danger);border:1px solid rgba(248,81,73,.3);padding:8px 12px;border-radius:8px;font-size:12px;margin-bottom:8px';
+  }
+  btn.textContent = 'Send Message →'; btn.disabled = false;
+}
+
 // WEB3 WALLET LOGIN
 // ============================================
 function showWalletModal() { document.getElementById('wallet-modal').classList.add('show'); }
@@ -901,6 +1091,29 @@ async function connectWallet(type) {
   } catch(e) {
     document.getElementById('loader').style.display = 'none';
     toast('❌ ' + (e.message || 'Wallet connection failed'));
+  }
+}
+
+async function connectByAddress() {
+  const addr = document.getElementById('wallet-addr-input').value.trim();
+  if (!addr || addr.length < 20) { toast('❌ Valid wallet address paste karo'); return; }
+  const ref = document.getElementById('su-r')?.value?.trim()?.toUpperCase() || '';
+  closeWalletModal();
+  setL('CONNECTING...');
+  document.getElementById('loader').style.display = 'flex';
+  try {
+    const data = await api('/api/auth/wallet', 'POST', {
+      wallet_address: addr,
+      wallet_type: addr.startsWith('0x') ? 'evm' : 'solana',
+      ref_code: ref || null
+    });
+    token = data.token; me = data.user;
+    saveSession();
+    localStorage.setItem('app_last_sync', String(Date.now()));
+    await finishLogin(true);
+  } catch(e) {
+    document.getElementById('loader').style.display = 'none';
+    toast('❌ ' + (e.message || 'Address se connect nahi hua'));
   }
 }
 
@@ -967,11 +1180,11 @@ async function finishLogin(freshLogin = false) {
   document.getElementById('loader').style.display = 'flex';
   document.getElementById('login-screen').classList.remove('show');
   try {
+    // freshLogin=true (naya login/register): cache skip karo, DB se lo
     if (freshLogin) { cacheClear('/api/settings'); cacheClear('/api/tasks'); }
-    // Settings aur tasks alag alag lo — ek fail ho to doosra rok na sake
     let settings = {}, taskData = { tasks: [], done: [] };
-    try { settings = await api('/api/settings'); } catch(e) { console.warn('settings:', e); }
-    try { taskData = await api('/api/tasks'); } catch(e) { console.warn('tasks:', e); }
+    try { settings = await api('/api/settings'); } catch(e) { console.warn('settings err:', e); }
+    try { taskData = await api('/api/tasks'); } catch(e) { console.warn('tasks err:', e); }
     cfg = settings;
     if (cfg.announcement) {
       const b = document.getElementById('ann-bar');
@@ -991,16 +1204,14 @@ async function finishLogin(freshLogin = false) {
     startAnimalLoop();
     showApp();
   } catch(e) {
-    console.error('finishLogin error:', e);
-    // Token invalid — logout karke login dikhao
-    localStorage.removeItem('app_token');
-    localStorage.removeItem('app_user');
-    localStorage.removeItem('app_last_sync');
+    console.error('finishLogin:', e);
     showLogin();
+    showE('Error loading. Please refresh.');
   }
 }
 
 function showApp() {
+  clearTimeout(window._st);
   document.getElementById('loader').style.display = 'none';
   document.getElementById('app-screen').classList.add('show');
   const ln = document.getElementById('login-nav');
@@ -1008,6 +1219,7 @@ function showApp() {
 }
 
 function showLogin() {
+  clearTimeout(window._st);
   document.getElementById('loader').style.display = 'none';
   document.getElementById('login-screen').classList.add('show');
   const ln = document.getElementById('login-nav');
@@ -1022,6 +1234,7 @@ function renderUser() {
   const p = Math.floor(me.points || 0).toLocaleString();
   const name = me.username || 'Miner';
   setText('musr', '@' + name);
+  const hlu = document.getElementById('hlogo-username'); if (hlu) hlu.textContent = '@' + name;
   setText('mbal', p); setText('hbal', p);
   setText('mpow', '⚡ ' + (me.mining_power || 1).toFixed(1) + 'x Power');
   setText('stm', Math.floor(me.total_mined || 0).toLocaleString());
@@ -1479,7 +1692,7 @@ async function loadLB() {
     if (!c || !data) return;
     const em = ['🥇','🥈','🥉'];
     c.innerHTML = data.map((u, i) => {
-      const name = u.username || (u.wallet_address ? u.wallet_address.slice(0,6)+'...'+u.wallet_address.slice(-4) : 'miner');
+      const name = u.username ? '@' + u.username : (u.wallet_address ? u.wallet_address.slice(0,6)+'...'+u.wallet_address.slice(-4) : 'miner');
       const isMe = u.username === me?.username;
       return `<div class="lbitem" style="${isMe ? 'border-color:rgba(0,255,136,.3);background:rgba(0,255,136,.03);' : ''}">
         <div class="lbrank ${['gold','silver','bronze'][i]||''}">${i < 3 ? em[i] : '#'+(i+1)}</div>
