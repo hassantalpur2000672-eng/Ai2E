@@ -369,16 +369,14 @@ export async function onRequest({ request, env }) {
     if (path === '/api/me' && request.method === 'GET') {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
-      const refs = await dbAll(env, 'SELECT COUNT(*) as c FROM users WHERE referred_by = ? AND total_mined > 0', [user.referral_code]);
-      const activeRefs = parseInt(refs[0]?.c || 0);
-      const cfgPPR = await dbFirst(env, "SELECT value FROM settings WHERE key = 'referral_power_per_ref'");
-      const cfgMax = await dbFirst(env, "SELECT value FROM settings WHERE key = 'max_mining_power'");
-      const ppr = parseFloat(cfgPPR?.value || '0.1');
-      const maxP = parseFloat(cfgMax?.value || '10.0');
-      const newPow = Math.min(1.0 + activeRefs * ppr, maxP);
-      await dbRun(env, 'UPDATE users SET mining_power = ?, active_referral_count = ? WHERE id = ?', [newPow, activeRefs, user.id]);
+      // Live count of active referrals (referred users who have mined)
+      const refs = await dbFirst(env, 'SELECT COUNT(*) as c FROM users WHERE referred_by = ? AND total_mined > 0', [user.referral_code]);
+      const activeRefs = parseInt(refs?.c || 0);
+      // Update active_referral_count in DB (no mining power boost - removed)
+      await dbRun(env, 'UPDATE users SET active_referral_count = ? WHERE id = ?', [activeRefs, user.id]);
       const updated = await dbFirst(env, 'SELECT * FROM users WHERE id = ?', [user.id]);
-      return json(updated);
+      // Return live active_referral_count even if column missing
+      return json({ ...updated, active_referral_count: activeRefs });
     }
 
     if (path === '/api/mine/start' && request.method === 'POST') {
@@ -413,32 +411,36 @@ export async function onRequest({ request, env }) {
       await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, 'mining_claim', earned, '⛏️ Mining claim']);
       await dbRun(env, "UPDATE mining_sessions SET claimed_at = datetime('now'), coins_earned = ?, is_claimed = 1 WHERE user_id = ? AND is_claimed = 0", [earned, user.id]);
 
-      // ── Refer Mining Tree (har claim par chale, sirf ek baar nahi) ──────────────
+      // ── Refer Mining Tree: L1=50%, L2=25%, L3=10% ──────────────────────────────
       if (user.referred_by) {
-        // Level 1: Direct parent — 10% of earned points
+        // Level 1: Direct referrer — 50% of earned
         const L1 = await dbFirst(env, 'SELECT * FROM users WHERE referral_code = ?', [user.referred_by]);
         if (L1) {
-          const l1Bonus = Math.floor(earned * 0.10);
+          const l1Bonus = Math.floor(earned * 0.50);
           if (l1Bonus > 0) {
-            // Power system: count active referrals and recalculate power for L1
-            const cfgPPR = await dbFirst(env, "SELECT value FROM settings WHERE key = 'referral_power_per_ref'");
-            const cfgMaxP = await dbFirst(env, "SELECT value FROM settings WHERE key = 'max_mining_power'");
-            const ppr = parseFloat(cfgPPR?.value || '0.1');
-            const maxP = parseFloat(cfgMaxP?.value || '10.0');
-            const activeRefsL1 = await dbFirst(env, 'SELECT COUNT(*) as c FROM users WHERE referred_by = ? AND total_mined > 0', [L1.referral_code]);
-            const arCountL1 = parseInt(activeRefsL1?.c || 0);
-            const newPowL1 = Math.min(1.0 + arCountL1 * ppr, maxP);
-            await dbRun(env, 'UPDATE users SET points = points + ?, mining_power = ?, active_referral_count = ? WHERE id = ?', [l1Bonus, newPowL1, arCountL1, L1.id]);
-            await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), L1.id, 'refer_mining_10pct', l1Bonus, '⛏️ 10% refer mining: @' + user.username]);
+            await dbRun(env, 'UPDATE users SET points = points + ? WHERE id = ?', [l1Bonus, L1.id]);
+            await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), L1.id, 'refer_mining_l1', l1Bonus, '⛏️ L1 50% refer mining: @' + user.username]);
 
-            // Level 2: Grandparent — 1% of earned points
+            // Level 2: L1 ka referrer — 25% of earned
             if (L1.referred_by) {
               const L2 = await dbFirst(env, 'SELECT * FROM users WHERE referral_code = ?', [L1.referred_by]);
               if (L2) {
-                const l2Bonus = Math.floor(earned * 0.01);
+                const l2Bonus = Math.floor(earned * 0.25);
                 if (l2Bonus > 0) {
                   await dbRun(env, 'UPDATE users SET points = points + ? WHERE id = ?', [l2Bonus, L2.id]);
-                  await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), L2.id, 'refer_mining_1pct', l2Bonus, '🌿 1% L2 refer mining: @' + user.username]);
+                  await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), L2.id, 'refer_mining_l2', l2Bonus, '🌿 L2 25% refer mining: @' + user.username]);
+
+                  // Level 3: L2 ka referrer — 10% of earned
+                  if (L2.referred_by) {
+                    const L3 = await dbFirst(env, 'SELECT * FROM users WHERE referral_code = ?', [L2.referred_by]);
+                    if (L3) {
+                      const l3Bonus = Math.floor(earned * 0.10);
+                      if (l3Bonus > 0) {
+                        await dbRun(env, 'UPDATE users SET points = points + ? WHERE id = ?', [l3Bonus, L3.id]);
+                        await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), L3.id, 'refer_mining_l3', l3Bonus, '🔥 L3 10% refer mining: @' + user.username]);
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -713,6 +715,8 @@ export async function onRequest({ request, env }) {
         try { await dbRun(env, 'ALTER TABLE users ADD COLUMN security_question TEXT'); } catch(e) {}
         try { await dbRun(env, 'ALTER TABLE users ADD COLUMN security_answer TEXT'); } catch(e) {}
         try { await dbRun(env, 'ALTER TABLE password_resets ADD COLUMN new_password_hash TEXT'); } catch(e) {}
+        try { await dbRun(env, 'ALTER TABLE users ADD COLUMN active_referral_count INTEGER DEFAULT 0'); } catch(e) {}
+        try { await dbRun(env, 'ALTER TABLE users ADD COLUMN referral_count INTEGER DEFAULT 0'); } catch(e) {}
         await dbRun(env, `CREATE TABLE IF NOT EXISTS support_messages (
           id TEXT PRIMARY KEY,
           user_id TEXT NOT NULL,
