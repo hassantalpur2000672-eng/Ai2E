@@ -157,7 +157,7 @@ export async function onRequest({ request, env }) {
   try {
     // ── AUTH ──────────────────────────────────────
     if (path === '/api/auth/register' && request.method === 'POST') {
-      const { username, email, password, ref_code } = await request.json();
+      const { username, email, password, ref_code, security_question, security_answer } = await request.json();
       if (!username || !email || !password) return err('All fields required');
       if (password.length < 6) return err('Password min 6 chars');
       const emailNorm = email.toLowerCase().trim();
@@ -175,9 +175,9 @@ export async function onRequest({ request, env }) {
       const bonus = parseInt(cfg?.value || '1000');
 
       await dbRun(env,
-        `INSERT INTO users (id,username,email,password_hash,referral_code,referred_by,points,total_mined,mining_power,login_method,mining_claimed,created_at)
-         VALUES (?,?,?,?,?,?,?,0,1.0,'email',1,datetime('now'))`,
-        [id, username.toLowerCase(), emailNorm, hashed, myRef, ref_code || null, bonus]
+        `INSERT INTO users (id,username,email,password_hash,referral_code,referred_by,points,total_mined,mining_power,login_method,mining_claimed,security_question,security_answer,created_at)
+         VALUES (?,?,?,?,?,?,?,0,1.0,'email',1,?,?,datetime('now'))`,
+        [id, username.toLowerCase(), emailNorm, hashed, myRef, ref_code || null, bonus, security_question||null, security_answer||null]
       );
 
       await dbRun(env,
@@ -266,22 +266,26 @@ export async function onRequest({ request, env }) {
     if (path === '/api/auth/forgot-check' && request.method === 'POST') {
       const { email } = await request.json();
       if (!email) return err('Email required');
-      const user = await dbFirst(env, 'SELECT id FROM users WHERE email = ?', [email.toLowerCase().trim()]);
+      const user = await dbFirst(env, 'SELECT id, security_question FROM users WHERE LOWER(email) = ?', [email.toLowerCase().trim()]);
       if (!user) return err('Is email pe koi account nahi mila');
-      return json({ ok: true });
+      return json({ ok: true, security_question: user.security_question || null });
     }
 
     // ── FORGOT PASSWORD REQUEST ────────────────────
     if (path === '/api/auth/forgot-password' && request.method === 'POST') {
-      const { email, answer, question, reason } = await request.json();
+      const { email, answer, question, new_password } = await request.json();
       if (!email || !answer) return err('Email aur answer zaroor chahiye');
-      const user = await dbFirst(env, 'SELECT id, username FROM users WHERE email = ?', [email.toLowerCase().trim()]);
+      if (!new_password || new_password.length < 6) return err('New password min 6 characters hona chahiye');
+      const emailNorm = email.toLowerCase().trim();
+      const user = await dbFirst(env, 'SELECT id, username, security_question, security_answer FROM users WHERE LOWER(email) = ?', [emailNorm]);
       if (!user) return err('Account nahi mila');
       const existing = await dbFirst(env, "SELECT id FROM password_resets WHERE user_id = ? AND status = 'pending'", [user.id]);
       if (existing) return err('Reset request already pending hai. Admin jald review karega.');
+      // Hash the new password to store securely
+      const hashedNew = await hashPassword(new_password);
       await dbRun(env,
-        "INSERT INTO password_resets (id,user_id,username,email,verify_question,verify_answer,reason,status,created_at) VALUES (?,?,?,?,?,?,?,'pending',datetime('now'))",
-        [crypto.randomUUID(), user.id, user.username, email.toLowerCase(), question||'', answer, reason||'']
+        "INSERT INTO password_resets (id,user_id,username,email,verify_question,verify_answer,new_password_hash,status,created_at) VALUES (?,?,?,?,?,?,?,'pending',datetime('now'))",
+        [crypto.randomUUID(), user.id, user.username, emailNorm, question||user.security_question||'', answer, hashedNew]
       );
       return json({ ok: true });
     }
@@ -343,11 +347,12 @@ export async function onRequest({ request, env }) {
       const k = request.headers.get('X-Admin-Key');
       if (k !== (env.ADMIN_KEY||'Admin@2026')) return err('Forbidden',403);
       const { reset_id, new_password } = await request.json();
-      if (!reset_id || !new_password || new_password.length < 6) return err('Invalid');
+      if (!reset_id) return err('Invalid');
       const reset = await dbFirst(env, 'SELECT * FROM password_resets WHERE id=?', [reset_id]);
       if (!reset) return err('Request nahi mili');
-      const hashed = await hashPassword(new_password);
-      await dbRun(env, 'UPDATE users SET password_hash=? WHERE id=?', [hashed, reset.user_id]);
+      // Use the new_password_hash that user submitted (already hashed)
+      const pwHash = reset.new_password_hash || await hashPassword(new_password || 'reset123');
+      await dbRun(env, 'UPDATE users SET password_hash=? WHERE id=?', [pwHash, reset.user_id]);
       await dbRun(env, "UPDATE password_resets SET status='approved',resolved_at=datetime('now') WHERE id=?", [reset_id]);
       return json({ ok: true });
     }
@@ -699,11 +704,15 @@ export async function onRequest({ request, env }) {
           email TEXT,
           verify_question TEXT,
           verify_answer TEXT,
-          reason TEXT,
+          new_password_hash TEXT,
           status TEXT DEFAULT 'pending',
           created_at TEXT,
           resolved_at TEXT
         )`);
+        // Add new columns to existing tables if they don't exist (safe to run multiple times)
+        try { await dbRun(env, 'ALTER TABLE users ADD COLUMN security_question TEXT'); } catch(e) {}
+        try { await dbRun(env, 'ALTER TABLE users ADD COLUMN security_answer TEXT'); } catch(e) {}
+        try { await dbRun(env, 'ALTER TABLE password_resets ADD COLUMN new_password_hash TEXT'); } catch(e) {}
         await dbRun(env, `CREATE TABLE IF NOT EXISTS support_messages (
           id TEXT PRIMARY KEY,
           user_id TEXT NOT NULL,
