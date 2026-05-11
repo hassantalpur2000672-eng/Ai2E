@@ -819,7 +819,7 @@ async function loadTx() {
     const data = await adm('/api/admin/transactions');
     const tbody = document.getElementById('tx-tbody');
     if (!tbody) return;
-    const icons = { mining_claim:'⛏️', task_complete:'✅', ad_watch:'📺', welcome_bonus:'🎉', referral_bonus:'👥', active_referral_bonus:'🔥' };
+    const icons = { mining_claim:'⛏️', task_complete:'✅', ad_watch:'📺', welcome_bonus:'🎉', referral_bonus:'👥', active_referral_bonus:'🔥', refer_mining_l1:'💰', refer_mining_l2:'🌿', refer_mining_l3:'🔥' };
     tbody.innerHTML = data.map(t => `
       <tr>
         <td>@${esc(t.username||'—')}</td>
