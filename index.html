@@ -416,7 +416,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 <div id="forgot-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(12px);z-index:9000;align-items:flex-end;justify-content:center">
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:20px 20px 0 0;padding:28px 20px 40px;width:100%;max-width:480px;animation:slideUp .3s ease">
     <div style="font-size:18px;font-weight:800;text-align:center;margin-bottom:4px">🔑 Forgot Password</div>
-    <div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:18px">Verify karo k account tumhara hai — phir admin reset karega.</div>
+    <div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:18px">Answer the verify question so admin can confirm your identity.</div>
     <div id="frg-step1">
       <div class="fg" style="margin-bottom:12px"><label>Your Email</label><input type="email" id="frg-email" placeholder="you@example.com"/></div>
       <button class="btn-p" id="frg-next-btn" onclick="doForgotStep1()">Next →</button>
@@ -427,7 +427,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
         <div style="font-size:11px;color:var(--accent);font-weight:700;margin-bottom:4px">VERIFY QUESTION</div>
         <div id="frg-question" style="font-size:14px;color:var(--text)"></div>
       </div>
-      <div class="fg" style="margin-bottom:12px"><label>Your Answer</label><input type="text" id="frg-answer" placeholder="Jawab likho..."/></div>
+      <div class="fg" style="margin-bottom:12px"><label>Your Answer</label><input type="text" id="frg-answer" placeholder="Type your answer..."/></div>
       <div class="fg" style="margin-bottom:16px"><label>Reason (optional)</label><input type="text" id="frg-reason" placeholder="e.g. lost access"/></div>
       <div id="frg-msg" style="display:none;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px"></div>
       <button class="btn-p" id="frg-btn" onclick="doForgotRequest()">Send Reset Request →</button>
@@ -443,13 +443,13 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
       <div style="font-size:17px;font-weight:800">💬 Support</div>
       <button onclick="hideSupport()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer">✕</button>
     </div>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:14px">24 ghante mein sirf 1 message — har account pe</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:14px">1 message per 24 hours per account</div>
     <div id="sup-msgs" style="flex:1;overflow-y:auto;margin-bottom:14px;min-height:100px;display:flex;flex-direction:column;gap:8px">
       <div style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">Loading...</div>
     </div>
     <div class="fg" style="margin-bottom:8px">
       <label>Message</label>
-      <textarea id="sup-text" placeholder="Apna masla likhein..." rows="3" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:11px 14px;color:var(--text);font-family:'Outfit',sans-serif;font-size:14px;outline:none;resize:none" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"></textarea>
+      <textarea id="sup-text" placeholder="Describe your issue..." rows="3" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:11px 14px;color:var(--text);font-family:'Outfit',sans-serif;font-size:14px;outline:none;resize:none" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"></textarea>
     </div>
     <div id="sup-status" style="display:none;padding:8px 12px;border-radius:8px;font-size:12px;margin-bottom:8px"></div>
     <button class="btn-p" id="sup-btn" onclick="sendSupport()">Send Message →</button>
@@ -506,10 +506,10 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
       </button>
     </div>
     <div style="margin:4px 16px 0;border-top:1px solid var(--border);padding-top:14px">
-      <div style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:8px;letter-spacing:.5px">YA WALLET ADDRESS PASTE KAREN</div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Agar pehle wallet address se register kiya hai to wahi paste karen. Naye users bhi address dal kar register kar sakte hain.</div>
+      <div style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:8px;letter-spacing:.5px">OR PASTE WALLET ADDRESS</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">If you registered with a wallet address, paste it here to sign in. New users can also paste an address to register.</div>
       <div style="display:flex;gap:8px">
-        <input type="text" id="wallet-addr-input" placeholder="0x... ya Solana address paste karen" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:'Space Mono',monospace;font-size:11px;outline:none" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"/>
+        <input type="text" id="wallet-addr-input" placeholder="Paste wallet address (0x... or Solana)" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:'Space Mono',monospace;font-size:11px;outline:none" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"/>
         <button onclick="connectByAddress()" style="padding:10px 14px;background:var(--accent);color:#030712;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">Go →</button>
       </div>
     </div>
@@ -946,11 +946,11 @@ async function doSignUp() {
 // FORGOT PASSWORD
 // ============================================
 const _FRG_Q = [
-  'Ap kis sheher mein paide hue?',
-  'Apke pehle pet ka naam kya tha?',
-  'Apki ammi ka pehla naam kya hai?',
-  'Apne kon si primary school mein parha?',
-  'Apka favorite childhood movie konsa tha?'
+  'What city were you born in?',
+  "What was your first pet's name?",
+  "What is your mother's first name?",
+  'What primary school did you attend?',
+  'What was your favorite childhood movie?'
 ];
 let _frgQ = '';
 
@@ -965,7 +965,7 @@ function hideForgot() { document.getElementById('forgot-modal').style.display = 
 
 async function doForgotStep1() {
   const email = document.getElementById('frg-email').value.trim();
-  if (!email) { toast('❌ Email daalo'); return; }
+  if (!email) { toast('❌ Please enter your email'); return; }
   const btn = document.getElementById('frg-next-btn');
   btn.textContent = 'Checking...'; btn.disabled = true;
   try {
@@ -976,7 +976,7 @@ async function doForgotStep1() {
     document.getElementById('frg-step2').style.display = 'block';
     document.getElementById('frg-answer').value = '';
     document.getElementById('frg-msg').style.display = 'none';
-  } catch(e) { toast('❌ ' + (e.message || 'Email nahi mila')); }
+  } catch(e) { toast('❌ ' + (e.message || 'No account found with this email')); }
   btn.textContent = 'Next →'; btn.disabled = false;
 }
 
@@ -987,14 +987,14 @@ async function doForgotRequest() {
   const msg = document.getElementById('frg-msg');
   const btn = document.getElementById('frg-btn');
   if (!answer) {
-    msg.textContent = 'Jawab zaroor daalo.';
+    msg.textContent = 'Please answer the verify question.';
     msg.style.cssText = 'display:block;background:rgba(248,81,73,.1);color:var(--danger);border:1px solid rgba(248,81,73,.3);padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px';
     return;
   }
   btn.textContent = 'Sending...'; btn.disabled = true;
   try {
     await api('/api/auth/forgot-password', 'POST', { email, answer, question: _frgQ, reason });
-    msg.textContent = '✅ Request send ho gayi! Admin verify karke password reset karega.';
+    msg.textContent = '✅ Request sent! Admin will verify and reset your password.';
     msg.style.cssText = 'display:block;background:rgba(0,255,136,.08);color:var(--accent);border:1px solid rgba(0,255,136,.2);padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px';
     btn.textContent = 'Sent ✓';
   } catch(e) {
@@ -1017,7 +1017,7 @@ async function loadSupportMsgs() {
   try {
     const data = await api('/api/support/my-messages');
     if (!data || !data.length) {
-      el.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">Koi message nahi — hamein likho!</div>';
+      el.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">No messages yet. Send us a message!</div>';
       return;
     }
     el.innerHTML = data.map(m => `
@@ -1029,19 +1029,19 @@ async function loadSupportMsgs() {
         </div>
         ${m.admin_reply ? `<div style="margin-top:8px;padding:8px 10px;background:rgba(0,255,136,.05);border:1px solid rgba(0,255,136,.15);border-radius:7px;font-size:12px;color:var(--accent)">💬 Admin: ${esc(m.admin_reply)}</div>` : ''}
       </div>`).join('');
-  } catch { el.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">Load nahi hua.</div>'; }
+  } catch { el.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">Could not load messages.</div>'; }
 }
 
 async function sendSupport() {
   const text = document.getElementById('sup-text').value.trim();
   const status = document.getElementById('sup-status');
   const btn = document.getElementById('sup-btn');
-  if (!text) { toast('❌ Message likho'); return; }
+  if (!text) { toast('❌ Please write a message'); return; }
   btn.textContent = 'Sending...'; btn.disabled = true;
   try {
     await api('/api/support/send', 'POST', { message: text });
     document.getElementById('sup-text').value = '';
-    status.textContent = '✅ Message send ho gaya!';
+    status.textContent = '✅ Message sent successfully!';
     status.style.cssText = 'display:block;background:rgba(0,255,136,.08);color:var(--accent);border:1px solid rgba(0,255,136,.2);padding:8px 12px;border-radius:8px;font-size:12px;margin-bottom:8px';
     loadSupportMsgs();
   } catch(e) {
@@ -1096,7 +1096,7 @@ async function connectWallet(type) {
 
 async function connectByAddress() {
   const addr = document.getElementById('wallet-addr-input').value.trim();
-  if (!addr || addr.length < 20) { toast('❌ Valid wallet address paste karo'); return; }
+  if (!addr || addr.length < 20) { toast('❌ Please paste a valid wallet address'); return; }
   const ref = document.getElementById('su-r')?.value?.trim()?.toUpperCase() || '';
   closeWalletModal();
   setL('CONNECTING...');
@@ -1113,7 +1113,7 @@ async function connectByAddress() {
     await finishLogin(true);
   } catch(e) {
     document.getElementById('loader').style.display = 'none';
-    toast('❌ ' + (e.message || 'Address se connect nahi hua'));
+    toast('❌ ' + (e.message || 'Could not connect with this address'));
   }
 }
 
@@ -1692,7 +1692,7 @@ async function loadLB() {
     if (!c || !data) return;
     const em = ['🥇','🥈','🥉'];
     c.innerHTML = data.map((u, i) => {
-      const name = u.username ? '@' + u.username : (u.wallet_address ? u.wallet_address.slice(0,6)+'...'+u.wallet_address.slice(-4) : 'miner');
+      const name = u.username ? '@' + u.username : (u.email ? u.email : (u.wallet_address ? u.wallet_address.slice(0,6)+'...'+u.wallet_address.slice(-4) : 'miner'));
       const isMe = u.username === me?.username;
       return `<div class="lbitem" style="${isMe ? 'border-color:rgba(0,255,136,.3);background:rgba(0,255,136,.03);' : ''}">
         <div class="lbrank ${['gold','silver','bronze'][i]||''}">${i < 3 ? em[i] : '#'+(i+1)}</div>
