@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0"/>
+<title>Ai2E — Mine. Earn. Own.</title>
+<meta name="description" content="Free crypto mining platform. Earn daily TOKEN rewards. Real Solana launch coming. Join thousands of early miners."/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#030712;--s1:#0a0f1e;--s2:#0f1629;--border:#1a2035;
+  --accent:#00ff88;--purple:#7c3aed;--gold:#f59e0b;--cyan:#00d4ff;
+  --text:#e8edf8;--muted:#5a6478;--dim:#2a3248;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;overflow-x:hidden;min-height:100vh}
+
+/* ── NOISE TEXTURE ── */
+body::after{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:9999;opacity:.4}
+
+/* ── GRID BACKGROUND ── */
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,255,136,.015) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,136,.015) 1px,transparent 1px);background-size:60px 60px;z-index:0;pointer-events:none}
+
+/* ── GLOW ORBS ── */
+.orb{position:fixed;border-radius:50%;pointer-events:none;z-index:0}
+.orb1{width:700px;height:700px;background:radial-gradient(circle,rgba(0,255,136,.05) 0%,transparent 65%);top:-200px;right:-200px}
+.orb2{width:600px;height:600px;background:radial-gradient(circle,rgba(124,58,237,.06) 0%,transparent 65%);bottom:-100px;left:-200px}
+.orb3{width:400px;height:400px;background:radial-gradient(circle,rgba(0,212,255,.04) 0%,transparent 65%);top:40%;left:50%;transform:translateX(-50%)}
+
+/* ── ANIMATIONS ── */
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
+@keyframes float{0%,100%{transform:translateY(0px)}50%{transform:translateY(-12px)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(32px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideIn{from{opacity:0;transform:translateX(-20px)}to{opacity:1;transform:translateX(0)}}
+@keyframes glow{0%,100%{box-shadow:0 0 20px rgba(0,255,136,.2)}50%{box-shadow:0 0 50px rgba(0,255,136,.5)}}
+@keyframes scanline{0%{transform:translateY(-100%)}100%{transform:translateY(100vh)}}
+@keyframes ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+@keyframes draw{from{stroke-dashoffset:1000}to{stroke-dashoffset:0}}
+@keyframes countUp{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:scale(1)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+/* ── NAV ── */
+nav{position:fixed;top:0;left:0;right:0;z-index:1000;padding:0 20px;height:64px;display:flex;align-items:center;justify-content:space-between;background:rgba(3,7,18,.85);backdrop-filter:blur(24px);border-bottom:1px solid var(--border)}
+.nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+.nav-logo-icon{width:36px;height:36px;position:relative}
+.nav-logo-icon svg{position:absolute;inset:0}
+.logo-ring{animation:spin 4s linear infinite}
+.nav-logo-text{font-family:'Space Mono',monospace;font-size:16px;font-weight:700;color:var(--accent);letter-spacing:2px}
+.nav-logo-sub{font-size:9px;color:var(--muted);letter-spacing:3px;font-family:'Space Mono',monospace;display:block;margin-top:-2px}
+.nav-right{display:flex;align-items:center;gap:10px}
+.nav-start-btn{background:var(--accent);color:#030712;border:none;padding:9px 20px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;transition:all .2s;white-space:nowrap}
+.nav-start-btn:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(0,255,136,.3)}
+.ham-btn{background:none;border:1px solid var(--border);color:var(--text);width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;gap:0;flex-direction:column;padding:10px;transition:border-color .2s}
+.ham-btn:hover{border-color:var(--accent)}
+.ham-line{width:18px;height:1.5px;background:var(--text);transition:all .2s;display:block}
+.ham-line+.ham-line{margin-top:4px}
+
+/* ── MOBILE MENU ── */
+.mob-menu{position:fixed;top:64px;left:0;right:0;bottom:0;background:rgba(3,7,18,.98);backdrop-filter:blur(24px);z-index:999;transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);padding:32px 24px;border-top:1px solid var(--border)}
+.mob-menu.open{transform:translateX(0)}
+.mob-nav-item{display:flex;align-items:center;gap:14px;padding:18px 0;border-bottom:1px solid var(--border);text-decoration:none;color:var(--text);font-size:18px;font-weight:500;transition:color .2s}
+.mob-nav-item:hover{color:var(--accent)}
+.mob-nav-icon{width:40px;height:40px;border-radius:10px;background:var(--s2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.mob-nav-label{flex:1}
+.mob-nav-sub{font-size:12px;color:var(--muted);display:block;margin-top:2px}
+.mob-mine-btn{display:block;width:100%;margin-top:28px;padding:16px;background:linear-gradient(135deg,var(--accent),#00ccff);color:#030712;font-family:'DM Sans',sans-serif;font-size:16px;font-weight:700;border-radius:12px;text-align:center;text-decoration:none;transition:all .2s}
+.mob-mine-btn:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(0,255,136,.3)}
+
+/* ── TICKER ── */
+.ticker-wrap{overflow:hidden;background:rgba(0,255,136,.04);border-bottom:1px solid rgba(0,255,136,.1);padding:8px 0;position:relative;z-index:1}
+.ticker-track{display:flex;gap:0;animation:ticker 30s linear infinite;width:max-content}
+.ticker-item{font-family:'Space Mono',monospace;font-size:11px;color:var(--accent);padding:0 40px;white-space:nowrap;opacity:.7}
+.ticker-item span{color:var(--text);margin-left:6px}
+
+/* ── HERO ── */
+.hero{position:relative;z-index:1;padding:100px 20px 60px;max-width:1100px;margin:0 auto;text-align:center}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(0,255,136,.06);border:1px solid rgba(0,255,136,.15);border-radius:99px;padding:6px 16px;font-size:12px;font-weight:600;color:var(--accent);margin-bottom:28px;font-family:'Space Mono',monospace;letter-spacing:1px;animation:fadeUp .6s ease both}
+.badge-dot{width:6px;height:6px;background:var(--accent);border-radius:50%;animation:pulse 1.5s ease-in-out infinite}
+.hero-title{font-family:'Syne',sans-serif;font-size:clamp(42px,10vw,88px);font-weight:800;line-height:1;letter-spacing:-2px;margin-bottom:24px;animation:fadeUp .7s ease both}
+.hero-title .line1{display:block;color:var(--text)}
+.hero-title .line2{display:block;background:linear-gradient(135deg,var(--accent) 0%,var(--cyan) 50%,var(--purple) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-sub{font-size:clamp(15px,2.5vw,19px);color:var(--muted);line-height:1.7;max-width:560px;margin:0 auto 40px;animation:fadeUp .8s ease both}
+.hero-btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;animation:fadeUp .9s ease both}
+.btn-primary{display:inline-flex;align-items:center;gap:8px;padding:14px 32px;background:var(--accent);color:#030712;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;border-radius:10px;text-decoration:none;transition:all .25s;border:none;cursor:pointer}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 36px rgba(0,255,136,.35)}
+.btn-primary svg{transition:transform .2s}
+.btn-primary:hover svg{transform:translateX(3px)}
+.btn-secondary{display:inline-flex;align-items:center;gap:8px;padding:14px 28px;background:transparent;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;font-weight:500;border-radius:10px;text-decoration:none;transition:all .25s;border:1px solid var(--border)}
+.btn-secondary:hover{border-color:var(--accent);color:var(--accent);background:rgba(0,255,136,.04)}
+
+/* ── MINING VISUAL ── */
+.mine-visual{position:relative;max-width:420px;margin:60px auto 0;animation:fadeUp 1s ease both}
+.mine-circle-wrap{position:relative;width:280px;height:280px;margin:0 auto}
+.mine-circle-wrap svg{width:100%;height:100%}
+.mine-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+.mine-center-val{font-family:'Space Mono',monospace;font-size:28px;font-weight:700;color:var(--accent);line-height:1}
+.mine-center-lbl{font-size:11px;color:var(--muted);letter-spacing:2px;font-family:'Space Mono',monospace}
+.mine-tags{display:flex;gap:8px;justify-content:center;margin-top:20px;flex-wrap:wrap}
+.mine-tag{background:var(--s2);border:1px solid var(--border);border-radius:99px;padding:5px 14px;font-size:12px;color:var(--muted)}
+.mine-tag.active{border-color:rgba(0,255,136,.3);color:var(--accent);background:rgba(0,255,136,.06)}
+
+/* ── STATS BAND ── */
+.stats-band{position:relative;z-index:1;padding:0 20px;margin:0 auto 0;max-width:1100px}
+.stats-inner{background:linear-gradient(135deg,rgba(10,15,30,.8),rgba(15,22,41,.8));border:1px solid var(--border);border-radius:20px;padding:32px 24px;display:grid;grid-template-columns:repeat(4,1fr);gap:20px;position:relative;overflow:hidden}
+.stats-inner::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(0,255,136,.03),rgba(124,58,237,.03));pointer-events:none}
+.stat-item{text-align:center}
+.stat-val{font-family:'Space Mono',monospace;font-size:clamp(22px,4vw,36px);font-weight:700;color:var(--accent);line-height:1;display:block}
+.stat-lbl{font-size:12px;color:var(--muted);margin-top:6px;display:block}
+.stat-item.purple .stat-val{color:var(--purple)}
+.stat-item.gold .stat-val{color:var(--gold)}
+.stat-item.cyan .stat-val{color:var(--cyan)}
+
+/* ── SECTION COMMON ── */
+section{position:relative;z-index:1;padding:80px 20px;max-width:1100px;margin:0 auto}
+.sec-label{font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:4px;text-transform:uppercase;display:block;margin-bottom:12px}
+.sec-title{font-family:'Syne',sans-serif;font-size:clamp(28px,5vw,48px);font-weight:800;line-height:1.1;letter-spacing:-1px;margin-bottom:16px}
+.sec-desc{font-size:16px;color:var(--muted);line-height:1.7;max-width:620px;margin-bottom:48px}
+.sec-title em{font-style:normal;background:linear-gradient(135deg,var(--accent),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+
+/* ── HOW IT WORKS ── */
+.how-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+.how-card{background:var(--s1);border:1px solid var(--border);border-radius:16px;padding:28px 22px;position:relative;overflow:hidden;transition:all .3s;cursor:default}
+.how-card::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,transparent,rgba(0,255,136,.03));opacity:0;transition:opacity .3s}
+.how-card:hover{border-color:rgba(0,255,136,.25);transform:translateY(-4px)}
+.how-card:hover::after{opacity:1}
+.how-num{font-family:'Space Mono',monospace;font-size:48px;font-weight:700;color:var(--dim);line-height:1;margin-bottom:16px}
+.how-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:16px}
+.how-icon.green{background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.15)}
+.how-icon.purple{background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.15)}
+.how-icon.gold{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.15)}
+.how-icon.cyan{background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.15)}
+.how-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;margin-bottom:8px}
+.how-desc{font-size:13px;color:var(--muted);line-height:1.6}
+
+/* ── REFER TREE ── */
+.refer-wrap{display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:center}
+.refer-tree{background:var(--s1);border:1px solid var(--border);border-radius:20px;padding:28px}
+.rtree-node{display:flex;align-items:center;gap:12px;padding:12px 0}
+.rtree-node+.rtree-node{border-top:1px solid var(--border)}
+.rn-indent{margin-left:32px}
+.rn-indent2{margin-left:64px}
+.rn-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.rn-dot.l0{background:var(--accent);box-shadow:0 0 10px rgba(0,255,136,.5)}
+.rn-dot.l1{background:var(--cyan)}
+.rn-dot.l2{background:var(--purple)}
+.rn-dot.l3{background:var(--gold)}
+.rn-info{flex:1}
+.rn-name{font-size:14px;font-weight:600}
+.rn-tag{font-size:11px;color:var(--muted)}
+.rn-earn{font-family:'Space Mono',monospace;font-size:13px;font-weight:700;text-align:right}
+.rn-earn.l1{color:var(--cyan)}
+.rn-earn.l2{color:var(--purple)}
+.rn-earn.l3{color:var(--gold)}
+.rn-connector{width:1px;height:20px;background:var(--border);margin-left:4px}
+.refer-info .ri-item{display:flex;gap:14px;margin-bottom:20px;align-items:flex-start}
+.ri-badge{min-width:52px;height:52px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:14px;font-weight:700;flex-shrink:0}
+.ri-badge.l1{background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.2);color:var(--cyan)}
+.ri-badge.l2{background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.2);color:var(--purple)}
+.ri-badge.l3{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);color:var(--gold)}
+.ri-text strong{display:block;font-size:15px;font-weight:600;margin-bottom:4px}
+.ri-text p{font-size:13px;color:var(--muted);line-height:1.5}
+
+/* ── ROADMAP ── */
+.road-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0;position:relative}
+.road-grid::before{content:'';position:absolute;top:28px;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--purple),var(--gold),var(--dim));z-index:0}
+.phase-card{background:var(--s1);border:1px solid var(--border);border-radius:16px;padding:24px 18px;position:relative;z-index:1;margin:0 8px;transition:all .3s}
+.phase-card:hover{border-color:rgba(0,255,136,.2);transform:translateY(-4px)}
+.phase-card.active{border-color:rgba(0,255,136,.4);background:rgba(0,255,136,.03)}
+.phase-dot{width:16px;height:16px;border-radius:50%;margin-bottom:20px;position:relative}
+.phase-dot::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:1px solid currentColor;opacity:.3}
+.phase-dot.done{background:var(--accent);box-shadow:0 0 14px rgba(0,255,136,.6);color:var(--accent)}
+.phase-dot.now{background:var(--cyan);box-shadow:0 0 14px rgba(0,212,255,.6);color:var(--cyan);animation:pulse 1.5s ease-in-out infinite}
+.phase-dot.soon{background:var(--purple);color:var(--purple)}
+.phase-dot.future{background:var(--dim);color:var(--dim)}
+.phase-label{font-family:'Space Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:2px;margin-bottom:6px}
+.phase-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;margin-bottom:8px}
+.phase-desc{font-size:12px;color:var(--muted);line-height:1.5}
+.phase-status{display:inline-block;margin-top:10px;padding:3px 10px;border-radius:99px;font-size:10px;font-weight:700;font-family:'Space Mono',monospace}
+.ps-live{background:rgba(0,255,136,.1);color:var(--accent);border:1px solid rgba(0,255,136,.2)}
+.ps-building{background:rgba(0,212,255,.1);color:var(--cyan);border:1px solid rgba(0,212,255,.2)}
+.ps-soon{background:rgba(124,58,237,.1);color:var(--purple);border:1px solid rgba(124,58,237,.2)}
+.ps-future{background:rgba(90,100,120,.1);color:var(--muted);border:1px solid var(--border)}
+
+/* ── BLOG CARDS ── */
+.blog-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.blog-card{background:var(--s1);border:1px solid var(--border);border-radius:16px;overflow:hidden;transition:all .3s;text-decoration:none;color:var(--text);display:block}
+.blog-card:hover{border-color:rgba(0,255,136,.2);transform:translateY(-4px)}
+.blog-thumb{height:140px;position:relative;overflow:hidden}
+.bt-bg{width:100%;height:100%;display:flex;align-items:center;justify-content:center;position:relative}
+.blog-body{padding:20px}
+.blog-cat{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;margin-bottom:8px}
+.blog-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin-bottom:8px;line-height:1.3}
+.blog-excerpt{font-size:13px;color:var(--muted);line-height:1.5}
+.blog-meta{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:11px;color:var(--muted)}
+
+/* ── TOKEN CARD ── */
+.token-section{padding:80px 20px;max-width:1100px;margin:0 auto;position:relative;z-index:1}
+.token-wrap{background:linear-gradient(135deg,#0a0f1e,#100820,#050e1a);border:1px solid var(--border);border-radius:24px;padding:48px 32px;display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center;position:relative;overflow:hidden}
+.token-wrap::before{content:'';position:absolute;top:-100px;right:-100px;width:400px;height:400px;background:radial-gradient(circle,rgba(124,58,237,.1),transparent 65%);pointer-events:none}
+.token-wrap::after{content:'';position:absolute;bottom:-80px;left:-80px;width:300px;height:300px;background:radial-gradient(circle,rgba(0,255,136,.08),transparent 65%);pointer-events:none}
+.token-info{position:relative;z-index:1}
+.token-visual{position:relative;z-index:1;display:flex;align-items:center;justify-content:center}
+.token-coin{width:180px;height:180px;position:relative;animation:float 4s ease-in-out infinite}
+.coin-svg{width:100%;height:100%}
+.token-features{display:flex;flex-direction:column;gap:12px;margin-top:24px}
+.tf-item{display:flex;align-items:center;gap:10px;font-size:14px}
+.tf-check{width:18px;height:18px;border-radius:50%;background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.3);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+/* ── CTA ── */
+.cta-section{text-align:center;padding:100px 20px;position:relative;z-index:1;max-width:700px;margin:0 auto}
+.cta-title{font-family:'Syne',sans-serif;font-size:clamp(32px,6vw,56px);font-weight:800;letter-spacing:-1.5px;margin-bottom:16px;line-height:1.05}
+.cta-sub{font-size:17px;color:var(--muted);line-height:1.6;margin-bottom:36px}
+.cta-btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+
+/* ── FOOTER ── */
+footer{border-top:1px solid var(--border);padding:40px 20px;max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr auto;gap:20px;align-items:center;position:relative;z-index:1}
+.footer-brand{font-family:'Space Mono',monospace;font-size:13px;color:var(--accent);font-weight:700}
+.footer-sub{font-size:12px;color:var(--muted);margin-top:4px}
+.footer-links{display:flex;gap:20px}
+.footer-links a{font-size:13px;color:var(--muted);text-decoration:none;transition:color .2s}
+.footer-links a:hover{color:var(--accent)}
+.footer-bottom{border-top:1px solid var(--border);padding:20px;text-align:center;font-size:12px;color:var(--muted);position:relative;z-index:1}
+
+/* ── DIVIDER ── */
+.section-divider{max-width:1100px;margin:0 auto;padding:0 20px;position:relative;z-index:1}
+.section-divider hr{border:none;border-top:1px solid var(--border)}
+
+/* ── RESPONSIVE ── */
+@media(max-width:768px){
+  .stats-inner{grid-template-columns:1fr 1fr}
+  .refer-wrap{grid-template-columns:1fr}
+  .token-wrap{grid-template-columns:1fr}
+  .token-visual{display:none}
+  .road-grid{grid-template-columns:1fr 1fr}
+  .road-grid::before{display:none}
+  footer{grid-template-columns:1fr}
+  .footer-links{flex-wrap:wrap;gap:12px}
+}
+@media(max-width:480px){
+  .hero{padding:80px 16px 40px}
+  .stats-inner{grid-template-columns:1fr 1fr;gap:12px}
+  .road-grid{grid-template-columns:1fr}
+  section{padding:60px 16px}
+}
+</style>
+</head>
+<body>
+
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+<div class="orb orb3"></div>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="nav-logo">
+    <div class="nav-logo-icon">
+      <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle class="logo-ring" cx="18" cy="18" r="16" stroke="url(#lg1)" stroke-width="1.5" stroke-dasharray="4 3"/>
+        <circle cx="18" cy="18" r="10" fill="url(#lg2)" opacity=".15"/>
+        <path d="M12 20l4-8 4 8M13.5 17.5h5" stroke="#00ff88" stroke-width="1.5" stroke-linecap="round"/>
+        <defs>
+          <linearGradient id="lg1" x1="0" y1="0" x2="36" y2="36"><stop stop-color="#00ff88"/><stop offset="1" stop-color="#7c3aed"/></linearGradient>
+          <linearGradient id="lg2" x1="0" y1="0" x2="36" y2="36"><stop stop-color="#00ff88"/><stop offset="1" stop-color="#00d4ff"/></linearGradient>
+        </defs>
+      </svg>
+    </div>
+    <div>
+      <span class="nav-logo-text">Ai2E</span>
+      <span class="nav-logo-sub">AI TO EARN</span>
+    </div>
+  </a>
+  <div class="nav-right">
+    <a href="mining.html" class="nav-start-btn">Start Mining →</a>
+    <button class="ham-btn" onclick="toggleMenu()" id="hamBtn" aria-label="Menu">
+      <span class="ham-line"></span>
+      <span class="ham-line"></span>
+      <span class="ham-line"></span>
+    </button>
+  </div>
+</nav>
+
+<!-- MOBILE MENU -->
+<div class="mob-menu" id="mobMenu">
+  <a href="mining.html" class="mob-nav-item" onclick="closeMenu()">
+    <div class="mob-nav-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </div>
+    <div>
+      <span class="mob-nav-label">Mine Points</span>
+      <span class="mob-nav-sub">Earn TOKEN daily for free</span>
+    </div>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+  </a>
+  <a href="mining.html#top" class="mob-nav-item" onclick="closeMenu()">
+    <div class="mob-nav-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+    </div>
+    <div>
+      <span class="mob-nav-label">Leaderboard</span>
+      <span class="mob-nav-sub">Top miners ranked</span>
+    </div>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+  </a>
+  <a href="mining.html#refer" class="mob-nav-item" onclick="closeMenu()">
+    <div class="mob-nav-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    </div>
+    <div>
+      <span class="mob-nav-label">Refer &amp; Earn</span>
+      <span class="mob-nav-sub">50% L1 · 25% L2 · 10% L3</span>
+    </div>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+  </a>
+  <a href="mining.html#profile" class="mob-nav-item" onclick="closeMenu()">
+    <div class="mob-nav-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    </div>
+    <div>
+      <span class="mob-nav-label">My Profile</span>
+      <span class="mob-nav-sub">Stats, wallet, history</span>
+    </div>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+  </a>
+  <a href="#roadmap" class="mob-nav-item" onclick="closeMenu()">
+    <div class="mob-nav-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
+    </div>
+    <div>
+      <span class="mob-nav-label">Roadmap</span>
+      <span class="mob-nav-sub">Vision 2026–2027+</span>
+    </div>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+  </a>
+  <a href="mining.html" class="mob-mine-btn" onclick="closeMenu()">
+    ⚒ Start Mining Now — It's Free
+  </a>
+</div>
+
+<!-- TICKER -->
+<div class="ticker-wrap" style="margin-top:64px">
+  <div class="ticker-track" id="ticker">
+    <span class="ticker-item">TOTAL MINERS <span id="t1">12,847+</span></span>
+    <span class="ticker-item">TOKENS MINED <span id="t2">2.4M+</span></span>
+    <span class="ticker-item">SOLANA LAUNCH <span>2026 Q3</span></span>
+    <span class="ticker-item">MINING RATE <span>+10/hr base</span></span>
+    <span class="ticker-item">REFERRAL L1 <span>50%</span></span>
+    <span class="ticker-item">FREE TO JOIN <span>No hardware needed</span></span>
+    <span class="ticker-item">TOTAL MINERS <span id="t1b">12,847+</span></span>
+    <span class="ticker-item">TOKENS MINED <span id="t2b">2.4M+</span></span>
+    <span class="ticker-item">SOLANA LAUNCH <span>2026 Q3</span></span>
+    <span class="ticker-item">MINING RATE <span>+10/hr base</span></span>
+    <span class="ticker-item">REFERRAL L1 <span>50%</span></span>
+    <span class="ticker-item">FREE TO JOIN <span>No hardware needed</span></span>
+  </div>
+</div>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-badge">
+    <span class="badge-dot"></span>
+    LIVE ON SOLANA TESTNET — MAINNET Q3 2026
+  </div>
+  <h1 class="hero-title">
+    <span class="line1">Mine Daily.</span>
+    <span class="line2">Earn TOKEN.</span>
+  </h1>
+  <p class="hero-sub">Free mining platform. No hardware. No investment. Earn real Ai2E TOKEN every hour — launch on Solana is coming. Early miners earn the most.</p>
+  <div class="hero-btns">
+    <a href="mining.html" class="btn-primary">
+      Start Mining Free
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    </a>
+    <a href="#how" class="btn-secondary">
+      How it works
+    </a>
+  </div>
+
+  <!-- Mining Circle Visual -->
+  <div class="mine-visual">
+    <div class="mine-circle-wrap">
+      <svg viewBox="0 0 280 280" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Outer ring -->
+        <circle cx="140" cy="140" r="130" stroke="#1a2035" stroke-width="1"/>
+        <!-- Progress arcs -->
+        <circle cx="140" cy="140" r="115" stroke="#00ff88" stroke-width="2" stroke-dasharray="542 722" stroke-dashoffset="180" stroke-linecap="round" opacity=".3"/>
+        <circle cx="140" cy="140" r="115" stroke="#00ff88" stroke-width="3" stroke-dasharray="200 722" stroke-dashoffset="180" stroke-linecap="round" style="animation:draw 2s ease forwards"/>
+        <!-- Middle ring -->
+        <circle cx="140" cy="140" r="95" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="3 6" opacity=".4"/>
+        <!-- Inner ring -->
+        <circle cx="140" cy="140" r="70" stroke="#1a2035" stroke-width="1"/>
+        <circle cx="140" cy="140" r="70" stroke="#00d4ff" stroke-width="2" stroke-dasharray="100 440" stroke-dashoffset="110" stroke-linecap="round" opacity=".6"/>
+        <!-- Dots on outer ring -->
+        <circle cx="140" cy="10" r="4" fill="#00ff88" opacity=".6"/>
+        <circle cx="262" cy="85" r="3" fill="#7c3aed" opacity=".5"/>
+        <circle cx="18" cy="195" r="3" fill="#00d4ff" opacity=".5"/>
+        <!-- Center fill -->
+        <circle cx="140" cy="140" r="55" fill="#0a0f1e" stroke="#21262d"/>
+        <!-- Pickaxe icon in center -->
+        <path d="M126 154l-8.5 8.5c-.8.8-.8 2.2 0 3 .8.8 2.2.8 3 0l13-13" stroke="#00ff88" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M126 154l-5-5 2-2 5 5" stroke="#00ff88" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M128 152l3-3 2 2-3 3" stroke="#00ff88" stroke-width="1.8" stroke-linecap="round"/>
+        <!-- Scan line -->
+        <line x1="85" y1="140" x2="195" y2="140" stroke="#00ff88" stroke-width=".5" opacity=".2" stroke-dasharray="4 4"/>
+        <line x1="140" y1="85" x2="140" y2="195" stroke="#00ff88" stroke-width=".5" opacity=".2" stroke-dasharray="4 4"/>
+      </svg>
+      <div class="mine-center">
+        <span class="mine-center-val" id="heroCounter">10.0</span>
+        <span class="mine-center-lbl">TOKEN/HR</span>
+      </div>
+    </div>
+    <div class="mine-tags">
+      <span class="mine-tag active">⚡ Mining Active</span>
+      <span class="mine-tag">No Hardware</span>
+      <span class="mine-tag">Free Forever</span>
+    </div>
+  </div>
+</div>
+
+<!-- STATS -->
+<div class="stats-band">
+  <div class="stats-inner">
+    <div class="stat-item">
+      <span class="stat-val">12K+</span>
+      <span class="stat-lbl">Total Miners</span>
+    </div>
+    <div class="stat-item purple">
+      <span class="stat-val">2.4M</span>
+      <span class="stat-lbl">TOKEN Mined</span>
+    </div>
+    <div class="stat-item gold">
+      <span class="stat-val">Q3 2026</span>
+      <span class="stat-lbl">Solana Launch</span>
+    </div>
+    <div class="stat-item cyan">
+      <span class="stat-val">3-Level</span>
+      <span class="stat-lbl">Refer Tree</span>
+    </div>
+  </div>
+</div>
+
+<!-- HOW IT WORKS -->
+<section id="how">
+  <span class="sec-label">How It Works</span>
+  <h2 class="sec-title">Mine TOKEN in <em>4 Simple Steps</em></h2>
+  <p class="sec-desc">No investment. No hardware. Just sign up, start mining, and collect your rewards every 24 hours.</p>
+  <div class="how-grid">
+    <div class="how-card">
+      <div class="how-num">01</div>
+      <div class="how-icon green">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </div>
+      <div class="how-title">Create Account</div>
+      <p class="how-desc">Register with email or connect your Web3 wallet. Takes 30 seconds. No KYC, no investment required.</p>
+    </div>
+    <div class="how-card">
+      <div class="how-num">02</div>
+      <div class="how-icon cyan">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 10-8.5 8.5c-.83.83-.83 2.17 0 3 .83.83 2.17.83 3 0L17 13"/><path d="M14 10 9 5l2-2 5 5"/><path d="m16 8 3-3 2 2-3 3"/></svg>
+      </div>
+      <div class="how-title">Start Mining</div>
+      <p class="how-desc">Hit "Start Mining" and your session begins. The platform mines TOKEN for you — no CPU, no energy needed.</p>
+    </div>
+    <div class="how-card">
+      <div class="how-num">03</div>
+      <div class="how-icon gold">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 12 20 22 4 22 4 12"/><rect width="20" height="5" x="2" y="7"/><line x1="12" y1="22" x2="12" y2="7"/></svg>
+      </div>
+      <div class="how-title">Claim Rewards</div>
+      <p class="how-desc">Come back after 24 hours and claim your earned TOKEN. Min 100 pts to claim. Repeat daily for maximum stack.</p>
+    </div>
+    <div class="how-card">
+      <div class="how-num">04</div>
+      <div class="how-icon purple">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <div class="how-title">Refer &amp; Multiply</div>
+      <p class="how-desc">Share your code. Earn 50% of every L1 claim, 25% of L2, 10% of L3 — forever, passively.</p>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"><hr/></div>
+
+<!-- REFER SECTION -->
+<section id="refer">
+  <span class="sec-label">Referral System</span>
+  <h2 class="sec-title">Build Your <em>Mining Tree</em></h2>
+  <p class="sec-desc">Every person you refer earns you passive income — and their referrals earn you income too. 3 levels deep.</p>
+  <div class="refer-wrap">
+    <div class="refer-tree">
+      <div style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:2px;margin-bottom:16px">LIVE EXAMPLE</div>
+      <div class="rtree-node">
+        <div class="rn-dot l0"></div>
+        <div class="rn-info">
+          <div class="rn-name">@you</div>
+          <div class="rn-tag">Your account</div>
+        </div>
+      </div>
+      <div class="rn-connector" style="margin-left:4px"></div>
+      <div class="rtree-node rn-indent">
+        <div class="rn-dot l1"></div>
+        <div class="rn-info">
+          <div class="rn-name">@ali</div>
+          <div class="rn-tag">Your direct refer — claims 1000 pts</div>
+        </div>
+        <div class="rn-earn l1">+500 pts</div>
+      </div>
+      <div class="rn-connector" style="margin-left:36px"></div>
+      <div class="rtree-node rn-indent2">
+        <div class="rn-dot l2"></div>
+        <div class="rn-info">
+          <div class="rn-name">@hassan</div>
+          <div class="rn-tag">Ali's refer — claims 1000 pts</div>
+        </div>
+        <div class="rn-earn l2">+250 pts</div>
+      </div>
+      <div class="rn-connector" style="margin-left:68px"></div>
+      <div class="rtree-node" style="margin-left:96px">
+        <div class="rn-dot l3"></div>
+        <div class="rn-info">
+          <div class="rn-name">@sara</div>
+          <div class="rn-tag">Hassan's refer — claims 1000 pts</div>
+        </div>
+        <div class="rn-earn l3">+100 pts</div>
+      </div>
+    </div>
+    <div class="refer-info">
+      <div class="ri-item">
+        <div class="ri-badge l1">L1<br>50%</div>
+        <div class="ri-text">
+          <strong>Direct Referrals</strong>
+          <p>Every time your direct refer claims mining — you get 50% of their earned amount. Automatically, forever.</p>
+        </div>
+      </div>
+      <div class="ri-item">
+        <div class="ri-badge l2">L2<br>25%</div>
+        <div class="ri-text">
+          <strong>Second Level</strong>
+          <p>When your refer's refer claims — you earn 25%. Build a team and earn while you sleep.</p>
+        </div>
+      </div>
+      <div class="ri-item">
+        <div class="ri-badge l3">L3<br>10%</div>
+        <div class="ri-text">
+          <strong>Third Level</strong>
+          <p>Three levels deep passive income. The bigger your network, the more TOKEN flows to you daily.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"><hr/></div>
+
+<!-- ROADMAP -->
+<section id="roadmap">
+  <span class="sec-label">Roadmap</span>
+  <h2 class="sec-title">The Path to <em>Launch</em></h2>
+  <p class="sec-desc">Every phase brings us closer to Solana mainnet. Early miners will hold the most TOKEN when launch happens.</p>
+  <div class="road-grid">
+    <div class="phase-card active">
+      <div class="phase-dot done"></div>
+      <div class="phase-label">PHASE 1 — Q2 2026</div>
+      <div class="phase-title">Mining Platform</div>
+      <p class="phase-desc">Free mining app live. Email + Web3 login. Referral tree. Daily tasks. Leaderboard.</p>
+      <span class="phase-status ps-live">✓ LIVE</span>
+    </div>
+    <div class="phase-card">
+      <div class="phase-dot now"></div>
+      <div class="phase-label">PHASE 2 — Q3 2026</div>
+      <div class="phase-title">Token Launch</div>
+      <p class="phase-desc">Ai2E TOKEN deploys on Solana. Miners convert points. CEX/DEX listings. Airdrop for early miners.</p>
+      <span class="phase-status ps-building">⚡ BUILDING</span>
+    </div>
+    <div class="phase-card">
+      <div class="phase-dot soon"></div>
+      <div class="phase-label">PHASE 3 — Q4 2026</div>
+      <div class="phase-title">AI Assistant</div>
+      <p class="phase-desc">AI-powered tools launch. Script marketplace opens. TOKEN becomes fuel for all AI services.</p>
+      <span class="phase-status ps-soon">SOON</span>
+    </div>
+    <div class="phase-card">
+      <div class="phase-dot future"></div>
+      <div class="phase-label">PHASE 4 — 2027</div>
+      <div class="phase-title">DeFi Suite</div>
+      <p class="phase-desc">Staking, yield farming, liquidity pools on Solana. Full Web3 hub. One unified ecosystem.</p>
+      <span class="phase-status ps-future">PLANNED</span>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"><hr/></div>
+
+<!-- TOKEN SECTION -->
+<div class="token-section">
+  <div class="token-wrap">
+    <div class="token-info">
+      <span class="sec-label">Ai2E TOKEN</span>
+      <h2 class="sec-title" style="font-size:clamp(24px,4vw,40px)">Real Crypto.<br><em>Real Value.</em></h2>
+      <p style="font-size:15px;color:var(--muted);line-height:1.7;margin-bottom:24px">Ai2E TOKEN is a real Solana-based cryptocurrency. Every point you mine today converts to TOKEN at launch. Early miners get the best ratio.</p>
+      <div class="token-features">
+        <div class="tf-item">
+          <div class="tf-check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+          Built on Solana — fast, low fees
+        </div>
+        <div class="tf-item">
+          <div class="tf-check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+          Points → TOKEN at 1:1 ratio (early miners)
+        </div>
+        <div class="tf-item">
+          <div class="tf-check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+          CEX + DEX listings planned Q3 2026
+        </div>
+        <div class="tf-item">
+          <div class="tf-check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+          Fuel for AI marketplace & DeFi suite
+        </div>
+      </div>
+      <a href="mining.html" class="btn-primary" style="margin-top:28px;display:inline-flex">
+        Mine TOKEN Now
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </a>
+    </div>
+    <div class="token-visual">
+      <div class="token-coin">
+        <svg class="coin-svg" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="coinGrad" x1="0" y1="0" x2="180" y2="180">
+              <stop stop-color="#00ff88"/>
+              <stop offset=".5" stop-color="#00d4ff"/>
+              <stop offset="1" stop-color="#7c3aed"/>
+            </linearGradient>
+            <linearGradient id="coinGrad2" x1="0" y1="0" x2="180" y2="180">
+              <stop stop-color="#0a1a0f"/>
+              <stop offset="1" stop-color="#0a0f20"/>
+            </linearGradient>
+            <filter id="coinGlow">
+              <feGaussianBlur stdDeviation="8" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <!-- Outer glow ring -->
+          <circle cx="90" cy="90" r="85" stroke="url(#coinGrad)" stroke-width="1" opacity=".3" stroke-dasharray="6 4"/>
+          <circle cx="90" cy="90" r="85" stroke="url(#coinGrad)" stroke-width=".5" opacity=".2" filter="url(#coinGlow)"/>
+          <!-- Main coin -->
+          <circle cx="90" cy="90" r="72" fill="url(#coinGrad2)" stroke="url(#coinGrad)" stroke-width="2"/>
+          <!-- Inner ring decoration -->
+          <circle cx="90" cy="90" r="62" stroke="url(#coinGrad)" stroke-width=".8" opacity=".3"/>
+          <!-- Ai2E text paths -->
+          <path d="M68 98l6-16 6 16M70.5 93.5h7" stroke="url(#coinGrad)" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M86 82v16M86 82h8a5 5 0 0 1 0 10H86" stroke="url(#coinGrad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M100 82h8v4h-8v4h8v4h-8" stroke="url(#coinGrad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <!-- Decorative dots -->
+          <circle cx="90" cy="24" r="3" fill="#00ff88" opacity=".6"/>
+          <circle cx="148" cy="62" r="2" fill="#00d4ff" opacity=".5"/>
+          <circle cx="148" cy="118" r="2" fill="#7c3aed" opacity=".5"/>
+          <circle cx="90" cy="156" r="3" fill="#00ff88" opacity=".4"/>
+          <circle cx="32" cy="118" r="2" fill="#00d4ff" opacity=".5"/>
+          <circle cx="32" cy="62" r="2" fill="#7c3aed" opacity=".5"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- BLOG / UPDATES -->
+<section id="blog">
+  <span class="sec-label">Latest Updates</span>
+  <h2 class="sec-title">From the <em>Team</em></h2>
+  <p class="sec-desc">Stay up to date with platform news, mining tips, and token launch updates.</p>
+  <div class="blog-grid">
+    <a href="blog.html" class="blog-card">
+      <div class="blog-thumb">
+        <div class="bt-bg" style="background:linear-gradient(135deg,#0a0f1e,#0a1a10)">
+          <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" opacity=".3"><path d="m14 10-8.5 8.5c-.83.83-.83 2.17 0 3 .83.83 2.17.83 3 0L17 13"/><path d="M14 10 9 5l2-2 5 5"/><path d="m16 8 3-3 2 2-3 3"/></svg>
+          <div style="position:absolute;bottom:12px;left:16px;font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:1px">MINING GUIDE</div>
+        </div>
+      </div>
+      <div class="blog-body">
+        <div class="blog-cat" style="color:var(--accent)">GUIDE</div>
+        <div class="blog-title">How to Maximize Your Daily TOKEN Mining</div>
+        <p class="blog-excerpt">Complete all tasks, refer actively, and claim daily for the highest possible TOKEN earnings before launch.</p>
+        <div class="blog-meta">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          3 min read
+        </div>
+      </div>
+    </a>
+    <a href="blog.html" class="blog-card">
+      <div class="blog-thumb">
+        <div class="bt-bg" style="background:linear-gradient(135deg,#0a0820,#0a0f1e)">
+          <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" opacity=".3"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/></svg>
+          <div style="position:absolute;bottom:12px;left:16px;font-family:'Space Mono',monospace;font-size:10px;color:var(--purple);letter-spacing:1px">TOKEN LAUNCH</div>
+        </div>
+      </div>
+      <div class="blog-body">
+        <div class="blog-cat" style="color:var(--purple)">ANNOUNCEMENT</div>
+        <div class="blog-title">Ai2E TOKEN Launches on Solana — Q3 2026</div>
+        <p class="blog-excerpt">Everything you need to know about the upcoming Solana mainnet launch, point conversion, and early miner benefits.</p>
+        <div class="blog-meta">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          5 min read
+        </div>
+      </div>
+    </a>
+    <a href="blog.html" class="blog-card">
+      <div class="blog-thumb">
+        <div class="bt-bg" style="background:linear-gradient(135deg,#0f0e00,#0a0f1e)">
+          <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" opacity=".3"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <div style="position:absolute;bottom:12px;left:16px;font-family:'Space Mono',monospace;font-size:10px;color:var(--gold);letter-spacing:1px">REFERRAL SYSTEM</div>
+        </div>
+      </div>
+      <div class="blog-body">
+        <div class="blog-cat" style="color:var(--gold)">FEATURE</div>
+        <div class="blog-title">3-Level Referral Tree — Earn Passively Forever</div>
+        <p class="blog-excerpt">The new L1/L2/L3 system means your entire network earns you TOKEN every single day. Here's how to build it.</p>
+        <div class="blog-meta">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          4 min read
+        </div>
+      </div>
+    </a>
+  </div>
+</section>
+
+<!-- CTA -->
+<div class="cta-section">
+  <h2 class="cta-title">Start Mining.<br><span style="background:linear-gradient(135deg,var(--accent),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Own TOKEN.</span></h2>
+  <p class="cta-sub">Thousands of miners are already building their TOKEN stack. Every day you wait is TOKEN you didn't mine.</p>
+  <div class="cta-btns">
+    <a href="mining.html" class="btn-primary" style="font-size:16px;padding:16px 36px">
+      Mine Free Now
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    </a>
+    <a href="vision.html" class="btn-secondary" style="font-size:16px;padding:16px 28px">Read Our Vision</a>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div>
+    <div class="footer-brand">Ai2E — AI TO EARN</div>
+    <div class="footer-sub">Free mining platform · Solana TOKEN launch Q3 2026</div>
+  </div>
+  <div class="footer-links">
+    <a href="vision.html">Vision</a>
+    <a href="blog.html">Blog</a>
+    <a href="partners.html">Partners</a>
+    <a href="policies.html">Policies</a>
+    <a href="mining.html">App</a>
+  </div>
+</footer>
+<div class="footer-bottom">© 2026 Ai2E. All rights reserved. — Built on Solana.</div>
+
+<script>
+// Hamburger menu
+function toggleMenu() {
+  const m = document.getElementById('mobMenu');
+  const b = document.getElementById('hamBtn');
+  const open = m.classList.toggle('open');
+  b.style.borderColor = open ? 'var(--accent)' : '';
+  document.body.style.overflow = open ? 'hidden' : '';
+}
+function closeMenu() {
+  document.getElementById('mobMenu').classList.remove('open');
+  document.getElementById('hamBtn').style.borderColor = '';
+  document.body.style.overflow = '';
+}
+// Close on outside click
+document.addEventListener('click', e => {
+  const m = document.getElementById('mobMenu');
+  if(m.classList.contains('open') && !m.contains(e.target) && !document.getElementById('hamBtn').contains(e.target)) closeMenu();
+});
+
+// Animated counter for hero
+let v = 10.0;
+const counterEl = document.getElementById('heroCounter');
+setInterval(() => {
+  v = Math.round((v + Math.random() * 0.1) * 10) / 10;
+  if(v > 10.9) v = 10.0;
+  if(counterEl) counterEl.textContent = v.toFixed(1);
+}, 1200);
+
+// Scroll reveal
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if(e.isIntersecting) {
+      e.target.style.animation = 'fadeUp .6s ease forwards';
+      e.target.style.opacity = '1';
+    }
+  });
+}, { threshold: 0.1 });
+
+document.querySelectorAll('.how-card, .phase-card, .blog-card, .ri-item').forEach(el => {
+  el.style.opacity = '0';
+  observer.observe(el);
+});
+</script>
+</body>
+</html>
