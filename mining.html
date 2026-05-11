@@ -1306,7 +1306,6 @@ async function loadMyRank() {
 // ============================================
 function getDur() { return parseInt(cfg.mining_duration_hours || '24') * 3600000; }
 function getCPMS() { return (parseFloat(cfg.mining_coins_per_hour || '10') * (me?.mining_power || 1)) / 3600000; }
-const MIN_CLAIM = 100;
 
 function updateMineUI() {
   const btn = document.getElementById('mine-btn');
@@ -1319,9 +1318,9 @@ function updateMineUI() {
 
   const isClaimed = (me.mining_claimed == 1 || me.mining_claimed === true);
   const hasSession = !!(me.last_mining_start && me.last_mining_start !== 'null' && me.last_mining_start !== '');
-  // Only reset to "Start Mining" when there is no active session.
-  // Do NOT gate on isClaimed alone — a stale cached value can wrongly hide the status box.
-  if (!hasSession) {
+  
+  // If session is claimed or doesn't exist, show "Start Mining" button
+  if (!hasSession || isClaimed) {
     btn.className = 'start'; btn.textContent = '⛏️ Start Mining'; btn.disabled = false;
     pw.style.display = 'none'; pe.style.display = 'none';
     an.classList.remove('mactive'); setText('mrated', 'IDLE');
@@ -1332,7 +1331,7 @@ function updateMineUI() {
   const st = new Date(me.last_mining_start).getTime();
   const el = Math.min(Date.now() - st, dur);
   const earn = Math.floor(getCPMS() * el);
-  const canClaim = earn >= MIN_CLAIM || el >= dur;
+  const canClaim = el >= dur; // Only allow claim after full 24 hours
   const pct = Math.min((el / dur * 100), 100).toFixed(1);
   const rem = Math.max(dur - el, 0);
   const h = Math.floor(rem / 3600000), m = Math.floor((rem % 3600000) / 60000);
@@ -1350,50 +1349,39 @@ function updateMineUI() {
     if (fill) fill.style.width = pct + '%';
     setText('msb-pct', pct + '%');
 
-    if (el >= dur) {
+    if (canClaim) {
       msb.classList.add('claim-ready');
       setText('msb-title-txt', '🏆 Ready to Claim!');
       setText('msb-live-txt', 'DONE');
       setText('msb-time', 'Complete!');
       setText('msb-prog-lbl', 'Mining Complete');
       setText('msb-hint', '✅ Tap claim button below to collect rewards');
-    } else if (canClaim) {
-      msb.classList.add('claim-ready');
-      setText('msb-title-txt', 'Claim Available');
-      setText('msb-live-txt', 'CLAIM');
-      setText('msb-time', h + 'h ' + m + 'm left');
-      setText('msb-prog-lbl', 'Early Claim Ready');
-      setText('msb-hint', '⚡ Min ' + MIN_CLAIM + ' pts reached — you can claim now!');
     } else {
       msb.classList.remove('claim-ready');
       setText('msb-title-txt', 'Mining Active');
       setText('msb-live-txt', 'LIVE');
       setText('msb-time', h + 'h ' + m + 'm left');
       setText('msb-prog-lbl', 'Progress');
-      setText('msb-hint', '⛏️ Earning rewards continuously... come back to claim');
+      setText('msb-hint', '⛏️ Earning rewards continuously... come back after 24 hours to claim');
     }
   }
 
-  if (el >= dur) {
+  if (canClaim) {
     btn.className = 'claim'; btn.textContent = '🎁 Claim ' + earn.toLocaleString() + ' Tokens'; btn.disabled = false;
     pw.style.display = 'block';
     document.getElementById('mpfill').style.width = '100%';
     setText('mplbl', 'Mining complete!'); setText('mptime', 'Ready!');
     setText('pendamt', earn.toLocaleString()); pe.style.display = 'block';
     an.classList.add('mactive'); setText('mrated', 'DONE!');
-    return;
-  }
-  if (canClaim) {
-    btn.className = 'claim'; btn.textContent = '🎁 Claim ' + earn.toLocaleString() + ' Tokens (Early)'; btn.disabled = false;
   } else {
-    btn.className = 'mining'; btn.textContent = '⏳ Mining... need ' + MIN_CLAIM + ' pts (' + earn + ' so far)'; btn.disabled = false;
+    btn.className = 'mining'; btn.textContent = '⏳ Mining... ' + h + 'h ' + m + 'm remaining'; btn.disabled = true;
+    pw.style.display = 'block';
+    document.getElementById('mpfill').style.width = pct + '%';
+    setText('mplbl', 'Mining in progress'); setText('mptime', h + 'h ' + m + 'm left');
+    setText('pendamt', earn.toLocaleString()); pe.style.display = 'block';
+    an.classList.add('mactive');
+    setText('mrated', '+' + ratePerHr + '/hr');
   }
-  pw.style.display = 'block';
-  document.getElementById('mpfill').style.width = pct + '%';
-  setText('mplbl', 'Mining in progress'); setText('mptime', h + 'h ' + m + 'm left');
-  setText('pendamt', earn.toLocaleString()); pe.style.display = 'block';
-  an.classList.add('mactive');
-  setText('mrated', '+' + ratePerHr + '/hr');
 }
 
 async function refreshMe(forceDB = false) {
