@@ -789,7 +789,7 @@ const ANIMALS = ['🐹','🦫','🦦','🦝','🐿️','🦙','🐰','🦔'];
 let aidx = 0;
 
 // ============================================
-// API HELPER + LOCAL CACHE (Turso reads bachao)
+// API HELPER + LOCAL CACHE (minimize Turso reads)
 // ============================================
 
 // Cache TTLs (milliseconds)
@@ -829,7 +829,7 @@ function cacheClear(path) {
 }
 
 async function api(path, method = 'GET', body = null) {
-  // GET requests: cache check pehle
+  // GET requests: check cache first
   if (method === 'GET' && !body) {
     const cached = cacheGet(path);
     if (cached !== null) return cached;
@@ -843,7 +843,7 @@ async function api(path, method = 'GET', body = null) {
   const res = await fetch(API + path, opts);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Request failed');
-  // Cache save karo GET results
+  // Save GET results to cache
   if (method === 'GET' && !body) cacheSet(path, data);
   return data;
 }
@@ -852,12 +852,12 @@ async function api(path, method = 'GET', body = null) {
 // INIT
 // ============================================
 window.addEventListener('DOMContentLoaded', async () => {
-  // Purana pages.dev token clear karo
+  // Clear old pages.dev token
   if (localStorage.getItem('ai2e_dv') !== 'v2') {
     ['app_token','app_user','app_last_sync'].forEach(k => localStorage.removeItem(k));
     localStorage.setItem('ai2e_dv', 'v2');
   }
-  // Safety — 7 sec baad bhi loader ho to login dikhao
+  // Safety — if loader still showing after 7s, show login
   window._st = setTimeout(() => { showLogin(); }, 7000);
   const ref = new URLSearchParams(window.location.search).get('ref');
   if (ref) {
@@ -870,19 +870,19 @@ window.addEventListener('DOMContentLoaded', async () => {
   const savedToken = localStorage.getItem('app_token');
   const savedUser = localStorage.getItem('app_user');
   const lastSync = parseInt(localStorage.getItem('app_last_sync') || '0');
-  const SYNC_TTL = 3 * 60 * 1000; // 3 min mein ek baar DB se sync
+  const SYNC_TTL = 3 * 60 * 1000; // sync from DB once every 3 min
 
   if (savedToken && savedUser) {
     token = savedToken;
     me = JSON.parse(savedUser);
     setL('LOADING MINER...');
     try {
-      // Agar 3 min se kam time hua hai — local data se kaam chalao, DB read bachao
+      // Less than 3 min since last sync — use local cached data, skip DB read
       if (Date.now() - lastSync < SYNC_TTL) {
         await finishLogin();
         return;
       }
-      // 3 min baad fresh DB read
+      // 3 min elapsed — fetch fresh data from DB
       me = await api('/api/me');
       localStorage.setItem('app_user', JSON.stringify(me));
       localStorage.setItem('app_last_sync', String(Date.now()));
@@ -1205,7 +1205,7 @@ async function finishLogin(freshLogin = false) {
   document.getElementById('loader').style.display = 'flex';
   document.getElementById('login-screen').classList.remove('show');
   try {
-    // freshLogin=true (naya login/register): cache skip karo, DB se lo
+    // freshLogin=true (new login/register): skip cache, fetch from DB
     if (freshLogin) { cacheClear('/api/settings'); cacheClear('/api/tasks'); }
     let settings = {}, taskData = { tasks: [], done: [] };
     try { settings = await api('/api/settings'); } catch(e) { console.warn('settings err:', e); }
@@ -1319,7 +1319,9 @@ function updateMineUI() {
 
   const isClaimed = (me.mining_claimed == 1 || me.mining_claimed === true);
   const hasSession = !!(me.last_mining_start && me.last_mining_start !== 'null' && me.last_mining_start !== '');
-  if (isClaimed || !hasSession) {
+  // Only reset to "Start Mining" when there is no active session.
+  // Do NOT gate on isClaimed alone — a stale cached value can wrongly hide the status box.
+  if (!hasSession) {
     btn.className = 'start'; btn.textContent = '⛏️ Start Mining'; btn.disabled = false;
     pw.style.display = 'none'; pe.style.display = 'none';
     an.classList.remove('mactive'); setText('mrated', 'IDLE');
@@ -1396,10 +1398,10 @@ function updateMineUI() {
 
 async function refreshMe(forceDB = false) {
   try {
-    // forceDB=false: sirf timer wala call — local data se kaam chalao
-    // forceDB=true: claim/start/task ke baad — DB se fresh data lo
+    // forceDB=false: timer tick only — update UI from local data, no DB read
+    // forceDB=true: after claim/start/task — fetch fresh data from DB
     if (!forceDB) {
-      // Mining progress sirf local calculation se update karo (no DB read)
+      // Update mining progress via local calculation only (no DB read)
       renderUser();
       updateMineUI();
       return;
@@ -1414,7 +1416,7 @@ async function refreshMe(forceDB = false) {
 
 function startTicker() {
   clearInterval(mInt);
-  mInt = setInterval(() => { refreshMe(); }, 5 * 60 * 1000); // 26a1 5 min 2014 DB reads bachao
+  mInt = setInterval(() => { refreshMe(); }, 5 * 60 * 1000); // sync DB every 5 min to reduce reads
   setInterval(() => { if (me) updateMineUI(); }, 5000);
 }
 
@@ -1905,7 +1907,7 @@ async function doLogout() {
   localStorage.removeItem('app_token');
   localStorage.removeItem('app_user');
   localStorage.removeItem('app_last_sync');
-  // Cache bhi clear karo
+  // Also clear cache
   ['_api_stats','_api_settings','_api_tasks','_api_leaderboard','_api_referrals','_api_transactions'].forEach(k => localStorage.removeItem('c' + k));
   token = null; me = null;
   document.getElementById('app-screen').classList.remove('show');
