@@ -1005,7 +1005,7 @@ async function doForgotRequest() {
   const answer = document.getElementById('frg-answer').value.trim();
   const newpw = document.getElementById('frg-newpw').value.trim();
   if (!newpw || newpw.length < 6) {
-    msg.textContent = 'New password min 6 characters hona chahiye.';
+    msg.textContent = 'New password must be at least 6 characters.';
     msg.style.cssText = 'display:block;background:rgba(248,81,73,.1);color:var(--danger);border:1px solid rgba(248,81,73,.3);padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px';
     return;
   }
@@ -1431,16 +1431,20 @@ function startAnimalLoop() {
 // Fixed bug: declared `dur` variable properly
 async function handleMineBtn() {
   if (!me) return;
-  const dur = getDur(); // <-- fixed missing variable
-  const isClaimed = (me.mining_claimed == 1 || me.mining_claimed === true);
+  const dur = getDur();
   const hasSession = !!(me.last_mining_start && me.last_mining_start !== 'null' && me.last_mining_start !== '');
-  if (isClaimed || !hasSession) {
+  // No active session — start mining
+  if (!hasSession) {
     await startMining();
+    return;
+  }
+  // Active session exists — calculate earnings and decide claim vs wait
+  const e = Math.min(Date.now() - new Date(me.last_mining_start).getTime(), dur);
+  const earn = Math.floor(getCPMS() * e);
+  if (earn >= MIN_CLAIM || e >= dur) {
+    await claimMining();
   } else {
-    const e = Math.min(Date.now() - new Date(me.last_mining_start).getTime(), dur);
-    const earn = Math.floor(getCPMS() * e);
-    if (earn >= MIN_CLAIM || e >= dur) await claimMining();
-    else toast('⏳ Mine at least ' + MIN_CLAIM + ' points first! (' + earn + ' so far)');
+    toast('⏳ Mine at least ' + MIN_CLAIM + ' points first! (' + earn + ' so far)');
   }
 }
 
