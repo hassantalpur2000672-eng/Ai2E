@@ -600,7 +600,10 @@ export async function onRequest({ request, env }) {
       const body = request.method !== 'GET' ? await request.json().catch(() => ({})) : {};
 
       if (path === '/api/admin/users' && request.method === 'GET') {
-        return json(await dbAll(env, 'SELECT * FROM users ORDER BY created_at DESC LIMIT 100'));
+        return json(await dbAll(env, `SELECT u.*,
+          (SELECT COUNT(*) FROM users r WHERE r.referred_by = u.referral_code) AS referral_count,
+          (SELECT COUNT(*) FROM users r WHERE r.referred_by = u.referral_code AND r.total_mined > 0) AS active_referral_count
+          FROM users u ORDER BY u.created_at DESC LIMIT 100`));
       }
       if (path === '/api/admin/users/update' && request.method === 'POST') {
         await dbRun(env, 'UPDATE users SET username=?,points=?,mining_power=?,is_banned=? WHERE id=?', [body.username, body.points, body.mining_power, body.is_banned ? 1 : 0, body.id]);
@@ -652,7 +655,7 @@ export async function onRequest({ request, env }) {
           dbFirst(env, 'SELECT COUNT(*) as c FROM tasks WHERE is_active=1'),
           dbFirst(env, 'SELECT COUNT(*) as c FROM mining_sessions'),
         ]);
-        const recent = await dbAll(env, 'SELECT username,points,total_mined,mining_power,created_at,login_method FROM users ORDER BY created_at DESC LIMIT 10');
+        const recent = await dbAll(env, 'SELECT id,username,email,wallet_address,points,total_mined,mining_power,created_at,login_method,is_banned,(SELECT COUNT(*) FROM users r WHERE r.referred_by = u.referral_code AND r.total_mined > 0) AS active_referral_count FROM users u ORDER BY created_at DESC LIMIT 10');
         return json({ users: parseInt(uc?.c||0), total_mined: parseInt(tm?.s||0), tasks: parseInt(tc?.c||0), sessions: parseInt(mc?.c||0), recent });
       }
 
@@ -673,6 +676,9 @@ export async function onRequest({ request, env }) {
       if (path === '/api/admin/ads/delete' && request.method === 'POST') {
         await dbRun(env, 'DELETE FROM ads WHERE id=?', [body.id]);
         return json({ success: true });
+      }
+      if (path === '/api/admin/mining' && request.method === 'GET') {
+        return json(await dbAll(env, 'SELECT ms.*,u.username FROM mining_sessions ms LEFT JOIN users u ON ms.user_id=u.id ORDER BY ms.started_at DESC LIMIT 100'));
       }
       if (path === '/api/admin/transactions' && request.method === 'GET') {
         return json(await dbAll(env, 'SELECT t.*,u.username FROM transactions t LEFT JOIN users u ON t.user_id=u.id ORDER BY t.created_at DESC LIMIT 100'));
