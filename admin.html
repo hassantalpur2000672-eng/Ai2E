@@ -166,7 +166,7 @@
   <div class="admin-header">
     <div style="display:flex;align-items:center;gap:10px;">
       <button class="mob-menu-btn" onclick="toggleSidebar()" aria-label="Menu">☰</button>
-      <div class="admin-logo">⛏️ TOKEN Admin</div>
+      <div class="admin-logo"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 10-8.5 8.5c-.83.83-.83 2.17 0 3 .83.83 2.17.83 3 0L17 13"/><path d="M14 10 9 5l2-2 5 5"/><path d="m16 8 3-3 2 2-3 3"/></svg> TOKEN Admin</div>
     </div>
     <div style="display:flex;align-items:center;gap:12px;">
       <span style="font-size:12px;color:var(--muted);" id="a-live-time"></span>
@@ -178,24 +178,24 @@
 
   <div class="admin-body">
     <div class="sidebar" id="sidebar">
-      <button class="sidebar-btn active" onclick="showPanel('dashboard',this)">📊 Dashboard</button>
-      <button class="sidebar-btn" onclick="showPanel('tasks',this)">🎯 Tasks</button>
-      <button class="sidebar-btn" onclick="showPanel('users',this)">👥 Users</button>
-      <button class="sidebar-btn" onclick="showPanel('resets',this)">🔑 Password Resets</button>
-      <button class="sidebar-btn" onclick="showPanel('support',this)">💬 Support</button>
-      <button class="sidebar-btn" onclick="showPanel('mining',this)">⛏️ Mining</button>
-      <button class="sidebar-btn" onclick="showPanel('transactions',this)">💰 Transactions</button>
+      <button class="sidebar-btn active" onclick="showPanel('dashboard',this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> Dashboard</button>
+      <button class="sidebar-btn" onclick="showPanel('tasks',this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg> Tasks</button>
+      <button class="sidebar-btn" onclick="showPanel('users',this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Users</button>
+      <button class="sidebar-btn" onclick="showPanel('resets',this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg> Password Resets</button>
+      <button class="sidebar-btn" onclick="showPanel('support',this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Support</button>
+      <button class="sidebar-btn" onclick="showPanel('mining',this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 10-8.5 8.5c-.83.83-.83 2.17 0 3 .83.83 2.17.83 3 0L17 13"/><path d="M14 10 9 5l2-2 5 5"/><path d="m16 8 3-3 2 2-3 3"/></svg> Mining</button>
+      <button class="sidebar-btn" onclick="showPanel('transactions',this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> Transactions</button>
       <div class="sidebar-sep"></div>
       <button class="sidebar-btn" onclick="showPanel('blog',this)">📍 Roadmap/Blog</button>
       <button class="sidebar-btn" onclick="showPanel('ads',this)">📢 Ad Manager</button>
-      <button class="sidebar-btn" onclick="showPanel('settings',this)">⚙️ Settings</button>
+      <button class="sidebar-btn" onclick="showPanel('settings',this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Settings</button>
     </div>
 
     <div class="main-panel">
 
       <!-- DASHBOARD -->
       <div id="panel-dashboard" class="panel active">
-        <div class="panel-head"><div class="panel-title">📊 Dashboard</div><button class="btn btn-sm btn-primary" onclick="loadDashboard()">↻ Refresh</button></div>
+        <div class="panel-head"><div class="panel-title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> Dashboard</div><button class="btn btn-sm btn-primary" onclick="loadDashboard()">↻ Refresh</button></div>
         <div class="stats-row">
           <div class="stat-box"><div class="stat-box-val" id="d-users">—</div><div class="stat-box-lbl">Total Users</div></div>
           <div class="stat-box"><div class="stat-box-val" id="d-mined">—</div><div class="stat-box-lbl">TOKEN Mined</div></div>
@@ -212,7 +212,7 @@
       <!-- TASKS -->
       <div id="panel-tasks" class="panel">
         <div class="panel-head">
-          <div class="panel-title">🎯 Tasks</div>
+          <div class="panel-title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg> Tasks</div>
           <button class="btn btn-sm btn-primary" onclick="openTaskModal()">+ Add Task</button>
         </div>
         <div class="tbl-wrap"><table>
@@ -224,7 +224,7 @@
       <!-- USERS -->
       <div id="panel-users" class="panel">
         <div class="panel-head">
-          <div class="panel-title">👥 Users</div>
+          <div class="panel-title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Users</div>
           <div style="display:flex;gap:8px;">
             <input type="text" id="user-search" placeholder="Search username..." style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 12px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;outline:none;width:200px;" oninput="searchUsers()"/>
             <button class="btn btn-sm btn-primary" onclick="loadUsers()">↻</button>
@@ -238,7 +238,7 @@
 
       <!-- MINING -->
       <div id="panel-mining" class="panel">
-        <div class="panel-head"><div class="panel-title">⛏️ Mining Sessions</div><button class="btn btn-sm btn-primary" onclick="loadMining()">↻ Refresh</button></div>
+        <div class="panel-head"><div class="panel-title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 10-8.5 8.5c-.83.83-.83 2.17 0 3 .83.83 2.17.83 3 0L17 13"/><path d="M14 10 9 5l2-2 5 5"/><path d="m16 8 3-3 2 2-3 3"/></svg> Mining Sessions</div><button class="btn btn-sm btn-primary" onclick="loadMining()">↻ Refresh</button></div>
         <div class="tbl-wrap"><table>
           <thead><tr><th>User</th><th>Started</th><th>Claimed</th><th>Coins</th><th>Power</th><th>Status</th></tr></thead>
           <tbody id="mining-tbody"></tbody>
@@ -247,7 +247,7 @@
 
       <!-- TRANSACTIONS -->
       <div id="panel-transactions" class="panel">
-        <div class="panel-head"><div class="panel-title">💰 Transactions</div><button class="btn btn-sm btn-primary" onclick="loadTx()">↻ Refresh</button></div>
+        <div class="panel-head"><div class="panel-title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> Transactions</div><button class="btn btn-sm btn-primary" onclick="loadTx()">↻ Refresh</button></div>
         <div class="tbl-wrap"><table>
           <thead><tr><th>User</th><th>Type</th><th>Amount</th><th>Description</th><th>Time</th></tr></thead>
           <tbody id="tx-tbody"></tbody>
@@ -290,7 +290,7 @@
           <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">📄 Page Ad Controls</div>
           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;">
             <label class="page-toggle-card"><input type="checkbox" id="pg-index" checked onchange="savePageToggle('index',this.checked)"><span class="toggle-dot"></span><span>🏠 Main App</span></label>
-            <label class="page-toggle-card"><input type="checkbox" id="pg-blog" checked onchange="savePageToggle('blog',this.checked)"><span class="toggle-dot"></span><span>📝 Blog</span></label>
+            <label class="page-toggle-card"><input type="checkbox" id="pg-blog" checked onchange="savePageToggle('blog',this.checked)"><span class="toggle-dot"></span><span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Blog</span></label>
             <label class="page-toggle-card"><input type="checkbox" id="pg-policies" checked onchange="savePageToggle('policies',this.checked)"><span class="toggle-dot"></span><span>📋 Policies</span></label>
             <label class="page-toggle-card"><input type="checkbox" id="pg-vision" checked onchange="savePageToggle('vision',this.checked)"><span class="toggle-dot"></span><span>🔭 Vision</span></label>
           </div>
@@ -303,7 +303,7 @@
               <select id="code-page-select" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:var(--text);font-size:12px;" onchange="showPageCode(this.value)">
                 <option value="all">📄 Sare Pages</option>
                 <option value="index">🏠 index.html</option>
-                <option value="blog">📝 blog.html</option>
+                <option value="blog"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> blog.html</option>
                 <option value="policies">📋 policies.html</option>
                 <option value="vision">🔭 vision.html</option>
               </select>
@@ -316,18 +316,18 @@
 
       <!-- SETTINGS -->
       <div id="panel-resets" class="panel">
-        <div class="panel-head"><div class="panel-title">🔑 Password Reset Requests</div><button class="btn btn-sm btn-primary" onclick="loadResets()">↻ Refresh</button></div>
+        <div class="panel-head"><div class="panel-title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg> Password Reset Requests</div><button class="btn btn-sm btn-primary" onclick="loadResets()">↻ Refresh</button></div>
         <div id="resets-list"><div style="color:var(--muted);font-size:13px">Click Refresh to load.</div></div>
       </div>
 
       <div id="panel-support" class="panel">
-        <div class="panel-head"><div class="panel-title">💬 Support Messages</div><button class="btn btn-sm btn-primary" onclick="loadSupport()">↻ Refresh</button></div>
+        <div class="panel-head"><div class="panel-title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Support Messages</div><button class="btn btn-sm btn-primary" onclick="loadSupport()">↻ Refresh</button></div>
         <div id="support-list"><div style="color:var(--muted);font-size:13px">Click Refresh to load.</div></div>
       </div>
 
       <div id="panel-settings" class="panel">
         <div class="panel-head">
-          <div class="panel-title">⚙️ Settings</div>
+          <div class="panel-title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Settings</div>
           <button class="btn btn-sm btn-primary" onclick="saveAllSettings()">💾 Save All</button>
         </div>
         <div class="settings-list" id="settings-list"></div>
@@ -443,7 +443,7 @@
     <div class="field"><label>Pages</label>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px;">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;"><input type="checkbox" id="ampage-index" checked> 🏠 index.html</label>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;"><input type="checkbox" id="ampage-blog" checked> 📝 blog.html</label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;"><input type="checkbox" id="ampage-blog" checked> <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> blog.html</label>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;"><input type="checkbox" id="ampage-policies" checked> 📋 Policies</label>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;"><input type="checkbox" id="ampage-vision" checked> 🔭 Vision</label>
       </div>
@@ -639,7 +639,7 @@ async function loadTasks() {
     if (!tbody) return;
     tbody.innerHTML = data.map(t => `
       <tr>
-        <td style="font-size:20px;">${t.icon||'🎯'}</td>
+        <td style="font-size:20px;">${t.icon||'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>'}</td>
         <td>${esc(t.title)}</td>
         <td><span class="badge badge-purple">${t.task_type}</span></td>
         <td style="font-family:'Space Mono',monospace;">${t.points_reward}</td>
@@ -681,7 +681,7 @@ async function openTaskModal(id = null) {
     }
   } else {
     ['t-id','t-title','t-desc','t-url','t-adurl','t-quiz-q','t-quiz-a','t-vcode'].forEach(id => setVal(id,''));
-    setVal('t-icon','🎯'); setVal('t-pts','100'); setVal('t-timer','0');
+    setVal('t-icon','<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>'); setVal('t-pts','100'); setVal('t-timer','0');
     setVal('t-order','99'); setVal('t-type','link'); setVal('t-active','true'); onTaskTypeChange();
   }
   document.getElementById('task-modal').classList.add('show');
@@ -695,7 +695,7 @@ async function saveTask() {
     id: id || null,
     title: document.getElementById('t-title').value.trim(),
     description: document.getElementById('t-desc').value.trim(),
-    icon: document.getElementById('t-icon').value.trim() || '🎯',
+    icon: document.getElementById('t-icon').value.trim() || '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>',
     task_type: document.getElementById('t-type').value,
     url: document.getElementById('t-url').value.trim() || null,
     ad_url: document.getElementById('t-adurl').value.trim() || null,
@@ -819,7 +819,7 @@ async function loadTx() {
     const data = await adm('/api/admin/transactions');
     const tbody = document.getElementById('tx-tbody');
     if (!tbody) return;
-    const icons = { mining_claim:'⛏️', task_complete:'✅', ad_watch:'📺', welcome_bonus:'🎉', referral_bonus:'👥', active_referral_bonus:'🔥', refer_mining_l1:'💰', refer_mining_l2:'🌿', refer_mining_l3:'🔥' };
+    const icons = { mining_claim:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 10-8.5 8.5c-.83.83-.83 2.17 0 3 .83.83 2.17.83 3 0L17 13"/><path d="M14 10 9 5l2-2 5 5"/><path d="m16 8 3-3 2 2-3 3"/></svg>', task_complete:'✅', ad_watch:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="15" x="2" y="7" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg>', welcome_bonus:'🎉', referral_bonus:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>', active_referral_bonus:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>', refer_mining_l1:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>', refer_mining_l2:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>', refer_mining_l3:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>' };
     tbody.innerHTML = data.map(t => `
       <tr>
         <td>@${esc(t.username||'—')}</td>
