@@ -130,6 +130,8 @@
       <button class="sidebar-btn active" onclick="showPanel('dashboard',this)">📊 Dashboard</button>
       <button class="sidebar-btn" onclick="showPanel('tasks',this)">🎯 Tasks</button>
       <button class="sidebar-btn" onclick="showPanel('users',this)">👥 Users</button>
+      <button class="sidebar-btn" onclick="showPanel('resets',this)">🔑 Password Resets</button>
+      <button class="sidebar-btn" onclick="showPanel('support',this)">💬 Support</button>
       <button class="sidebar-btn" onclick="showPanel('mining',this)">⛏️ Mining</button>
       <button class="sidebar-btn" onclick="showPanel('transactions',this)">💰 Transactions</button>
       <div class="sidebar-sep"></div>
@@ -262,6 +264,16 @@
       </div>
 
       <!-- SETTINGS -->
+      <div id="panel-resets" class="panel">
+        <div class="panel-head"><div class="panel-title">🔑 Password Reset Requests</div><button class="btn btn-sm btn-primary" onclick="loadResets()">↻ Refresh</button></div>
+        <div id="resets-list"><div style="color:var(--muted);font-size:13px">Click Refresh to load.</div></div>
+      </div>
+
+      <div id="panel-support" class="panel">
+        <div class="panel-head"><div class="panel-title">💬 Support Messages</div><button class="btn btn-sm btn-primary" onclick="loadSupport()">↻ Refresh</button></div>
+        <div id="support-list"><div style="color:var(--muted);font-size:13px">Click Refresh to load.</div></div>
+      </div>
+
       <div id="panel-settings" class="panel">
         <div class="panel-head">
           <div class="panel-title">⚙️ Settings</div>
@@ -399,7 +411,7 @@
 // ============================================
 // CONFIG — APNA WORKER URL YAHAN LIKHO
 // ============================================
-const API = 'https://ai2e.space';
+const API = 'https://ai2e.pages.dev';
 const ADMIN_KEY = 'Admin@2026'; // ← same jo Worker mein set kiya
 
 // ============================================
@@ -437,6 +449,75 @@ function adminLogin() {
 }
 
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && !isLoggedIn) adminLogin(); });
+
+async function loadResets() {
+  const el = document.getElementById('resets-list');
+  el.innerHTML = '<div style="color:var(--muted);font-size:13px">Loading...</div>';
+  try {
+    const res = await fetch('/api/admin/reset-requests', { headers: { 'X-Admin-Key': adminKey } });
+    const data = await res.json();
+    const reqs = data.requests || [];
+    if (!reqs.length) { el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:20px 0">Koi request nahi.</div>'; return; }
+    el.innerHTML = reqs.map(r => `
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div><span style="font-weight:700">@${r.username||'user'}</span> <span style="color:var(--muted);font-size:12px">${r.email||''}</span></div>
+          <span style="font-size:11px;padding:3px 10px;border-radius:99px;${r.status==='pending'?'background:rgba(251,191,36,.1);color:#fbbf24;border:1px solid rgba(251,191,36,.3)':r.status==='approved'?'background:rgba(0,255,136,.1);color:#00ff88;border:1px solid rgba(0,255,136,.2)':'background:rgba(248,81,73,.1);color:#f85149;border:1px solid rgba(248,81,73,.3)'}">${r.status.toUpperCase()}</span>
+        </div>
+        ${r.verify_question ? `<div style="font-size:12px;margin-bottom:8px;padding:8px 10px;background:rgba(251,191,36,.05);border:1px solid rgba(251,191,36,.15);border-radius:7px"><b style="color:#fbbf24">Q:</b> ${r.verify_question}<br><b style="color:#fbbf24">A:</b> <span style="color:var(--text)">${r.verify_answer||'—'}</span></div>` : ''}
+        ${r.reason ? `<div style="font-size:12px;color:var(--muted);margin-bottom:10px">Reason: ${r.reason}</div>` : ''}
+        <div style="font-size:11px;color:var(--muted);margin-bottom:${r.status==='pending'?'10':'0'}px">${new Date(r.created_at).toLocaleString()}</div>
+        ${r.status==='pending' ? `<div style="display:flex;gap:8px"><input type="text" id="np-${r.id}" placeholder="Naya password (min 6)" style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:8px 12px;color:var(--text);font-size:13px;outline:none"/><button onclick="approveReset('${r.id}')" style="padding:8px 14px;background:#00ff88;color:#030712;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">✓ Approve</button><button onclick="rejectReset('${r.id}')" style="padding:8px 14px;background:rgba(248,81,73,.15);color:#f85149;border:1px solid rgba(248,81,73,.3);border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">✗ Reject</button></div>` : ''}
+      </div>`).join('');
+  } catch(e) { el.innerHTML = '<div style="color:var(--danger);font-size:13px">Error loading.</div>'; }
+}
+async function approveReset(id) {
+  const pw = document.getElementById('np-'+id).value.trim();
+  if (!pw || pw.length < 6) { alert('Min 6 char password daalo'); return; }
+  if (!confirm('Password reset karna hai?')) return;
+  const res = await fetch('/api/admin/reset-approve', { method:'POST', headers:{'Content-Type':'application/json','X-Admin-Key':adminKey}, body:JSON.stringify({reset_id:id,new_password:pw}) });
+  const d = await res.json();
+  if (d.ok) { alert('✅ Password reset ho gaya!'); loadResets(); } else alert('Error: '+d.error);
+}
+async function rejectReset(id) {
+  if (!confirm('Reject karna hai?')) return;
+  await fetch('/api/admin/reset-reject', { method:'POST', headers:{'Content-Type':'application/json','X-Admin-Key':adminKey}, body:JSON.stringify({reset_id:id}) });
+  loadResets();
+}
+
+async function loadSupport() {
+  const el = document.getElementById('support-list');
+  el.innerHTML = '<div style="color:var(--muted);font-size:13px">Loading...</div>';
+  try {
+    const res = await fetch('/api/admin/support', { headers: { 'X-Admin-Key': adminKey } });
+    const data = await res.json();
+    const msgs = data.messages || [];
+    if (!msgs.length) { el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:20px 0">Koi message nahi.</div>'; return; }
+    el.innerHTML = msgs.map(m => `
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div><span style="font-weight:700">@${m.username||'user'}</span> <span style="color:var(--muted);font-size:12px">${m.email||''}</span></div>
+          <span style="font-size:11px;padding:3px 10px;border-radius:99px;${m.status==='open'?'background:rgba(251,191,36,.1);color:#fbbf24;border:1px solid rgba(251,191,36,.3)':m.status==='replied'?'background:rgba(0,255,136,.1);color:#00ff88;border:1px solid rgba(0,255,136,.2)':'background:rgba(100,100,100,.1);color:#888;border:1px solid rgba(100,100,100,.2)'}">${(m.status||'open').toUpperCase()}</span>
+        </div>
+        <div style="font-size:13px;padding:10px;background:rgba(255,255,255,.03);border-radius:7px;margin-bottom:8px">${m.message}</div>
+        ${m.admin_reply ? `<div style="padding:8px 10px;background:rgba(0,255,136,.05);border:1px solid rgba(0,255,136,.15);border-radius:7px;font-size:12px;color:#00ff88;margin-bottom:8px">Reply: ${m.admin_reply}</div>` : ''}
+        <div style="font-size:11px;color:var(--muted);margin-bottom:${m.status!=='closed'?'10':'0'}px">${new Date(m.created_at).toLocaleString()}</div>
+        ${m.status!=='closed' ? `<div style="display:flex;gap:8px"><input type="text" id="reply-${m.id}" placeholder="Reply likho..." style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:8px 12px;color:var(--text);font-size:13px;outline:none"/><button onclick="replySupport('${m.id}')" style="padding:8px 14px;background:#00ff88;color:#030712;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">Reply</button><button onclick="closeSupport('${m.id}')" style="padding:8px 14px;background:rgba(100,100,100,.15);color:#888;border:1px solid rgba(100,100,100,.2);border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">Close</button></div>` : ''}
+      </div>`).join('');
+  } catch(e) { el.innerHTML = '<div style="color:var(--danger);font-size:13px">Error loading.</div>'; }
+}
+async function replySupport(id) {
+  const reply = document.getElementById('reply-'+id).value.trim();
+  if (!reply) { alert('Reply likho'); return; }
+  const res = await fetch('/api/admin/support/reply', { method:'POST', headers:{'Content-Type':'application/json','X-Admin-Key':adminKey}, body:JSON.stringify({msg_id:id,reply}) });
+  const d = await res.json();
+  if (d.ok) { alert('✅ Reply send!'); loadSupport(); } else alert('Error: '+d.error);
+}
+async function closeSupport(id) {
+  if (!confirm('Close karna hai?')) return;
+  await fetch('/api/admin/support/close', { method:'POST', headers:{'Content-Type':'application/json','X-Admin-Key':adminKey}, body:JSON.stringify({msg_id:id}) });
+  loadSupport();
+}
 
 function adminLogout() {
   isLoggedIn = false;
