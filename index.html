@@ -390,6 +390,20 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
         <div class="fg"><label>Display Name</label><input type="text" id="su-n" placeholder="Satoshi"/></div>
         <div class="fg"><label>Email</label><input type="email" id="su-e" placeholder="you@example.com"/></div>
         <div class="fg"><label>Password</label><input type="password" id="su-p" placeholder="Min 6 characters"/></div>
+        <div class="fg">
+          <label>Security Question</label>
+          <select id="su-q" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--text);font-family:inherit;font-size:14px;outline:none;">
+            <option value="">-- Select a question --</option>
+            <option>What city were you born in?</option>
+            <option>What was your first pet's name?</option>
+            <option>What is your mother's first name?</option>
+            <option>What primary school did you attend?</option>
+            <option>What was your favorite childhood movie?</option>
+            <option>What is your oldest sibling's name?</option>
+            <option>What street did you grow up on?</option>
+          </select>
+        </div>
+        <div class="fg"><label>Security Answer</label><input type="text" id="su-qa" placeholder="Your answer (remember this!)"/></div>
         <div class="fg"><label>Referral Code (optional)</label><input type="text" id="su-r" placeholder="TOKEN123456" style="text-transform:uppercase"/></div>
         <button class="btn-p" id="bsu" onclick="doSignUp()">Create Account →</button>
       </div>
@@ -416,7 +430,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 <div id="forgot-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(12px);z-index:9000;align-items:flex-end;justify-content:center">
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:20px 20px 0 0;padding:28px 20px 40px;width:100%;max-width:480px;animation:slideUp .3s ease">
     <div style="font-size:18px;font-weight:800;text-align:center;margin-bottom:4px">🔑 Forgot Password</div>
-    <div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:18px">Answer the verify question so admin can confirm your identity.</div>
+    <div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:18px">Enter your security answer and new password. Admin will verify and approve.</div>
     <div id="frg-step1">
       <div class="fg" style="margin-bottom:12px"><label>Your Email</label><input type="email" id="frg-email" placeholder="you@example.com"/></div>
       <button class="btn-p" id="frg-next-btn" onclick="doForgotStep1()">Next →</button>
@@ -428,7 +442,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
         <div id="frg-question" style="font-size:14px;color:var(--text)"></div>
       </div>
       <div class="fg" style="margin-bottom:12px"><label>Your Answer</label><input type="text" id="frg-answer" placeholder="Type your answer..."/></div>
-      <div class="fg" style="margin-bottom:16px"><label>Reason (optional)</label><input type="text" id="frg-reason" placeholder="e.g. lost access"/></div>
+      <div class="fg" style="margin-bottom:16px"><label>New Password</label><input type="password" id="frg-newpw" placeholder="Min 6 characters"/></div>
       <div id="frg-msg" style="display:none;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px"></div>
       <button class="btn-p" id="frg-btn" onclick="doForgotRequest()">Send Reset Request →</button>
       <button onclick="hideForgot()" style="width:100%;padding:12px;background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;margin-top:8px">Cancel</button>
@@ -932,7 +946,11 @@ async function doSignUp() {
   const btn = document.getElementById('bsu');
   btn.disabled = true; btn.textContent = 'Creating...';
   try {
-    const data = await api('/api/auth/register', 'POST', { username, email, password, ref_code: ref_code || null });
+    const secQ = document.getElementById('su-q').value.trim();
+    const secA = document.getElementById('su-qa').value.trim();
+    if (!secQ) { showErr('Please select a security question'); return; }
+    if (!secA) { showErr('Please enter your security answer'); return; }
+    const data = await api('/api/auth/register', 'POST', { username, email, password, ref_code: ref_code || null, security_question: secQ, security_answer: secA });
     token = data.token; me = data.user;
     saveSession();
     localStorage.setItem('app_last_sync', String(Date.now()));
@@ -970,8 +988,9 @@ async function doForgotStep1() {
   const btn = document.getElementById('frg-next-btn');
   btn.textContent = 'Checking...'; btn.disabled = true;
   try {
-    await api('/api/auth/forgot-check', 'POST', { email });
-    _frgQ = _FRG_Q[Math.floor(Math.random() * _FRG_Q.length)];
+    const chk = await api('/api/auth/forgot-check', 'POST', { email });
+    // Use user's own registered security question, else fallback to random
+    _frgQ = (chk && chk.security_question) ? chk.security_question : _FRG_Q[Math.floor(Math.random() * _FRG_Q.length)];
     document.getElementById('frg-question').textContent = _frgQ;
     document.getElementById('frg-step1').style.display = 'none';
     document.getElementById('frg-step2').style.display = 'block';
@@ -984,7 +1003,12 @@ async function doForgotStep1() {
 async function doForgotRequest() {
   const email = document.getElementById('frg-email').value.trim();
   const answer = document.getElementById('frg-answer').value.trim();
-  const reason = document.getElementById('frg-reason').value.trim();
+  const newpw = document.getElementById('frg-newpw').value.trim();
+  if (!newpw || newpw.length < 6) {
+    msg.textContent = 'New password min 6 characters hona chahiye.';
+    msg.style.cssText = 'display:block;background:rgba(248,81,73,.1);color:var(--danger);border:1px solid rgba(248,81,73,.3);padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px';
+    return;
+  }
   const msg = document.getElementById('frg-msg');
   const btn = document.getElementById('frg-btn');
   if (!answer) {
@@ -994,7 +1018,7 @@ async function doForgotRequest() {
   }
   btn.textContent = 'Sending...'; btn.disabled = true;
   try {
-    await api('/api/auth/forgot-password', 'POST', { email, answer, question: _frgQ, reason });
+    await api('/api/auth/forgot-password', 'POST', { email, answer, question: _frgQ, new_password: newpw });
     msg.textContent = '✅ Request sent! Admin will verify and reset your password.';
     msg.style.cssText = 'display:block;background:rgba(0,255,136,.08);color:var(--accent);border:1px solid rgba(0,255,136,.2);padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px';
     btn.textContent = 'Sent ✓';
