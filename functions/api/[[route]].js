@@ -160,8 +160,9 @@ export async function onRequest({ request, env }) {
       const { username, email, password, ref_code } = await request.json();
       if (!username || !email || !password) return err('All fields required');
       if (password.length < 6) return err('Password min 6 chars');
+      const emailNorm = email.toLowerCase().trim();
 
-      const exists = await dbFirst(env, 'SELECT id FROM users WHERE email = ?', [email]);
+      const exists = await dbFirst(env, 'SELECT id FROM users WHERE LOWER(email) = ?', [emailNorm]);
       if (exists) return err('Email already registered');
 
       const uExists = await dbFirst(env, 'SELECT id FROM users WHERE username = ?', [username.toLowerCase()]);
@@ -176,7 +177,7 @@ export async function onRequest({ request, env }) {
       await dbRun(env,
         `INSERT INTO users (id,username,email,password_hash,referral_code,referred_by,points,total_mined,mining_power,login_method,mining_claimed,created_at)
          VALUES (?,?,?,?,?,?,?,0,1.0,'email',1,datetime('now'))`,
-        [id, username.toLowerCase(), email, hashed, myRef, ref_code || null, bonus]
+        [id, username.toLowerCase(), emailNorm, hashed, myRef, ref_code || null, bonus]
       );
 
       await dbRun(env,
@@ -200,8 +201,11 @@ export async function onRequest({ request, env }) {
     if (path === '/api/auth/login' && request.method === 'POST') {
       const { email, password } = await request.json();
       if (!email || !password) return err('Email and password required');
+      const emailNorm = email.toLowerCase().trim();
 
-      const user = await dbFirst(env, 'SELECT * FROM users WHERE email = ?', [email]);
+      // Case-insensitive email lookup (handles old accounts with mixed case emails)
+      let user = await dbFirst(env, 'SELECT * FROM users WHERE email = ?', [emailNorm]);
+      if (!user) user = await dbFirst(env, 'SELECT * FROM users WHERE LOWER(email) = ?', [emailNorm]);
       if (!user) return err('Wrong email or password');
       if (user.is_banned == 1) return err('Account banned');
 
@@ -685,7 +689,36 @@ export async function onRequest({ request, env }) {
       }
     }
 
-    return err('Not found', 404);
+
+      if (path === '/api/admin/db-init' && request.method === 'POST') {
+        // Create tables that were added in v5 update (run once after deploy)
+        await dbRun(env, `CREATE TABLE IF NOT EXISTS password_resets (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          username TEXT,
+          email TEXT,
+          verify_question TEXT,
+          verify_answer TEXT,
+          reason TEXT,
+          status TEXT DEFAULT 'pending',
+          created_at TEXT,
+          resolved_at TEXT
+        )`);
+        await dbRun(env, `CREATE TABLE IF NOT EXISTS support_messages (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          username TEXT,
+          email TEXT,
+          message TEXT,
+          status TEXT DEFAULT 'open',
+          admin_reply TEXT,
+          replied_at TEXT,
+          created_at TEXT
+        )`);
+        return json({ success: true, message: 'Tables created (or already existed)' });
+      }
+
+        return err('Not found', 404);
 
   } catch (e) {
     return err('Server error: ' + e.message, 500);
