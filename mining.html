@@ -1445,11 +1445,18 @@ async function handleMineBtn() {
 }
 
 async function startMining() {
+  const btn = document.getElementById('mine-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Starting...'; }
   try {
     await api('/api/mine/start', 'POST');
     toast('⛏️ Mining started! Come back in 24h.'); spawnCoin();
+    cacheClear('/api/me');
+    localStorage.removeItem('app_last_sync');
     await refreshMe(true);
-  } catch(e) { toast('❌ ' + (e.message || 'Failed to start')); }
+  } catch(e) {
+    toast('❌ ' + (e.message || 'Failed to start'));
+    if (btn) { btn.disabled = false; btn.textContent = '⛏️ Start Mining'; }
+  }
 }
 
 async function claimMining() {
