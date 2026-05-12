@@ -190,205 +190,9 @@
         <div class="panel-head">
           <div class="panel-title">👥 Users</div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <input type="text" id="user-search" placeholder="Search username / email..." style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 12px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;outline:none;width:180px;" oninput="searchUsers()"/>
+            <input type="text" id="user-search" placeholder="Search..." style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 12px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;outline:none;width:150px;" oninput="searchUsers()"/>
             <button class="btn btn-sm" id="filter-all-btn" onclick="filterUsers('all')" style="background:var(--accent);color:#030712;font-weight:700;">All</button>
             <button class="btn btn-sm btn-danger" id="filter-banned-btn" onclick="filterUsers('banned')" style="opacity:.6;">🚫 Banned</button>
-            <button class="btn btn-sm btn-primary" onclick="loadUsers()">↻</button>
-          </div>
-        </div>
-        <div id="banned-alert" style="display:none;background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.25);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#f85149;"></div>
-<html lang="en">
-<head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>AirDrop Zone — Admin Panel</title>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
-  <style>
-    :root {
-      --bg:#030712;--surface:#0d1117;--surface2:#161b22;
-      --border:#21262d;--accent:#00ff88;--accent2:#7c3aed;
-      --accent3:#f59e0b;--text:#e6edf3;--muted:#7d8590;
-      --danger:#f85149;--success:#3fb950;
-    }
-    *{margin:0;padding:0;box-sizing:border-box;}
-    body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;min-height:100vh;}
-    #admin-login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
-    .login-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px 28px;width:100%;max-width:360px;}
-    .login-box h2{font-size:20px;font-weight:800;margin-bottom:4px;}
-    .login-box p{font-size:13px;color:var(--muted);margin-bottom:24px;}
-    .field{margin-bottom:14px;}
-    .field label{display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
-    .field input,.field select,.field textarea{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:'Outfit',sans-serif;font-size:14px;outline:none;transition:border-color .2s;}
-    .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);}
-    .field textarea{resize:vertical;min-height:80px;}
-    .field select option{background:var(--surface2);}
-    .btn{padding:10px 18px;border:none;border-radius:8px;font-family:'Outfit',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;}
-    .btn-primary{background:var(--accent);color:#030712;}
-    .btn-primary:hover{opacity:.85;}
-    .btn-danger{background:rgba(248,81,73,.12);color:var(--danger);border:1px solid rgba(248,81,73,.2);}
-    .btn-danger:hover{background:rgba(248,81,73,.2);}
-    .btn-sm{padding:6px 12px;font-size:12px;}
-    .btn-full{width:100%;padding:12px;}
-    #login-err{color:var(--danger);font-size:13px;margin-top:8px;display:none;}
-    #admin-app{display:none;}
-    .admin-header{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
-    .admin-logo{font-family:'Space Mono',monospace;font-size:14px;color:var(--accent);font-weight:700;}
-    .admin-body{display:flex;min-height:calc(100vh - 53px);}
-    .sidebar{width:200px;flex-shrink:0;border-right:1px solid var(--border);padding:16px 0;background:var(--surface);position:sticky;top:53px;height:calc(100vh - 53px);overflow-y:auto;}
-    .sidebar-btn{display:flex;align-items:center;gap:10px;padding:10px 16px;font-size:13px;font-weight:500;cursor:pointer;color:var(--muted);transition:all .2s;border:none;background:none;width:100%;text-align:left;font-family:'Outfit',sans-serif;}
-    .sidebar-btn:hover{color:var(--text);background:var(--surface2);}
-    .sidebar-btn.active{color:var(--accent);background:rgba(0,255,136,.06);border-right:2px solid var(--accent);}
-    .sidebar-sep{height:1px;background:var(--border);margin:8px 16px;}
-    .main-panel{flex:1;padding:24px;overflow-y:auto;}
-    .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;}
-    .stat-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;}
-    .stat-box-val{font-family:'Space Mono',monospace;font-size:22px;color:var(--accent);font-weight:700;}
-    .stat-box-lbl{font-size:11px;color:var(--muted);margin-top:4px;}
-    .panel{display:none;}
-    .panel.active{display:block;}
-    .panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
-    .panel-title{font-size:18px;font-weight:800;}
-    .tbl-wrap{overflow-x:auto;}
-    table{width:100%;border-collapse:collapse;font-size:13px;}
-    thead th{text-align:left;padding:10px 12px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);}
-    tbody td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle;}
-    tbody tr:hover{background:var(--surface2);}
-    .badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;}
-    .badge-green{background:rgba(63,185,80,.1);color:var(--success);}
-    .badge-red{background:rgba(248,81,73,.1);color:var(--danger);}
-    .badge-yellow{background:rgba(245,158,11,.1);color:var(--accent3);}
-    .badge-purple{background:rgba(124,58,237,.1);color:var(--accent2);}
-    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;z-index:9000;padding:20px;}
-    .modal-overlay.show{display:flex;}
-    .modal-box{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;}
-    .modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
-    .modal-title{font-size:16px;font-weight:700;}
-    .modal-close{background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;}
-    .modal-actions{display:flex;gap:8px;margin-top:16px;justify-content:flex-end;}
-    #a-toast{position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid var(--border);padding:10px 18px;border-radius:10px;font-size:13px;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;}
-    #a-toast.show{opacity:1;}
-    .settings-list{display:flex;flex-direction:column;gap:8px;}
-    .setting-row{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 16px;display:flex;align-items:center;gap:12px;}
-    .setting-key{font-family:'Space Mono',monospace;font-size:12px;color:var(--accent2);width:220px;flex-shrink:0;}
-    .setting-val{flex:1;}
-    .setting-val input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;outline:none;}
-    .setting-val input:focus{border-color:var(--accent);}
-    .setting-desc{font-size:10px;color:var(--muted);margin-top:2px;}
-    .page-toggle-card{display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;cursor:pointer;transition:all .2s;font-size:13px;font-weight:500;}
-    .page-toggle-card:has(input:checked){border-color:var(--accent);background:rgba(0,255,136,.04);}
-    .page-toggle-card input{display:none;}
-    .toggle-dot{width:32px;height:18px;border-radius:99px;background:var(--border);position:relative;flex-shrink:0;transition:background .2s;}
-    .toggle-dot::after{content:'';position:absolute;width:14px;height:14px;border-radius:50%;background:#fff;top:2px;left:2px;transition:left .2s;}
-    .page-toggle-card:has(input:checked) .toggle-dot{background:var(--accent);}
-    .page-toggle-card:has(input:checked) .toggle-dot::after{left:16px;}
-    .ad-type-badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;background:rgba(0,255,136,.1);color:var(--accent);white-space:nowrap;}
-    .ad-type-badge.popunder{background:rgba(245,158,11,.1);color:var(--accent3);}
-    .ad-type-badge.banner{background:rgba(124,58,237,.1);color:var(--accent2);}
-    .ad-type-badge.iframe{background:rgba(63,185,80,.1);color:var(--success);}
-    .ad-type-badge.native{background:rgba(0,204,255,.1);color:#00ccff;}
-    .ad-type-badge.social{background:rgba(248,81,73,.1);color:var(--danger);}
-    .ad-type-badge.smartlink{background:rgba(124,58,237,.15);color:var(--accent2);}
-    .mob-menu-btn{display:none;background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;padding:4px 8px;}
-    .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:199;}
-    .sidebar-overlay.open{display:block;}
-    @media(max-width:900px){
-      .mob-menu-btn{display:block;}
-      .admin-body{flex-direction:column;}
-      .sidebar{position:fixed;top:0;left:-220px;width:220px;height:100vh;z-index:200;background:var(--surface);border-right:1px solid var(--border);padding:16px 0;overflow-y:auto;transition:left .25s ease;}
-      .sidebar.open{left:0;}
-      .sidebar-btn{padding:12px 18px;font-size:13px;width:100%;text-align:left;}
-      .sidebar-section{display:block;}
-      .main-panel{padding:12px;width:100%;}
-      .stats-row{grid-template-columns:1fr 1fr;gap:8px;}
-      .panel-head{flex-direction:column;gap:8px;align-items:flex-start;}
-      .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
-      table{min-width:520px;}
-      #a-toast{bottom:16px;right:12px;left:12px;text-align:center;}
-    }
-    @media(max-width:480px){
-      .stats-row{grid-template-columns:1fr 1fr;gap:6px;}
-      .main-panel{padding:10px;}
-    }
-  </style>
-</head>
-<body>
-
-<div id="admin-login">
-  <div class="login-box">
-    <div style="font-size:32px;margin-bottom:12px;">🔐</div>
-    <h2>Admin Panel</h2>
-    <p>AirDrop Zone — Restricted Access</p>
-    <div class="field"><label>Admin Key</label><input type="password" id="a-pass" placeholder="Enter admin key"/></div>
-    <button class="btn btn-primary btn-full" onclick="adminLogin()">Access Panel →</button>
-    <div id="login-err">Wrong admin key.</div>
-  </div>
-</div>
-
-<div id="admin-app">
-  <div class="admin-header">
-    <div style="display:flex;align-items:center;gap:10px;">
-      <button class="mob-menu-btn" onclick="toggleSidebar()">☰</button>
-      <div class="admin-logo">⛏️ TOKEN Admin</div>
-    </div>
-    <div style="display:flex;align-items:center;gap:12px;">
-      <span style="font-size:12px;color:var(--muted);" id="a-live-time"></span>
-      <button class="btn btn-sm btn-danger" onclick="adminLogout()">Logout</button>
-    </div>
-  </div>
-
-  <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
-
-  <div class="admin-body">
-    <div class="sidebar" id="sidebar">
-      <button class="sidebar-btn active" onclick="showPanel('dashboard',this)">📊 Dashboard</button>
-      <button class="sidebar-btn" onclick="showPanel('tasks',this)">🎯 Tasks</button>
-      <button class="sidebar-btn" onclick="showPanel('users',this)">👥 Users</button>
-      <button class="sidebar-btn" onclick="showPanel('resets',this)">🔑 Password Resets</button>
-      <button class="sidebar-btn" onclick="showPanel('support',this)">💬 Support</button>
-      <button class="sidebar-btn" onclick="showPanel('mining',this)">⛏️ Mining</button>
-      <button class="sidebar-btn" onclick="showPanel('transactions',this)">💰 Transactions</button>
-      <div class="sidebar-sep"></div>
-      <button class="sidebar-btn" onclick="showPanel('blog',this)">📍 Roadmap/Blog</button>
-      <button class="sidebar-btn" onclick="showPanel('ads',this)">📢 Ad Manager</button>
-      <button class="sidebar-btn" onclick="showPanel('settings',this)">⚙️ Settings</button>
-    </div>
-
-    <div class="main-panel">
-
-      <!-- DASHBOARD -->
-      <div id="panel-dashboard" class="panel active">
-        <div class="panel-head"><div class="panel-title">📊 Dashboard</div><button class="btn btn-sm btn-primary" onclick="loadDashboard()">↻ Refresh</button></div>
-        <div class="stats-row">
-          <div class="stat-box"><div class="stat-box-val" id="d-users">—</div><div class="stat-box-lbl">Total Users</div></div>
-          <div class="stat-box"><div class="stat-box-val" id="d-mined">—</div><div class="stat-box-lbl">TOKEN Mined</div></div>
-          <div class="stat-box"><div class="stat-box-val" id="d-tasks">—</div><div class="stat-box-lbl">Active Tasks</div></div>
-          <div class="stat-box"><div class="stat-box-val" id="d-sessions">—</div><div class="stat-box-lbl">Mining Sessions</div></div>
-        </div>
-        <div style="font-size:13px;color:var(--muted);margin-bottom:12px;font-family:'Space Mono',monospace;">RECENT USERS</div>
-        <div class="tbl-wrap"><table>
-          <thead><tr><th>Username</th><th>Balance</th><th>Power</th><th>Refs</th><th>Joined</th><th>Login</th></tr></thead>
-          <tbody id="d-recent-users"></tbody>
-        </table></div>
-      </div>
-
-      <!-- TASKS -->
-      <div id="panel-tasks" class="panel">
-        <div class="panel-head">
-          <div class="panel-title">🎯 Tasks</div>
-          <button class="btn btn-sm btn-primary" onclick="openTaskModal()">+ Add Task</button>
-        </div>
-        <div class="tbl-wrap"><table>
-          <thead><tr><th>Icon</th><th>Title</th><th>Type</th><th>Points</th><th>Timer</th><th>Status</th><th>Order</th><th>Actions</th></tr></thead>
-          <tbody id="tasks-tbody"></tbody>
-        </table></div>
-      </div>
-
-      <!-- USERS -->
-      <div id="panel-users" class="panel">
-        <div class="panel-head">
-          <div class="panel-title">👥 Users</div>
-          <div style="display:flex;gap:8px;">
-            <input type="text" id="user-search" placeholder="Search username..." style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 12px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;outline:none;width:200px;" oninput="searchUsers()"/>
             <button class="btn btn-sm btn-primary" onclick="loadUsers()">↻</button>
           </div>
         </div>
@@ -680,15 +484,15 @@ async function loadResets() {
         ${r.verify_question ? `<div style="font-size:12px;margin-bottom:8px;padding:8px 10px;background:rgba(251,191,36,.05);border:1px solid rgba(251,191,36,.15);border-radius:7px"><b style="color:#fbbf24">Q:</b> ${r.verify_question}<br><b style="color:#fbbf24">A:</b> <span style="color:var(--text)">${r.verify_answer||'—'}</span></div>` : ''}
         ${r.reason ? `<div style="font-size:12px;color:var(--muted);margin-bottom:10px">Reason: ${r.reason}</div>` : ''}
         <div style="font-size:11px;color:var(--muted);margin-bottom:${r.status==='pending'?'10':'0'}px">${new Date(r.created_at).toLocaleString()}</div>
-        ${r.status==='pending' ? `<div style="background:rgba(0,255,136,.04);border:1px solid rgba(0,255,136,.15);border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:12px;color:var(--muted)">User ne apna naya password set kar diya hai — Approve karne par apply hoga.</div><div style="display:flex;gap:8px"><button onclick="approveReset('${r.id}')" style="padding:8px 14px;background:#00ff88;color:#030712;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">✓ Approve</button><button onclick="rejectReset('${r.id}')" style="padding:8px 14px;background:rgba(248,81,73,.15);color:#f85149;border:1px solid rgba(248,81,73,.3);border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">✗ Reject</button></div>` : ''}
+        ${r.status==='pending' ? `<div style="background:rgba(0,255,136,.04);border:1px solid rgba(0,255,136,.15);border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:12px;color:var(--muted)">User ne apna naya password set kar diya — Approve karne par apply hoga.</div><div style="display:flex;gap:8px"><button onclick="approveReset('${r.id}')" style="padding:8px 14px;background:#00ff88;color:#030712;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">✓ Approve</button><button onclick="rejectReset('${r.id}')" style="padding:8px 14px;background:rgba(248,81,73,.15);color:#f85149;border:1px solid rgba(248,81,73,.3);border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">✗ Reject</button></div>` : ''}
       </div>`).join('');
   } catch(e) { el.innerHTML = '<div style="color:var(--danger);font-size:13px">Error loading.</div>'; }
 }
 async function approveReset(id) {
-  if (!confirm('Is request ko approve karna hai?')) return;
+  if(!confirm('Is request ko approve karna hai?')) return;
   const res = await fetch('/api/admin/reset-approve', { method:'POST', headers:{'Content-Type':'application/json','X-Admin-Key':ADMIN_KEY}, body:JSON.stringify({reset_id:id}) });
   const d = await res.json();
-  if (d.ok) { toast('✅ Password reset ho gaya!'); loadResets(); } else alert('Error: '+d.error);
+  if(d.ok){ toast('✅ Password reset ho gaya!'); loadResets(); } else alert('Error: '+d.error);
 }
 async function rejectReset(id) {
   if (!confirm('Reject karna hai?')) return;
@@ -893,8 +697,28 @@ async function loadUsers() {
   } catch(e) { toast('Error: ' + e.message); }
 }
 
-function searchUsers() {
-  filterUsers(userFilter || 'all');
+function searchUsers() { filterUsers(userFilter || 'all'); }
+
+let userFilter = 'all';
+function filterUsers(type) {
+  userFilter = type;
+  const ab = document.getElementById('filter-all-btn');
+  const bb = document.getElementById('filter-banned-btn');
+  if(ab){ ab.style.background = type==='all'?'var(--accent)':'var(--surface2)'; ab.style.color = type==='all'?'#030712':'var(--text)'; }
+  if(bb){ bb.style.opacity = type==='banned'?'1':'.6'; }
+  const q = (document.getElementById('user-search')||{}).value?.toLowerCase()||'';
+  let users = allUsers;
+  if(type==='banned') users = users.filter(u => u.is_banned);
+  if(q) users = users.filter(u => (u.username||'').toLowerCase().includes(q)||(u.email||'').toLowerCase().includes(q)||(u.wallet_address||'').toLowerCase().includes(q));
+  renderUsers(users);
+  const bannedCount = allUsers.filter(u=>u.is_banned).length;
+  const alertEl = document.getElementById('banned-alert');
+  if(alertEl){
+    if(bannedCount>0 && type==='all'){
+      alertEl.style.display='block';
+      alertEl.innerHTML=`⚠️ <strong>${bannedCount} banned user${bannedCount>1?'s':''}</strong> hain — <a href="#" onclick="filterUsers('banned');return false;" style="color:#f85149;font-weight:700;">Dekhen</a>`;
+    } else { alertEl.style.display='none'; }
+  }
 }
 
 function renderUsers(users) {
@@ -941,42 +765,18 @@ async function saveUser() {
 
 async function toggleBan(id, isBanned) {
   const u = allUsers.find(x => x.id === id);
-  if (!u) return;
-  if (isBanned) {
-    // Unban - simple confirm
-    if (!confirm(`@${u.username} ko UNBAN karna chahte hain?\nUser wapas login kar sakega.`)) return;
+  if(!u) return;
+  if(isBanned){
+    if(!confirm(`@${u.username} ko UNBAN karna chahte hain?`)) return;
   } else {
-    // Ban - ask reason
-    const reason = prompt(`@${u.username} ko BAN karna chahte hain?\n\nWajah likhein (optional):`, '');
-    if (reason === null) return; // cancelled
+    const r = prompt(`@${u.username} ko BAN karna chahte hain?\nWajah (optional):`, '');
+    if(r === null) return;
   }
   try {
     await adm('/api/admin/users/ban', 'POST', { id, is_banned: !isBanned });
-    toast(isBanned ? '✅ User unban ho gaya!' : '🚫 User ban ho gaya!');
+    toast(isBanned?'✅ Unban ho gaya!':'🚫 Ban ho gaya!');
     loadUsers();
-  } catch(e) { toast('Error: ' + e.message); }
-}
-
-let userFilter = 'all';
-function filterUsers(type) {
-  userFilter = type;
-  document.getElementById('filter-all-btn').style.background = type==='all' ? 'var(--accent)' : 'var(--surface2)';
-  document.getElementById('filter-all-btn').style.color = type==='all' ? '#030712' : 'var(--text)';
-  document.getElementById('filter-banned-btn').style.opacity = type==='banned' ? '1' : '.6';
-  const q = document.getElementById('user-search').value.toLowerCase();
-  let users = allUsers;
-  if (type === 'banned') users = allUsers.filter(u => u.is_banned);
-  if (q) users = users.filter(u => (u.username||'').toLowerCase().includes(q) || (u.email||'').toLowerCase().includes(q));
-  renderUsers(users);
-  // Show alert if banned users exist
-  const bannedCount = allUsers.filter(u => u.is_banned).length;
-  const alertEl = document.getElementById('banned-alert');
-  if (bannedCount > 0 && type === 'all') {
-    alertEl.style.display = 'block';
-    alertEl.innerHTML = `⚠️ <strong>${bannedCount} banned user${bannedCount>1?'s':''}</strong> hain — <a href="#" onclick="filterUsers('banned');return false;" style="color:#f85149;font-weight:700;">Dekhen</a>`;
-  } else {
-    alertEl.style.display = 'none';
-  }
+  } catch(e) { toast('Error: '+e.message); }
 }
 
 // ============================================
