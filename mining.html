@@ -1420,19 +1420,27 @@ function startAnimalLoop() {
 async function handleMineBtn() {
   if (!me) return;
   const dur = getDur();
+  const isClaimed = (me.mining_claimed == 1 || me.mining_claimed === true);
   const hasSession = !!(me.last_mining_start && me.last_mining_start !== 'null' && me.last_mining_start !== '');
-  // No active session — start mining
-  if (!hasSession) {
+  
+  // If no session or session is already claimed, start new mining
+  if (!hasSession || isClaimed) {
     await startMining();
     return;
   }
-  // Active session exists — calculate earnings and decide claim vs wait
+  
+  // Active session exists — check if 24 hours completed
   const e = Math.min(Date.now() - new Date(me.last_mining_start).getTime(), dur);
-  const earn = Math.floor(getCPMS() * e);
-  if (earn >= MIN_CLAIM || e >= dur) {
+  
+  if (e >= dur) {
+    // 24 hours completed, allow claim
     await claimMining();
   } else {
-    toast('⏳ Mine at least ' + MIN_CLAIM + ' points first! (' + earn + ' so far)');
+    // Still mining, show time remaining
+    const rem = dur - e;
+    const h = Math.floor(rem / 3600000);
+    const m = Math.floor((rem % 3600000) / 60000);
+    toast('⏳ Mining in progress! Come back in ' + h + 'h ' + m + 'm to claim.');
   }
 }
 
