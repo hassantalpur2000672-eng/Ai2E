@@ -1,0 +1,15 @@
+# Ai2E Official Robots.txt
+# Allow all search engines to crawl the site
+
+User-agent: *
+Allow: /
+
+# Block admin pages from indexing
+Disallow: /admin.html
+Disallow: /functions/
+
+# Sitemap Location
+Sitemap: https://ai2e.space/sitemap.xml
+
+# Crawl Delay (optional - prevents aggressive crawling)
+Crawl-delay: 1
