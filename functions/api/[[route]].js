@@ -160,8 +160,8 @@ export async function onRequest({ request, env }) {
       const { username, email, password, ref_code, security_question, security_answer } = await request.json();
       if (!username || !email || !password) return err('All fields required');
       if (password.length < 6) return err('Password min 6 chars');
-      const emailNorm = email.toLowerCase().trim();
 
+      const emailNorm = email.toLowerCase().trim();
       const exists = await dbFirst(env, 'SELECT id FROM users WHERE LOWER(email) = ?', [emailNorm]);
       if (exists) return err('Email already registered');
 
@@ -202,8 +202,6 @@ export async function onRequest({ request, env }) {
       const { email, password } = await request.json();
       if (!email || !password) return err('Email and password required');
       const emailNorm = email.toLowerCase().trim();
-
-      // Case-insensitive email lookup (handles old accounts with mixed case emails)
       let user = await dbFirst(env, 'SELECT * FROM users WHERE email = ?', [emailNorm]);
       if (!user) user = await dbFirst(env, 'SELECT * FROM users WHERE LOWER(email) = ?', [emailNorm]);
       if (!user) return err('Wrong email or password');
@@ -247,7 +245,7 @@ export async function onRequest({ request, env }) {
           [crypto.randomUUID(), id, 'welcome_bonus', bonus, '🎉 Welcome bonus']
         );
 
-        // Referral: update count only
+        // Refer: sirf count update
         if (ref_code) {
           const refUser = await dbFirst(env, 'SELECT * FROM users WHERE referral_code = ?', [ref_code]);
           if (refUser) {
@@ -267,25 +265,24 @@ export async function onRequest({ request, env }) {
       const { email } = await request.json();
       if (!email) return err('Email required');
       const user = await dbFirst(env, 'SELECT id, security_question FROM users WHERE LOWER(email) = ?', [email.toLowerCase().trim()]);
-      if (!user) return err('No account found with this email');
+      if (!user) return err('Is email pe koi account nahi mila');
       return json({ ok: true, security_question: user.security_question || null });
     }
 
     // ── FORGOT PASSWORD REQUEST ────────────────────
     if (path === '/api/auth/forgot-password' && request.method === 'POST') {
       const { email, answer, question, new_password } = await request.json();
-      if (!email || !answer) return err('Email and answer are required');
-      if (!new_password || new_password.length < 6) return err('New password must be at least 6 characters');
+      if (!email || !answer) return err('Email aur answer zaroor chahiye');
+      if (!new_password || new_password.length < 6) return err('New password min 6 characters');
       const emailNorm = email.toLowerCase().trim();
-      const user = await dbFirst(env, 'SELECT id, username, security_question, security_answer FROM users WHERE LOWER(email) = ?', [emailNorm]);
-      if (!user) return err('Account not found');
+      const user = await dbFirst(env, 'SELECT id, username FROM users WHERE LOWER(email) = ?', [emailNorm]);
+      if (!user) return err('Account nahi mila');
       const existing = await dbFirst(env, "SELECT id FROM password_resets WHERE user_id = ? AND status = 'pending'", [user.id]);
-      if (existing) return err('Password reset request already pending. Admin will review soon.');
-      // Hash the new password to store securely
+      if (existing) return err('Reset request already pending hai. Admin jald review karega.');
       const hashedNew = await hashPassword(new_password);
       await dbRun(env,
         "INSERT INTO password_resets (id,user_id,username,email,verify_question,verify_answer,new_password_hash,status,created_at) VALUES (?,?,?,?,?,?,?,'pending',datetime('now'))",
-        [crypto.randomUUID(), user.id, user.username, emailNorm, question||user.security_question||'', answer, hashedNew]
+        [crypto.randomUUID(), user.id, user.username, emailNorm, question||'', answer, hashedNew]
       );
       return json({ ok: true });
     }
@@ -295,9 +292,9 @@ export async function onRequest({ request, env }) {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
       const { message } = await request.json();
-      if (!message || message.trim().length < 5) return err('Message is too short');
+      if (!message || message.trim().length < 5) return err('Message bahut chota hai');
       const last = await dbFirst(env, "SELECT id FROM support_messages WHERE user_id = ? AND created_at > datetime('now','-24 hours')", [user.id]);
-      if (last) return err('You can only send 1 message per 24 hours');
+      if (last) return err('24 ghante mein sirf 1 message bhej sakte hain');
       await dbRun(env,
         "INSERT INTO support_messages (id,user_id,username,email,message,status,created_at) VALUES (?,?,?,?,?,'open',datetime('now'))",
         [crypto.randomUUID(), user.id, user.username, user.email||'', message.trim()]
@@ -349,9 +346,8 @@ export async function onRequest({ request, env }) {
       const { reset_id, new_password } = await request.json();
       if (!reset_id) return err('Invalid');
       const reset = await dbFirst(env, 'SELECT * FROM password_resets WHERE id=?', [reset_id]);
-      if (!reset) return err('Request not found');
-      // Use the new_password_hash that user submitted (already hashed)
-      const pwHash = reset.new_password_hash || await hashPassword(new_password || 'reset123');
+      if (!reset) return err('Request nahi mili');
+      const pwHash = reset.new_password_hash || await hashPassword('reset123');
       await dbRun(env, 'UPDATE users SET password_hash=? WHERE id=?', [pwHash, reset.user_id]);
       await dbRun(env, "UPDATE password_resets SET status='approved',resolved_at=datetime('now') WHERE id=?", [reset_id]);
       return json({ ok: true });
@@ -369,32 +365,17 @@ export async function onRequest({ request, env }) {
     if (path === '/api/me' && request.method === 'GET') {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
-      // Live count of active referrals (referred users who have mined)
       const refs = await dbFirst(env, 'SELECT COUNT(*) as c FROM users WHERE referred_by = ? AND total_mined > 0', [user.referral_code]);
       const activeRefs = parseInt(refs?.c || 0);
-      // Update active_referral_count in DB (no mining power boost - removed)
-      await dbRun(env, 'UPDATE users SET active_referral_count = ? WHERE id = ?', [activeRefs, user.id]);
+      try { await dbRun(env, 'UPDATE users SET active_referral_count = ? WHERE id = ?', [activeRefs, user.id]); } catch(e) {}
       const updated = await dbFirst(env, 'SELECT * FROM users WHERE id = ?', [user.id]);
-      // Return live active_referral_count even if column missing
       return json({ ...updated, active_referral_count: activeRefs });
     }
 
     if (path === '/api/mine/start' && request.method === 'POST') {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
-      
-      // Check if there's an active unclaimed session
-      if (user.mining_claimed != 1 && user.last_mining_start) {
-        const lastStart = new Date(user.last_mining_start).getTime();
-        const durMs = 24 * 3600000; // 24 hours
-        const elapsed = Date.now() - lastStart;
-        
-        // If session is still active (not completed), don't allow starting again
-        if (elapsed < durMs) {
-          return err('Already mining. Please wait for the session to complete.');
-        }
-      }
-      
+      if (user.mining_claimed != 1) return err('Already mining');
       const now = new Date().toISOString();
       await dbRun(env, "UPDATE users SET last_mining_start = ?, mining_claimed = 0 WHERE id = ?", [now, user.id]);
       await dbRun(env, "INSERT INTO mining_sessions (id,user_id,started_at,mining_power) VALUES (?,?,?,?)", [crypto.randomUUID(), user.id, now, user.mining_power]);
@@ -415,8 +396,7 @@ export async function onRequest({ request, env }) {
       const elapsed = Math.min(Date.now() - start, durMs);
       const earned = Math.floor(cpm * elapsed);
 
-      // Allow claim only after full duration (24 hours) has completed
-      if (elapsed < durMs) return err('Mining session not complete yet. Come back when timer ends.');
+      if (earned < 100) return err('Mine at least 100 points first');
 
       const newPts = parseInt(user.points || 0) + earned;
       const newMined = parseInt(user.total_mined || 0) + earned;
@@ -426,31 +406,26 @@ export async function onRequest({ request, env }) {
 
       // ── Refer Mining Tree: L1=50%, L2=25%, L3=10% ──────────────────────────────
       if (user.referred_by) {
-        // Level 1: Direct referrer — 50% of earned
         const L1 = await dbFirst(env, 'SELECT * FROM users WHERE referral_code = ?', [user.referred_by]);
         if (L1) {
           const l1Bonus = Math.floor(earned * 0.50);
           if (l1Bonus > 0) {
             await dbRun(env, 'UPDATE users SET points = points + ? WHERE id = ?', [l1Bonus, L1.id]);
-            await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), L1.id, 'refer_mining_l1', l1Bonus, '⛏️ L1 50% refer mining: @' + user.username]);
-
-            // Level 2: L1 ka referrer — 25% of earned
+            await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), L1.id, 'refer_mining_l1', l1Bonus, '⛏️ L1 50%: @' + user.username]);
             if (L1.referred_by) {
               const L2 = await dbFirst(env, 'SELECT * FROM users WHERE referral_code = ?', [L1.referred_by]);
               if (L2) {
                 const l2Bonus = Math.floor(earned * 0.25);
                 if (l2Bonus > 0) {
                   await dbRun(env, 'UPDATE users SET points = points + ? WHERE id = ?', [l2Bonus, L2.id]);
-                  await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), L2.id, 'refer_mining_l2', l2Bonus, '🌿 L2 25% refer mining: @' + user.username]);
-
-                  // Level 3: L2 ka referrer — 10% of earned
+                  await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), L2.id, 'refer_mining_l2', l2Bonus, '🌿 L2 25%: @' + user.username]);
                   if (L2.referred_by) {
                     const L3 = await dbFirst(env, 'SELECT * FROM users WHERE referral_code = ?', [L2.referred_by]);
                     if (L3) {
                       const l3Bonus = Math.floor(earned * 0.10);
                       if (l3Bonus > 0) {
                         await dbRun(env, 'UPDATE users SET points = points + ? WHERE id = ?', [l3Bonus, L3.id]);
-                        await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), L3.id, 'refer_mining_l3', l3Bonus, '🔥 L3 10% refer mining: @' + user.username]);
+                        await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), L3.id, 'refer_mining_l3', l3Bonus, '🔥 L3 10%: @' + user.username]);
                       }
                     }
                   }
@@ -487,20 +462,20 @@ export async function onRequest({ request, env }) {
       return json({ success: true, earned: task.points_reward });
     }
 
-    // VERIFY CODE — user visits URL/video to find code, submits here
+    // VERIFY CODE — user URL/video pe jaake code dhundta hai, yahan submit karta hai
     if (path === '/api/tasks/verify-code' && request.method === 'POST') {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
       const { task_id, code } = await request.json();
-      if (!task_id || !code) return err('Task ID and code are required');
+      if (!task_id || !code) return err('Task ID aur code zaroori hain');
       const task = await dbFirst(env, 'SELECT * FROM tasks WHERE id = ? AND is_active = 1', [task_id]);
-      if (!task) return err('Task not found');
+      if (!task) return err('Task nahi mila');
       const already = await dbFirst(env, 'SELECT id FROM user_tasks WHERE user_id = ? AND task_id = ?', [user.id, task_id]);
       if (already) return err('Already completed');
       let attempt = await dbFirst(env, 'SELECT * FROM quiz_attempts WHERE user_id = ? AND task_id = ?', [user.id, task_id]);
       const maxAttempts = 3;
       const attempts = attempt ? attempt.attempts : 0;
-      if (attempt && attempt.failed == 1) return json({ success: false, failed: true, message: 'You have failed. Please restart the task.' });
+      if (attempt && attempt.failed == 1) return json({ success: false, failed: true, message: 'Aap fail ho chuke hain. Dobara task shuru karen.' });
       const correct = (task.verify_code || '').trim().toLowerCase();
       const given = (code || '').trim().toLowerCase();
       const isCorrect = correct === given;
@@ -519,12 +494,12 @@ export async function onRequest({ request, env }) {
           await dbRun(env, "INSERT INTO quiz_attempts (id,user_id,task_id,attempts,failed,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, task_id, newAttempts, isFailed ? 1 : 0]);
         }
         const remaining = maxAttempts - newAttempts;
-        if (isFailed) return json({ success: false, failed: true, message: 'Wrong code! Failed 3 times. Please restart the task.' });
-        return json({ success: false, failed: false, remaining, message: 'Wrong code! ' + remaining + ' attempts remaining.' });
+        if (isFailed) return json({ success: false, failed: true, message: 'Galat code! 3 baar fail ho gaye. Dobara task shuru karen.' });
+        return json({ success: false, failed: false, remaining, message: 'Galat code! ' + remaining + ' maukay baki hain.' });
       }
     }
 
-    // VERIFY CODE RESET — restart after failure
+    // VERIFY CODE RESET — fail hone k baad dobara shuru
     if (path === '/api/tasks/verify-reset' && request.method === 'POST') {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
@@ -545,7 +520,7 @@ export async function onRequest({ request, env }) {
       let attempt = await dbFirst(env, 'SELECT * FROM quiz_attempts WHERE user_id = ? AND task_id = ?', [user.id, task_id]);
       const maxAttempts = 3;
       const attempts = attempt ? attempt.attempts : 0;
-      if (attempt && attempt.failed == 1) return json({ success: false, failed: true, message: 'You have failed. Please restart the task.' });
+      if (attempt && attempt.failed == 1) return json({ success: false, failed: true, message: 'Aap fail ho chuke hain. Dobara task shuru karen.' });
       const correct = (task.quiz_answer || '').trim().toLowerCase();
       const given = (answer || '').trim().toLowerCase();
       const isCorrect = correct === given;
@@ -564,8 +539,8 @@ export async function onRequest({ request, env }) {
           await dbRun(env, "INSERT INTO quiz_attempts (id,user_id,task_id,attempts,failed,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, task_id, newAttempts, isFailed ? 1 : 0]);
         }
         const remaining = maxAttempts - newAttempts;
-        if (isFailed) return json({ success: false, failed: true, message: 'Wrong answer! Failed 3 times. Please restart the task.' });
-        return json({ success: false, failed: false, remaining, message: 'Wrong answer! ' + remaining + ' attempts remaining.' });
+        if (isFailed) return json({ success: false, failed: true, message: 'Galat jawab! 3 baar fail ho gaye. Dobara task shuru karen.' });
+        return json({ success: false, failed: false, remaining, message: 'Galat jawab! ' + remaining + ' maukay baki hain.' });
       }
     }
 
@@ -614,8 +589,8 @@ export async function onRequest({ request, env }) {
       return json({ users: parseInt(uc?.c || 0), total_mined: parseInt(tm?.s || 0) });
     }
 
-    // ── ADS ── Now ads are manual in ads.js, not from DB
-    // /api/ads removed — ads directly hardcoded in ads.js
+    // ── ADS ── Ab ads.js mein manual hain, DB se nahi aate
+    // /api/ads removed — ads directly ads.js mein hardcode karo
 
     // ── ADMIN ─────────────────────────────────────
     if (path.startsWith('/api/admin/')) {
@@ -628,6 +603,12 @@ export async function onRequest({ request, env }) {
           (SELECT COUNT(*) FROM users r WHERE r.referred_by = u.referral_code) AS referral_count,
           (SELECT COUNT(*) FROM users r WHERE r.referred_by = u.referral_code AND r.total_mined > 0) AS active_referral_count
           FROM users u ORDER BY u.created_at DESC LIMIT 100`));
+      }
+      if (path === '/api/admin/users/ban' && request.method === 'POST') {
+        const { id, is_banned } = body;
+        if (!id) return err('Invalid');
+        await dbRun(env, 'UPDATE users SET is_banned=? WHERE id=?', [is_banned ? 1 : 0, id]);
+        return json({ ok: true });
       }
       if (path === '/api/admin/users/update' && request.method === 'POST') {
         await dbRun(env, 'UPDATE users SET username=?,points=?,mining_power=?,is_banned=? WHERE id=?', [body.username, body.points, body.mining_power, body.is_banned ? 1 : 0, body.id]);
@@ -709,42 +690,17 @@ export async function onRequest({ request, env }) {
       }
     }
 
-
       if (path === '/api/admin/db-init' && request.method === 'POST') {
-        // Create tables that were added in v5 update (run once after deploy)
-        await dbRun(env, `CREATE TABLE IF NOT EXISTS password_resets (
-          id TEXT PRIMARY KEY,
-          user_id TEXT NOT NULL,
-          username TEXT,
-          email TEXT,
-          verify_question TEXT,
-          verify_answer TEXT,
-          new_password_hash TEXT,
-          status TEXT DEFAULT 'pending',
-          created_at TEXT,
-          resolved_at TEXT
-        )`);
-        // Add new columns to existing tables if they don't exist (safe to run multiple times)
+        await dbRun(env, `CREATE TABLE IF NOT EXISTS password_resets (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, username TEXT, email TEXT, verify_question TEXT, verify_answer TEXT, new_password_hash TEXT, status TEXT DEFAULT 'pending', created_at TEXT, resolved_at TEXT)`);
+        await dbRun(env, `CREATE TABLE IF NOT EXISTS support_messages (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, username TEXT, email TEXT, message TEXT, status TEXT DEFAULT 'open', admin_reply TEXT, replied_at TEXT, created_at TEXT)`);
         try { await dbRun(env, 'ALTER TABLE users ADD COLUMN security_question TEXT'); } catch(e) {}
         try { await dbRun(env, 'ALTER TABLE users ADD COLUMN security_answer TEXT'); } catch(e) {}
-        try { await dbRun(env, 'ALTER TABLE password_resets ADD COLUMN new_password_hash TEXT'); } catch(e) {}
         try { await dbRun(env, 'ALTER TABLE users ADD COLUMN active_referral_count INTEGER DEFAULT 0'); } catch(e) {}
-        try { await dbRun(env, 'ALTER TABLE users ADD COLUMN referral_count INTEGER DEFAULT 0'); } catch(e) {}
-        await dbRun(env, `CREATE TABLE IF NOT EXISTS support_messages (
-          id TEXT PRIMARY KEY,
-          user_id TEXT NOT NULL,
-          username TEXT,
-          email TEXT,
-          message TEXT,
-          status TEXT DEFAULT 'open',
-          admin_reply TEXT,
-          replied_at TEXT,
-          created_at TEXT
-        )`);
-        return json({ success: true, message: 'Tables created (or already existed)' });
+        try { await dbRun(env, 'ALTER TABLE password_resets ADD COLUMN new_password_hash TEXT'); } catch(e) {}
+        return json({ success: true, message: 'Tables ready' });
       }
 
-        return err('Not found', 404);
+    return err('Not found', 404);
 
   } catch (e) {
     return err('Server error: ' + e.message, 500);
