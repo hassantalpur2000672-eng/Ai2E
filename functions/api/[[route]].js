@@ -247,7 +247,7 @@ export async function onRequest({ request, env }) {
           [crypto.randomUUID(), id, 'welcome_bonus', bonus, '🎉 Welcome bonus']
         );
 
-        // Refer: sirf count update
+        // Referral: update count only
         if (ref_code) {
           const refUser = await dbFirst(env, 'SELECT * FROM users WHERE referral_code = ?', [ref_code]);
           if (refUser) {
@@ -267,20 +267,20 @@ export async function onRequest({ request, env }) {
       const { email } = await request.json();
       if (!email) return err('Email required');
       const user = await dbFirst(env, 'SELECT id, security_question FROM users WHERE LOWER(email) = ?', [email.toLowerCase().trim()]);
-      if (!user) return err('Is email pe koi account nahi mila');
+      if (!user) return err('No account found with this email');
       return json({ ok: true, security_question: user.security_question || null });
     }
 
     // ── FORGOT PASSWORD REQUEST ────────────────────
     if (path === '/api/auth/forgot-password' && request.method === 'POST') {
       const { email, answer, question, new_password } = await request.json();
-      if (!email || !answer) return err('Email aur answer zaroor chahiye');
-      if (!new_password || new_password.length < 6) return err('New password min 6 characters hona chahiye');
+      if (!email || !answer) return err('Email and answer are required');
+      if (!new_password || new_password.length < 6) return err('New password must be at least 6 characters');
       const emailNorm = email.toLowerCase().trim();
       const user = await dbFirst(env, 'SELECT id, username, security_question, security_answer FROM users WHERE LOWER(email) = ?', [emailNorm]);
-      if (!user) return err('Account nahi mila');
+      if (!user) return err('Account not found');
       const existing = await dbFirst(env, "SELECT id FROM password_resets WHERE user_id = ? AND status = 'pending'", [user.id]);
-      if (existing) return err('Reset request already pending hai. Admin jald review karega.');
+      if (existing) return err('Password reset request already pending. Admin will review soon.');
       // Hash the new password to store securely
       const hashedNew = await hashPassword(new_password);
       await dbRun(env,
@@ -295,9 +295,9 @@ export async function onRequest({ request, env }) {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
       const { message } = await request.json();
-      if (!message || message.trim().length < 5) return err('Message bahut chota hai');
+      if (!message || message.trim().length < 5) return err('Message is too short');
       const last = await dbFirst(env, "SELECT id FROM support_messages WHERE user_id = ? AND created_at > datetime('now','-24 hours')", [user.id]);
-      if (last) return err('24 ghante mein sirf 1 message bhej sakte hain');
+      if (last) return err('You can only send 1 message per 24 hours');
       await dbRun(env,
         "INSERT INTO support_messages (id,user_id,username,email,message,status,created_at) VALUES (?,?,?,?,?,'open',datetime('now'))",
         [crypto.randomUUID(), user.id, user.username, user.email||'', message.trim()]
@@ -349,7 +349,7 @@ export async function onRequest({ request, env }) {
       const { reset_id, new_password } = await request.json();
       if (!reset_id) return err('Invalid');
       const reset = await dbFirst(env, 'SELECT * FROM password_resets WHERE id=?', [reset_id]);
-      if (!reset) return err('Request nahi mili');
+      if (!reset) return err('Request not found');
       // Use the new_password_hash that user submitted (already hashed)
       const pwHash = reset.new_password_hash || await hashPassword(new_password || 'reset123');
       await dbRun(env, 'UPDATE users SET password_hash=? WHERE id=?', [pwHash, reset.user_id]);
@@ -382,7 +382,19 @@ export async function onRequest({ request, env }) {
     if (path === '/api/mine/start' && request.method === 'POST') {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
-      if (user.mining_claimed != 1) return err('Already mining');
+      
+      // Check if there's an active unclaimed session
+      if (user.mining_claimed != 1 && user.last_mining_start) {
+        const lastStart = new Date(user.last_mining_start).getTime();
+        const durMs = 24 * 3600000; // 24 hours
+        const elapsed = Date.now() - lastStart;
+        
+        // If session is still active (not completed), don't allow starting again
+        if (elapsed < durMs) {
+          return err('Already mining. Please wait for the session to complete.');
+        }
+      }
+      
       const now = new Date().toISOString();
       await dbRun(env, "UPDATE users SET last_mining_start = ?, mining_claimed = 0 WHERE id = ?", [now, user.id]);
       await dbRun(env, "INSERT INTO mining_sessions (id,user_id,started_at,mining_power) VALUES (?,?,?,?)", [crypto.randomUUID(), user.id, now, user.mining_power]);
@@ -403,7 +415,8 @@ export async function onRequest({ request, env }) {
       const elapsed = Math.min(Date.now() - start, durMs);
       const earned = Math.floor(cpm * elapsed);
 
-      if (earned < 100) return err('Mine at least 100 points first');
+      // Allow claim only after full duration (24 hours) has completed
+      if (elapsed < durMs) return err('Mining session not complete yet. Come back when timer ends.');
 
       const newPts = parseInt(user.points || 0) + earned;
       const newMined = parseInt(user.total_mined || 0) + earned;
@@ -474,20 +487,20 @@ export async function onRequest({ request, env }) {
       return json({ success: true, earned: task.points_reward });
     }
 
-    // VERIFY CODE — user URL/video pe jaake code dhundta hai, yahan submit karta hai
+    // VERIFY CODE — user visits URL/video to find code, submits here
     if (path === '/api/tasks/verify-code' && request.method === 'POST') {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
       const { task_id, code } = await request.json();
-      if (!task_id || !code) return err('Task ID aur code zaroori hain');
+      if (!task_id || !code) return err('Task ID and code are required');
       const task = await dbFirst(env, 'SELECT * FROM tasks WHERE id = ? AND is_active = 1', [task_id]);
-      if (!task) return err('Task nahi mila');
+      if (!task) return err('Task not found');
       const already = await dbFirst(env, 'SELECT id FROM user_tasks WHERE user_id = ? AND task_id = ?', [user.id, task_id]);
       if (already) return err('Already completed');
       let attempt = await dbFirst(env, 'SELECT * FROM quiz_attempts WHERE user_id = ? AND task_id = ?', [user.id, task_id]);
       const maxAttempts = 3;
       const attempts = attempt ? attempt.attempts : 0;
-      if (attempt && attempt.failed == 1) return json({ success: false, failed: true, message: 'Aap fail ho chuke hain. Dobara task shuru karen.' });
+      if (attempt && attempt.failed == 1) return json({ success: false, failed: true, message: 'You have failed. Please restart the task.' });
       const correct = (task.verify_code || '').trim().toLowerCase();
       const given = (code || '').trim().toLowerCase();
       const isCorrect = correct === given;
@@ -506,12 +519,12 @@ export async function onRequest({ request, env }) {
           await dbRun(env, "INSERT INTO quiz_attempts (id,user_id,task_id,attempts,failed,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, task_id, newAttempts, isFailed ? 1 : 0]);
         }
         const remaining = maxAttempts - newAttempts;
-        if (isFailed) return json({ success: false, failed: true, message: 'Galat code! 3 baar fail ho gaye. Dobara task shuru karen.' });
-        return json({ success: false, failed: false, remaining, message: 'Galat code! ' + remaining + ' maukay baki hain.' });
+        if (isFailed) return json({ success: false, failed: true, message: 'Wrong code! Failed 3 times. Please restart the task.' });
+        return json({ success: false, failed: false, remaining, message: 'Wrong code! ' + remaining + ' attempts remaining.' });
       }
     }
 
-    // VERIFY CODE RESET — fail hone k baad dobara shuru
+    // VERIFY CODE RESET — restart after failure
     if (path === '/api/tasks/verify-reset' && request.method === 'POST') {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
@@ -532,7 +545,7 @@ export async function onRequest({ request, env }) {
       let attempt = await dbFirst(env, 'SELECT * FROM quiz_attempts WHERE user_id = ? AND task_id = ?', [user.id, task_id]);
       const maxAttempts = 3;
       const attempts = attempt ? attempt.attempts : 0;
-      if (attempt && attempt.failed == 1) return json({ success: false, failed: true, message: 'Aap fail ho chuke hain. Dobara task shuru karen.' });
+      if (attempt && attempt.failed == 1) return json({ success: false, failed: true, message: 'You have failed. Please restart the task.' });
       const correct = (task.quiz_answer || '').trim().toLowerCase();
       const given = (answer || '').trim().toLowerCase();
       const isCorrect = correct === given;
@@ -551,8 +564,8 @@ export async function onRequest({ request, env }) {
           await dbRun(env, "INSERT INTO quiz_attempts (id,user_id,task_id,attempts,failed,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, task_id, newAttempts, isFailed ? 1 : 0]);
         }
         const remaining = maxAttempts - newAttempts;
-        if (isFailed) return json({ success: false, failed: true, message: 'Galat jawab! 3 baar fail ho gaye. Dobara task shuru karen.' });
-        return json({ success: false, failed: false, remaining, message: 'Galat jawab! ' + remaining + ' maukay baki hain.' });
+        if (isFailed) return json({ success: false, failed: true, message: 'Wrong answer! Failed 3 times. Please restart the task.' });
+        return json({ success: false, failed: false, remaining, message: 'Wrong answer! ' + remaining + ' attempts remaining.' });
       }
     }
 
@@ -601,8 +614,8 @@ export async function onRequest({ request, env }) {
       return json({ users: parseInt(uc?.c || 0), total_mined: parseInt(tm?.s || 0) });
     }
 
-    // ── ADS ── Ab ads.js mein manual hain, DB se nahi aate
-    // /api/ads removed — ads directly ads.js mein hardcode karo
+    // ── ADS ── Now ads are manual in ads.js, not from DB
+    // /api/ads removed — ads directly hardcoded in ads.js
 
     // ── ADMIN ─────────────────────────────────────
     if (path.startsWith('/api/admin/')) {
