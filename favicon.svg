@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a1d26"/>
+      <stop offset="100%" stop-color="#0d0f16"/>
+    </linearGradient>
+    <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#c084fc"/>
+      <stop offset="25%" stop-color="#60a5fa"/>
+      <stop offset="50%" stop-color="#34d399"/>
+      <stop offset="75%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#c084fc"/>
+    </linearGradient>
+    <linearGradient id="iGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#c084fc"/>
+      <stop offset="35%" stop-color="#60a5fa"/>
+      <stop offset="65%" stop-color="#34d399"/>
+      <stop offset="100%" stop-color="#fbbf24"/>
+    </linearGradient>
+    <filter id="softglow">
+      <feGaussianBlur stdDeviation="1.5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Dark rounded background -->
+  <rect width="100" height="100" rx="22" fill="url(#bgGrad)"/>
+
+  <!-- Outer ring -->
+  <circle cx="50" cy="50" r="43" fill="none" stroke="url(#ringGrad)" stroke-width="2.5" stroke-linecap="round" opacity="0.9" filter="url(#softglow)"/>
+  <!-- Inner ring -->
+  <circle cx="50" cy="50" r="38" fill="none" stroke="url(#ringGrad)" stroke-width="1" opacity="0.4"/>
+
+  <!-- A -->
+  <text x="10" y="68" font-family="Arial Black, sans-serif" font-size="42" font-weight="900" fill="white" letter-spacing="-1">A</text>
+
+  <!-- i — colorful -->
+  <text x="42" y="68" font-family="Arial Black, sans-serif" font-size="42" font-weight="900" fill="url(#iGrad)" filter="url(#softglow)">i</text>
+
+  <!-- 2E -->
+  <text x="51" y="68" font-family="Arial Black, sans-serif" font-size="42" font-weight="900" fill="white" letter-spacing="-1">2E</text>
+</svg>
