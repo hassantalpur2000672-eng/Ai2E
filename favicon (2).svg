@@ -1,0 +1,34 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background with gradient -->
+  <rect width="64" height="64" rx="14" fill="url(#gradient1)"/>
+  
+  <!-- Gradient definitions -->
+  <defs>
+    <linearGradient id="gradient1" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#00ff88"/>
+    </linearGradient>
+    <linearGradient id="gradient2" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#00ff88"/>
+      <stop offset="100%" stop-color="#00ccff"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- AI Circuit Pattern -->
+  <circle cx="32" cy="32" r="18" stroke="url(#gradient2)" stroke-width="2.5" fill="none" opacity="0.4"/>
+  <circle cx="32" cy="32" r="12" stroke="url(#gradient2)" stroke-width="2" fill="none" opacity="0.6"/>
+  
+  <!-- AI Brain/Chip Icon -->
+  <path d="M32 20 L38 24 L38 32 L32 36 L26 32 L26 24 Z" fill="url(#gradient2)" opacity="0.9"/>
+  <circle cx="32" cy="28" r="4" fill="white" opacity="0.9"/>
+  
+  <!-- Corner nodes -->
+  <circle cx="22" cy="22" r="2" fill="#00ff88"/>
+  <circle cx="42" cy="22" r="2" fill="#00ccff"/>
+  <circle cx="22" cy="42" r="2" fill="#7c3aed"/>
+  <circle cx="42" cy="42" r="2" fill="#00ff88"/>
+  
+  <!-- Connecting lines -->
+  <line x1="24" y1="22" x2="26" y2="24" stroke="#00ff88" stroke-width="1.5" opacity="0.5"/>
+  <line x1="40" y1="22" x2="38" y2="24" stroke="#00ccff" stroke-width="1.5" opacity="0.5"/>
+</svg>
