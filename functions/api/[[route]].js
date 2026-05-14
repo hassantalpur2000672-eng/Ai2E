@@ -1,21 +1,7 @@
 // ============================================
-// Ai2E — Cloudflare Pages Function  (OPTIMIZED v3)
+// Ai2E (Artificial Intelligence to Earn) — Cloudflare Pages Function
 // Database: Turso (LibSQL)
-//
-// DB READ/WRITE OPTIMIZATIONS:
-//  1. tursoBatch() — multiple stmts in 1 HTTP pipeline call
-//     (replaces multiple sequential await dbRun/dbFirst calls)
-//  2. /api/mine/start  — 2 writes → 1 batch
-//  3. /api/mine/claim  — user+tx+session+referral writes → 1 batch
-//     (mining timer runs on FRONTEND; NO per-second DB writes)
-//  4. /api/tasks       — tasks+done in 1 batch (2 reads → 1 call)
-//  5. /api/tasks/complete — 3 writes → 1 batch
-//  6. /api/me          — COUNT+UPDATE with sub-query (no extra read)
-//  7. /api/stats       — 2 aggregates → 1 batch
-//  8. /api/admin/dashboard — 4 aggregates → 1 batch
-//  9. /api/admin/settings  — N updates → 1 batch
-// 10. /api/auth/login-full — user+settings+tasks+done in 1 response
-//     Frontend uses this on first load; caches 3 min locally.
+// Updated: Secure PBKDF2 password hashing (100k iterations)
 // ============================================
 
 const CORS = {
@@ -24,58 +10,55 @@ const CORS = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
-// ── Database: Turso Batch Pipeline ───────
-// stmts = [{ sql, args }, ...]  → 1 HTTP call for ALL statements
-async function tursoBatch(env, stmts) {
+// ── Database helper (Turso via HTTP) ─────
+async function turso(env, sql, args = []) {
   const url = env.TURSO_URL.replace('libsql://', 'https://');
-  const requests = stmts.map(s => ({
-    type: 'execute',
-    stmt: {
-      sql: s.sql,
-      args: (s.args || []).map(v => {
-        if (v === null || v === undefined) return { type: 'null' };
-        if (typeof v === 'number') return { type: 'integer', value: String(v) };
-        return { type: 'text', value: String(v) };
-      })
-    }
-  }));
-  requests.push({ type: 'close' });
-
   const res = await fetch(`${url}/v2/pipeline`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${env.TURSO_TOKEN}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ requests })
+    body: JSON.stringify({
+      requests: [
+        {
+          type: 'execute',
+          stmt: {
+            sql,
+            args: args.map(v => {
+              if (v === null || v === undefined) return { type: 'null' };
+              if (typeof v === 'number') return { type: 'integer', value: String(v) };
+              return { type: 'text', value: String(v) };
+            })
+          }
+        },
+        { type: 'close' }
+      ]
+    })
   });
   const data = await res.json();
-
-  // Return array of result-sets, one per statement
-  return (data.results || [])
-    .filter(r => r.type !== 'error' && r.response?.result)
-    .map(r => {
-      const result = r.response.result;
-      const cols = result.cols.map(c => c.name);
-      return result.rows.map(row => {
-        const obj = {};
-        cols.forEach((col, i) => { obj[col] = row[i]?.value ?? null; });
-        return obj;
-      });
-    });
+  if (data.results?.[0]?.type === 'error') throw new Error(data.results[0].error.message);
+  const result = data.results?.[0]?.response?.result;
+  if (!result) return [];
+  const cols = result.cols.map(c => c.name);
+  return result.rows.map(row => {
+    const obj = {};
+    cols.forEach((col, i) => { obj[col] = row[i]?.value ?? null; });
+    return obj;
+  });
 }
 
-// Single-statement helpers (thin wrappers, backward-compatible)
 async function dbFirst(env, sql, args = []) {
-  const [rows] = await tursoBatch(env, [{ sql, args }]);
-  return (rows && rows[0]) || null;
+  const rows = await turso(env, sql, args);
+  return rows[0] || null;
 }
+
 async function dbAll(env, sql, args = []) {
-  const [rows] = await tursoBatch(env, [{ sql, args }]);
-  return rows || [];
+  return await turso(env, sql, args);
 }
+
 async function dbRun(env, sql, args = []) {
-  await tursoBatch(env, [{ sql, args }]);
+  return await turso(env, sql, args);
 }
 
 // ── Token helpers (JWT-like) ─────────────
@@ -178,117 +161,64 @@ export async function onRequest({ request, env }) {
       if (!username || !email || !password) return err('All fields required');
       if (password.length < 6) return err('Password min 6 chars');
 
-      const emailNorm    = email.toLowerCase().trim();
-      const usernameNorm = username.toLowerCase().trim();
+      const emailNorm = email.toLowerCase().trim();
+      const exists = await dbFirst(env, 'SELECT id FROM users WHERE LOWER(email) = ?', [emailNorm]);
+      if (exists) return err('Email already registered');
 
-      // BATCH READ: email + username + welcome_bonus + refUser — 1 pipeline call
-      const checkStmts = [
-        { sql: 'SELECT id FROM users WHERE LOWER(email) = ?',   args: [emailNorm] },
-        { sql: 'SELECT id FROM users WHERE username = ?',        args: [usernameNorm] },
-        { sql: "SELECT value FROM settings WHERE key = 'welcome_bonus'" },
-      ];
-      if (ref_code) checkStmts.push({ sql: 'SELECT id FROM users WHERE referral_code = ?', args: [ref_code.toUpperCase()] });
+      const uExists = await dbFirst(env, 'SELECT id FROM users WHERE username = ?', [username.toLowerCase()]);
+      if (uExists) return err('Username taken');
 
-      const checkResults = await tursoBatch(env, checkStmts);
-      const emailRow = checkResults[0]?.[0];
-      const uRow     = checkResults[1]?.[0];
-      const cfgRow   = checkResults[2]?.[0];
-      const refUser  = ref_code ? checkResults[3]?.[0] : null;
+      const hashed = await hashPassword(password); // new secure hash (100k iter)
+      const myRef = 'AI2E' + Math.random().toString(36).substr(2, 6).toUpperCase();
+      const id = crypto.randomUUID();
+      const cfg = await dbFirst(env, "SELECT value FROM settings WHERE key = 'welcome_bonus'");
+      const bonus = parseInt(cfg?.value || '1000');
 
-      if (emailRow) return err('Email already registered');
-      if (uRow)     return err('Username taken');
+      await dbRun(env,
+        `INSERT INTO users (id,username,email,password_hash,referral_code,referred_by,points,total_mined,mining_power,login_method,mining_claimed,security_question,security_answer,created_at)
+         VALUES (?,?,?,?,?,?,?,0,1.0,'email',1,?,?,datetime('now'))`,
+        [id, username.toLowerCase(), emailNorm, hashed, myRef, ref_code || null, bonus, security_question||null, security_answer||null]
+      );
 
-      const bonus  = parseInt(cfgRow?.value || '1000');
-      const hashed = await hashPassword(password);
-      const myRef  = 'AI2E' + Math.random().toString(36).substr(2, 6).toUpperCase();
-      const id     = crypto.randomUUID();
+      await dbRun(env,
+        "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",
+        [crypto.randomUUID(), id, 'welcome_bonus', bonus, '🎉 Welcome bonus']
+      );
 
-      // BATCH WRITE: user + welcome tx + ref count — 1 pipeline call
-      const writeStmts = [
-        {
-          sql: "INSERT INTO users (id,username,email,password_hash,referral_code,referred_by,points,total_mined,mining_power,login_method,mining_claimed,security_question,security_answer,created_at) VALUES (?,?,?,?,?,?,?,0,1.0,'email',1,?,?,datetime('now'))",
-          args: [id, usernameNorm, emailNorm, hashed, myRef,
-                 ref_code ? ref_code.toUpperCase() : null,
-                 bonus, security_question||null, security_answer||null]
-        },
-        {
-          sql: "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",
-          args: [crypto.randomUUID(), id, 'welcome_bonus', bonus, '🎉 Welcome bonus']
-        },
-      ];
-      if (refUser && refUser.id !== id) {
-        writeStmts.push({ sql: 'UPDATE users SET referral_count=referral_count+1 WHERE id=?', args: [refUser.id] });
-        writeStmts.push({ sql: "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", args: [crypto.randomUUID(), refUser.id, 'referral_bonus', 0, '👥 New referral: @'+usernameNorm] });
+      // Refer system: registration pe sirf count badhe — asli faida mining claim par (10% + 1% tree)
+      if (ref_code) {
+        const refUser = await dbFirst(env, 'SELECT * FROM users WHERE referral_code = ?', [ref_code]);
+        if (refUser && refUser.id !== id) {
+          await dbRun(env, 'UPDATE users SET referral_count = referral_count + 1 WHERE id = ?', [refUser.id]);
+        }
       }
-      await tursoBatch(env, writeStmts);
 
-      // Return user + settings + tasks + leaderboard in 1 batch
-      const token = await makeToken(id, env);
-      const [userRows, settingsRows, tasksRows, lbRows] = await tursoBatch(env, [
-        { sql: 'SELECT * FROM users WHERE id=?', args: [id] },
-        { sql: 'SELECT key, value FROM settings' },
-        { sql: 'SELECT * FROM tasks WHERE is_active=1 ORDER BY display_order' },
-        { sql: `SELECT u.username, u.wallet_address, u.wallet_type,
-                        u.points AS total_points, u.total_mined, u.mining_power,
-                        (SELECT COUNT(*) FROM users r WHERE r.referred_by=u.referral_code) AS total_referrals,
-                        (SELECT COUNT(*) FROM users r WHERE r.referred_by=u.referral_code AND r.total_mined>0) AS active_referrals
-                 FROM users u WHERE u.points>0 ORDER BY u.points DESC LIMIT 25` }
-      ]);
-      const newUser  = userRows?.[0] || null;
-      const settings = {};
-      (settingsRows || []).forEach(r => { settings[r.key] = r.value; });
-      return json({ token, user: newUser, settings, tasks: tasksRows||[], done: [], leaderboard: lbRows||[] });
+            const token = await makeToken(id, env);
+      const user = await dbFirst(env, 'SELECT * FROM users WHERE id = ?', [id]);
+      return json({ token, user });
     }
 
     if (path === '/api/auth/login' && request.method === 'POST') {
       const { email, password } = await request.json();
       if (!email || !password) return err('Email and password required');
       const emailNorm = email.toLowerCase().trim();
-      // 1 read only
-      const user = await dbFirst(env, 'SELECT * FROM users WHERE LOWER(email) = ?', [emailNorm]);
+      let user = await dbFirst(env, 'SELECT * FROM users WHERE email = ?', [emailNorm]);
+      if (!user) user = await dbFirst(env, 'SELECT * FROM users WHERE LOWER(email) = ?', [emailNorm]);
       if (!user) return err('Wrong email or password');
       if (user.is_banned == 1) return err('Account banned');
+
+      // Verify password (handles old/new format + automatic upgrade)
       const valid = await verifyPassword(password, user.password_hash);
       if (!valid) return err('Wrong email or password');
-      // Hash upgrade: fire-and-forget, doesn't block response
-      if (!user.password_hash.includes(':')) hashPassword(password).then(h => dbRun(env,'UPDATE users SET password_hash=? WHERE id=?',[h,user.id]));
+
+      // If old format, upgrade to new format on-the-fly
+      if (!user.password_hash.includes(':')) {
+        const newHash = await hashPassword(password);
+        await dbRun(env, 'UPDATE users SET password_hash = ? WHERE id = ?', [newHash, user.id]);
+      }
+
       const token = await makeToken(user.id, env);
       return json({ token, user });
-    }
-
-
-    // ── LOGIN-FULL — OPTIMIZATION #4 ─────────────────────────────────────────
-    // Frontend ek call mein user + settings + tasks + done-list pata kare.
-    // Replaces 4 separate fetches with 1 call. Frontend 3 min cache kare.
-    // Usage: POST /api/auth/login-full  { email, password }
-    // Returns: { token, user, settings, tasks, done }
-    if (path === '/api/auth/login-full' && request.method === 'POST') {
-      const { email, password } = await request.json();
-      if (!email || !password) return err('Email and password required');
-      const emailNorm = email.toLowerCase().trim();
-
-      // 1 read for user, then 1 batch for settings+tasks+done
-      const user = await dbFirst(env, 'SELECT * FROM users WHERE LOWER(email) = ?', [emailNorm]);
-      if (!user) return err('Wrong email or password');
-      if (user.is_banned == 1) return err('Account banned');
-      const valid = await verifyPassword(password, user.password_hash);
-      if (!valid) return err('Wrong email or password');
-      if (!user.password_hash.includes(':')) hashPassword(password).then(h => dbRun(env,'UPDATE users SET password_hash=? WHERE id=?',[h,user.id]));
-      // leaderboard piggybacked — same batch, zero extra HTTP call
-      const [settingsRows, tasksRows, doneRows, lbRows] = await tursoBatch(env, [
-        { sql: 'SELECT key, value FROM settings' },
-        { sql: 'SELECT * FROM tasks WHERE is_active = 1 ORDER BY display_order' },
-        { sql: 'SELECT task_id FROM user_tasks WHERE user_id = ?', args: [user.id] },
-        { sql: `SELECT u.username, u.wallet_address, u.wallet_type,
-                        u.points AS total_points, u.total_mined, u.mining_power,
-                        (SELECT COUNT(*) FROM users r WHERE r.referred_by=u.referral_code) AS total_referrals,
-                        (SELECT COUNT(*) FROM users r WHERE r.referred_by=u.referral_code AND r.total_mined>0) AS active_referrals
-                 FROM users u WHERE u.points>0 ORDER BY u.points DESC LIMIT 25` }
-      ]);
-      const settings = {};
-      (settingsRows || []).forEach(r => { settings[r.key] = r.value; });
-      const token = await makeToken(user.id, env);
-      return json({ token, user, settings, tasks: tasksRows||[], done: (doneRows||[]).map(d=>d.task_id), leaderboard: lbRows||[] });
     }
 
     if (path === '/api/auth/wallet' && request.method === 'POST') {
@@ -298,29 +228,34 @@ export async function onRequest({ request, env }) {
       let user = await dbFirst(env, 'SELECT * FROM users WHERE wallet_address = ?', [addr]);
 
       if (!user) {
-        const id       = crypto.randomUUID();
+        const id = crypto.randomUUID();
         const username = 'w_' + wallet_address.slice(2, 10).toLowerCase();
-        const myRef    = 'AI2E' + Math.random().toString(36).substr(2,6).toUpperCase();
-        // BATCH READ: welcome_bonus + refUser in 1 call
-        const readStmts = [{ sql: "SELECT value FROM settings WHERE key='welcome_bonus'" }];
-        if (ref_code) readStmts.push({ sql: 'SELECT id FROM users WHERE referral_code=?', args: [ref_code.toUpperCase()] });
-        const readRes = await tursoBatch(env, readStmts);
-        const bonus   = parseInt(readRes[0]?.[0]?.value || '1000');
-        const refUser = ref_code ? readRes[1]?.[0] : null;
-        // BATCH WRITE: insert + welcome tx + ref count — 1 call
-        const wStmts = [
-          { sql: "INSERT INTO users (id,username,wallet_address,wallet_type,referral_code,referred_by,points,total_mined,mining_power,login_method,mining_claimed,created_at) VALUES (?,?,?,?,?,?,?,0,1.0,?,1,datetime('now'))", args: [id,username,addr,wallet_type||'web3',myRef,ref_code?.toUpperCase()||null,bonus,wallet_type||'wallet'] },
-          { sql: "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", args: [crypto.randomUUID(),id,'welcome_bonus',bonus,'🎉 Welcome bonus'] },
-        ];
-        if (refUser) {
-          wStmts.push({ sql:'UPDATE users SET referral_count=referral_count+1 WHERE id=?', args:[refUser.id] });
-          wStmts.push({ sql:"INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", args:[crypto.randomUUID(),refUser.id,'referral_bonus',0,'👥 New wallet referral'] });
+        const myRef = 'AI2E' + Math.random().toString(36).substr(2, 6).toUpperCase();
+        const cfg = await dbFirst(env, "SELECT value FROM settings WHERE key = 'welcome_bonus'");
+        const bonus = parseInt(cfg?.value || '1000');
+
+        await dbRun(env,
+          `INSERT INTO users (id,username,wallet_address,wallet_type,referral_code,referred_by,points,total_mined,mining_power,login_method,mining_claimed,created_at)
+           VALUES (?,?,?,?,?,?,?,0,1.0,?,1,datetime('now'))`,
+          [id, username, addr, wallet_type || 'web3', myRef, ref_code || null, bonus, wallet_type || 'wallet']
+        );
+
+        await dbRun(env,
+          "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",
+          [crypto.randomUUID(), id, 'welcome_bonus', bonus, '🎉 Welcome bonus']
+        );
+
+        // Refer: sirf count update
+        if (ref_code) {
+          const refUser = await dbFirst(env, 'SELECT * FROM users WHERE referral_code = ?', [ref_code]);
+          if (refUser) {
+            await dbRun(env, 'UPDATE users SET referral_count = referral_count + 1 WHERE id = ?', [refUser.id]);
+          }
         }
-        // Fetch new user in same batch as writes (piggyback SELECT)
-        const [,, freshRows] = await tursoBatch(env, [...wStmts, { sql:'SELECT * FROM users WHERE id=?', args:[id] }]);
-        user = freshRows?.[0] || null;
+                user = await dbFirst(env, 'SELECT * FROM users WHERE id = ?', [id]);
       }
-      if (!user || user.is_banned==1) return err('Account banned');
+
+      if (user.is_banned == 1) return err('Account banned');
       const token = await makeToken(user.id, env);
       return json({ token, user });
     }
@@ -337,17 +272,13 @@ export async function onRequest({ request, env }) {
     // ── FORGOT PASSWORD REQUEST ────────────────────
     if (path === '/api/auth/forgot-password' && request.method === 'POST') {
       const { email, answer, question, new_password } = await request.json();
-      if (!email || !answer) return err('Email and answer required');
+      if (!email || !answer) return err('Email aur answer zaroor chahiye');
       if (!new_password || new_password.length < 6) return err('New password min 6 characters');
       const emailNorm = email.toLowerCase().trim();
-      // BATCH READ: user + existing reset in 1 call
-      const [userRows, existingRows] = await tursoBatch(env, [
-        { sql: 'SELECT id,username FROM users WHERE LOWER(email)=?', args: [emailNorm] },
-        { sql: "SELECT id FROM password_resets WHERE email=? AND status='pending'", args: [emailNorm] }
-      ]);
-      const user = userRows?.[0];
-      if (!user) return err('Account not found');
-      if (existingRows?.[0]) return err('Reset request already pending. Admin will review soon.');
+      const user = await dbFirst(env, 'SELECT id, username FROM users WHERE LOWER(email) = ?', [emailNorm]);
+      if (!user) return err('Account nahi mila');
+      const existing = await dbFirst(env, "SELECT id FROM password_resets WHERE user_id = ? AND status = 'pending'", [user.id]);
+      if (existing) return err('Reset request already pending hai. Admin jald review karega.');
       const hashedNew = await hashPassword(new_password);
       await dbRun(env,
         "INSERT INTO password_resets (id,user_id,username,email,verify_question,verify_answer,new_password_hash,status,created_at) VALUES (?,?,?,?,?,?,?,'pending',datetime('now'))",
@@ -432,29 +363,23 @@ export async function onRequest({ request, env }) {
 
     // ── USER ──────────────────────────────────────
     if (path === '/api/me' && request.method === 'GET') {
-      // OPTIMIZATION #4: COUNT + UPDATE in 1 batch call (no separate read)
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
-      // 1 batch: update active_referral_count, then return user via RETURNING-style trick
-      // SQLite doesn't support RETURNING in libsql batch, so we do 2 stmts in 1 call
-      const [, freshRows] = await tursoBatch(env, [
-        { sql: "UPDATE users SET active_referral_count=(SELECT COUNT(*) FROM users WHERE referred_by=? AND total_mined>0) WHERE id=?", args: [user.referral_code, user.id] },
-        { sql: 'SELECT * FROM users WHERE id=?', args: [user.id] }
-      ]);
-      return json(freshRows?.[0] || user);
+      const refs = await dbFirst(env, 'SELECT COUNT(*) as c FROM users WHERE referred_by = ? AND total_mined > 0', [user.referral_code]);
+      const activeRefs = parseInt(refs?.c || 0);
+      try { await dbRun(env, 'UPDATE users SET active_referral_count = ? WHERE id = ?', [activeRefs, user.id]); } catch(e) {}
+      const updated = await dbFirst(env, 'SELECT * FROM users WHERE id = ?', [user.id]);
+      return json({ ...updated, active_referral_count: activeRefs });
     }
 
     if (path === '/api/mine/start' && request.method === 'POST') {
-      // OPTIMIZATION #1: 2 writes → 1 batch call
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
       if (user.mining_claimed != 1) return err('Already mining');
       const now = new Date().toISOString();
-      await tursoBatch(env, [
-        { sql: "UPDATE users SET last_mining_start = ?, mining_claimed = 0 WHERE id = ?", args: [now, user.id] },
-        { sql: "INSERT INTO mining_sessions (id,user_id,started_at,mining_power) VALUES (?,?,?,?)", args: [crypto.randomUUID(), user.id, now, user.mining_power] }
-      ]);
-      return json({ success: true, started_at: now });
+      await dbRun(env, "UPDATE users SET last_mining_start = ?, mining_claimed = 0 WHERE id = ?", [now, user.id]);
+      await dbRun(env, "INSERT INTO mining_sessions (id,user_id,started_at,mining_power) VALUES (?,?,?,?)", [crypto.randomUUID(), user.id, now, user.mining_power]);
+      return json({ success: true });
     }
 
     if (path === '/api/mine/claim' && request.method === 'POST') {
@@ -473,59 +398,36 @@ export async function onRequest({ request, env }) {
 
       if (earned < 100) return err('Mine at least 100 points first');
 
-      const newPts   = parseInt(user.points || 0) + earned;
+      const newPts = parseInt(user.points || 0) + earned;
       const newMined = parseInt(user.total_mined || 0) + earned;
+      await dbRun(env, 'UPDATE users SET points = ?, total_mined = ?, total_claimed = total_claimed + ?, mining_claimed = 1 WHERE id = ?', [newPts, newMined, earned, user.id]);
+      await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, 'mining_claim', earned, '⛏️ Mining claim']);
+      await dbRun(env, "UPDATE mining_sessions SET claimed_at = datetime('now'), coins_earned = ?, is_claimed = 1 WHERE user_id = ? AND is_claimed = 0", [earned, user.id]);
 
-      // ── OPTIMIZATION #2: Build all stmts first, send ONE batch call ──
-      const claimStmts = [
-        // 1. Update user balance + mark claimed
-        {
-          sql: 'UPDATE users SET points = ?, total_mined = ?, total_claimed = total_claimed + ?, mining_claimed = 1 WHERE id = ?',
-          args: [newPts, newMined, earned, user.id]
-        },
-        // 2. Transaction record
-        {
-          sql: "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",
-          args: [crypto.randomUUID(), user.id, 'mining_claim', earned, '⛏️ Mining claim']
-        },
-        // 3. Close mining session
-        {
-          sql: "UPDATE mining_sessions SET claimed_at = datetime('now'), coins_earned = ?, is_claimed = 1 WHERE user_id = ? AND is_claimed = 0",
-          args: [earned, user.id]
-        },
-        // 4. Refresh active_referral_count in same batch (no extra round-trip)
-        {
-          sql: "UPDATE users SET active_referral_count = (SELECT COUNT(*) FROM users WHERE referred_by = ? AND total_mined > 0) WHERE id = ?",
-          args: [user.referral_code, user.id]
-        }
-      ];
-
-      // ── OPTIMIZATION #3: Referral bonuses collected into same batch ──
-      // We still need 1-3 reads to get L1/L2/L3 ids (unavoidable without
-      // schema change), but all the bonus WRITES join the batch above.
+      // ── Refer Mining Tree: L1=50%, L2=25%, L3=10% ──────────────────────────────
       if (user.referred_by) {
-        const L1 = await dbFirst(env, 'SELECT id, username, referred_by FROM users WHERE referral_code = ?', [user.referred_by]);
+        const L1 = await dbFirst(env, 'SELECT * FROM users WHERE referral_code = ?', [user.referred_by]);
         if (L1) {
           const l1Bonus = Math.floor(earned * 0.50);
           if (l1Bonus > 0) {
-            claimStmts.push({ sql: 'UPDATE users SET points = points + ? WHERE id = ?', args: [l1Bonus, L1.id] });
-            claimStmts.push({ sql: "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", args: [crypto.randomUUID(), L1.id, 'refer_mining_l1', l1Bonus, '⛏️ L1 50%: @' + user.username] });
-          }
-          if (L1.referred_by) {
-            const L2 = await dbFirst(env, 'SELECT id, username, referred_by FROM users WHERE referral_code = ?', [L1.referred_by]);
-            if (L2) {
-              const l2Bonus = Math.floor(earned * 0.25);
-              if (l2Bonus > 0) {
-                claimStmts.push({ sql: 'UPDATE users SET points = points + ? WHERE id = ?', args: [l2Bonus, L2.id] });
-                claimStmts.push({ sql: "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", args: [crypto.randomUUID(), L2.id, 'refer_mining_l2', l2Bonus, '🌿 L2 25%: @' + user.username] });
-              }
-              if (L2.referred_by) {
-                const L3 = await dbFirst(env, 'SELECT id, username FROM users WHERE referral_code = ?', [L2.referred_by]);
-                if (L3) {
-                  const l3Bonus = Math.floor(earned * 0.10);
-                  if (l3Bonus > 0) {
-                    claimStmts.push({ sql: 'UPDATE users SET points = points + ? WHERE id = ?', args: [l3Bonus, L3.id] });
-                    claimStmts.push({ sql: "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", args: [crypto.randomUUID(), L3.id, 'refer_mining_l3', l3Bonus, '🔥 L3 10%: @' + user.username] });
+            await dbRun(env, 'UPDATE users SET points = points + ? WHERE id = ?', [l1Bonus, L1.id]);
+            await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), L1.id, 'refer_mining_l1', l1Bonus, '⛏️ L1 50%: @' + user.username]);
+            if (L1.referred_by) {
+              const L2 = await dbFirst(env, 'SELECT * FROM users WHERE referral_code = ?', [L1.referred_by]);
+              if (L2) {
+                const l2Bonus = Math.floor(earned * 0.25);
+                if (l2Bonus > 0) {
+                  await dbRun(env, 'UPDATE users SET points = points + ? WHERE id = ?', [l2Bonus, L2.id]);
+                  await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), L2.id, 'refer_mining_l2', l2Bonus, '🌿 L2 25%: @' + user.username]);
+                  if (L2.referred_by) {
+                    const L3 = await dbFirst(env, 'SELECT * FROM users WHERE referral_code = ?', [L2.referred_by]);
+                    if (L3) {
+                      const l3Bonus = Math.floor(earned * 0.10);
+                      if (l3Bonus > 0) {
+                        await dbRun(env, 'UPDATE users SET points = points + ? WHERE id = ?', [l3Bonus, L3.id]);
+                        await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), L3.id, 'refer_mining_l3', l3Bonus, '🔥 L3 10%: @' + user.username]);
+                      }
+                    }
                   }
                 }
               }
@@ -533,178 +435,68 @@ export async function onRequest({ request, env }) {
           }
         }
       }
-
-      // Single pipeline call — all writes atomic
-      await tursoBatch(env, claimStmts);
       return json({ success: true, earned });
     }
 
-    // ── /api/mine/claim-all — mine + pending tasks + auto-restart ────────
-    // Frontend sends pending_task_ids[] earned locally since last claim.
-    // Server validates tasks (not already done), awards pts, saves txs,
-    // pays referral bonuses, auto-restarts mining — ALL in 1 batch call.
-    if (path === '/api/mine/claim-all' && request.method === 'POST') {
-      const user = await getUser(request, env);
-      if (!user) return err('Unauthorized', 401);
-      if (user.mining_claimed == 1) return err('Nothing to claim');
-
-      const cfgRows = await dbAll(env,
-        "SELECT key,value FROM settings WHERE key IN ('mining_duration_hours','mining_coins_per_hour')"
-      );
-      const cfgMap = {};
-      cfgRows.forEach(r => { cfgMap[r.key] = r.value; });
-
-      const durMs   = parseInt(cfgMap.mining_duration_hours  || '24') * 3600000;
-      const cpm     = parseFloat(cfgMap.mining_coins_per_hour || '10')
-                      * parseFloat(user.mining_power || 1) / 3600000;
-      const start   = new Date(user.last_mining_start).getTime();
-      const elapsed = Math.min(Date.now() - start, durMs);
-      const earned  = Math.floor(cpm * elapsed);
-      if (earned < 1) return err('No mining rewards yet');
-
-      // Validate pending tasks from frontend in 1 batch (2 reads)
-      const reqBody    = await request.json().catch(() => ({}));
-      const pendingIds = Array.isArray(reqBody.pending_task_ids) ? reqBody.pending_task_ids.slice(0,50) : [];
-      let taskBonus    = 0;
-      const taskStmts  = [];
-      let validCount   = 0;
-
-      if (pendingIds.length > 0) {
-        const placeholders = pendingIds.map(() => '?').join(',');
-        const [taskRows, doneRows] = await tursoBatch(env, [
-          { sql: `SELECT id,points_reward FROM tasks WHERE id IN (${placeholders}) AND is_active=1`, args: pendingIds },
-          { sql: `SELECT task_id FROM user_tasks WHERE user_id=? AND task_id IN (${placeholders})`,  args: [user.id, ...pendingIds] }
-        ]);
-        const doneSet    = new Set((doneRows||[]).map(r=>r.task_id));
-        const validTasks = (taskRows||[]).filter(t => !doneSet.has(t.id));
-        validCount = validTasks.length;
-        for (const task of validTasks) {
-          const pts = parseInt(task.points_reward || 0);
-          taskBonus += pts;
-          taskStmts.push({ sql: "INSERT OR IGNORE INTO user_tasks (id,user_id,task_id,completed_at) VALUES (?,?,?,datetime('now'))", args: [crypto.randomUUID(), user.id, task.id] });
-          taskStmts.push({ sql: "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", args: [crypto.randomUUID(), user.id, 'task_complete', pts, '✅ Task (batch claim)'] });
-        }
-      }
-
-      const now      = new Date().toISOString();
-      const newPts   = parseInt(user.points||0)       + earned + taskBonus;
-      const newMined = parseInt(user.total_mined||0)  + earned;
-      const newClaim = parseInt(user.total_claimed||0) + earned;
-
-      // Build master batch — everything in 1 pipeline call
-      const masterStmts = [
-        // 1. Update balance + auto-restart (mining_claimed=0, new start time)
-        { sql: 'UPDATE users SET points=?,total_mined=?,total_claimed=?,mining_claimed=0,last_mining_start=? WHERE id=?',
-          args: [newPts, newMined, newClaim, now, user.id] },
-        // 2. Mining claim tx
-        { sql: "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",
-          args: [crypto.randomUUID(), user.id, 'mining_claim', earned, '⛏️ Mining claim'] },
-        // 3. Close old session
-        { sql: "UPDATE mining_sessions SET claimed_at=datetime('now'),coins_earned=?,is_claimed=1 WHERE user_id=? AND is_claimed=0",
-          args: [earned, user.id] },
-        // 4. Open new session (auto-restart)
-        { sql: "INSERT INTO mining_sessions (id,user_id,started_at,mining_power) VALUES (?,?,?,?)",
-          args: [crypto.randomUUID(), user.id, now, user.mining_power] },
-        // 5. Refresh active_referral_count via sub-query
-        { sql: "UPDATE users SET active_referral_count=(SELECT COUNT(*) FROM users WHERE referred_by=? AND total_mined>0) WHERE id=?",
-          args: [user.referral_code, user.id] },
-        // 6. Task count bump
-        ...(validCount > 0 ? [{ sql: 'UPDATE users SET total_tasks_completed=total_tasks_completed+? WHERE id=?', args: [validCount, user.id] }] : []),
-        // 7+. Task insert + tx rows
-        ...taskStmts
-      ];
-
-      // Referral bonus writes — append to same batch
-      if (user.referred_by) {
-        const L1 = await dbFirst(env,'SELECT id,username,referred_by FROM users WHERE referral_code=?',[user.referred_by]);
-        if (L1) {
-          const l1b=Math.floor(earned*0.50); if(l1b>0){masterStmts.push({sql:'UPDATE users SET points=points+? WHERE id=?',args:[l1b,L1.id]});masterStmts.push({sql:"INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",args:[crypto.randomUUID(),L1.id,'refer_mining_l1',l1b,'⛏️ L1 50%: @'+user.username]});}
-          if (L1.referred_by) {
-            const L2=await dbFirst(env,'SELECT id,username,referred_by FROM users WHERE referral_code=?',[L1.referred_by]);
-            if (L2) {
-              const l2b=Math.floor(earned*0.25); if(l2b>0){masterStmts.push({sql:'UPDATE users SET points=points+? WHERE id=?',args:[l2b,L2.id]});masterStmts.push({sql:"INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",args:[crypto.randomUUID(),L2.id,'refer_mining_l2',l2b,'🌿 L2 25%: @'+user.username]});}
-              if (L2.referred_by) {
-                const L3=await dbFirst(env,'SELECT id,username FROM users WHERE referral_code=?',[L2.referred_by]);
-                if (L3) { const l3b=Math.floor(earned*0.10); if(l3b>0){masterStmts.push({sql:'UPDATE users SET points=points+? WHERE id=?',args:[l3b,L3.id]});masterStmts.push({sql:"INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",args:[crypto.randomUUID(),L3.id,'refer_mining_l3',l3b,'🔥 L3 10%: @'+user.username]});}}
-              }
-            }
-          }
-        }
-      }
-
-      // ONE call — atomic
-      await tursoBatch(env, masterStmts);
-      return json({ success: true, earned, task_bonus: taskBonus, started_at: now });
-    }
-
     if (path === '/api/tasks' && request.method === 'GET') {
-      // OPTIMIZATION: tasks + done list in 1 batch (2 reads → 1 call)
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
-      const [tasksRows, doneRows] = await tursoBatch(env, [
-        { sql: 'SELECT * FROM tasks WHERE is_active = 1 ORDER BY display_order' },
-        { sql: 'SELECT task_id FROM user_tasks WHERE user_id = ?', args: [user.id] }
-      ]);
-      return json({ tasks: tasksRows || [], done: (doneRows || []).map(d => d.task_id) });
+      const tasks = await dbAll(env, 'SELECT * FROM tasks WHERE is_active = 1 ORDER BY display_order');
+      const done = await dbAll(env, 'SELECT task_id FROM user_tasks WHERE user_id = ?', [user.id]);
+      return json({ tasks, done: done.map(d => d.task_id) });
     }
 
     if (path === '/api/tasks/complete' && request.method === 'POST') {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
       const { task_id } = await request.json();
-      // 2 reads in 1 batch
-      const [taskRows, alreadyRows] = await tursoBatch(env, [
-        { sql: 'SELECT * FROM tasks WHERE id=? AND is_active=1', args: [task_id] },
-        { sql: 'SELECT id FROM user_tasks WHERE user_id=? AND task_id=?', args: [user.id, task_id] }
-      ]);
-      const task = taskRows?.[0];
+      const task = await dbFirst(env, 'SELECT * FROM tasks WHERE id = ? AND is_active = 1', [task_id]);
       if (!task) return err('Task not found');
-      if (alreadyRows?.[0]) return err('Already completed');
-      if (task.task_type==='quiz') return err('Quiz tasks require answer verification');
-      if (task.verify_code?.trim()) return err('This task requires a secret code');
-      // 3 writes in 1 batch
-      await tursoBatch(env, [
-        { sql: "INSERT OR IGNORE INTO user_tasks (id,user_id,task_id,completed_at) VALUES (?,?,?,datetime('now'))", args: [crypto.randomUUID(), user.id, task_id] },
-        { sql: 'UPDATE users SET points=points+?,total_tasks_completed=total_tasks_completed+1 WHERE id=?', args: [task.points_reward, user.id] },
-        { sql: "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", args: [crypto.randomUUID(), user.id, 'task_complete', task.points_reward, '✅ '+task.title] }
-      ]);
+      const already = await dbFirst(env, 'SELECT id FROM user_tasks WHERE user_id = ? AND task_id = ?', [user.id, task_id]);
+      if (already) return err('Already completed');
+      if (task.task_type === 'quiz') return err('Quiz tasks require answer verification');
+      if (task.verify_code && task.verify_code.trim() !== '') return err('This task requires a secret code to complete');
+      await dbRun(env, "INSERT INTO user_tasks (id,user_id,task_id,completed_at) VALUES (?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, task_id]);
+      await dbRun(env, 'UPDATE users SET points = points + ?, total_tasks_completed = total_tasks_completed + 1 WHERE id = ?', [task.points_reward, user.id]);
+      await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, 'task_complete', task.points_reward, '✅ ' + task.title]);
       return json({ success: true, earned: task.points_reward });
     }
 
-    // VERIFY CODE (server-side fallback — frontend checks first from cache)
+    // VERIFY CODE — user URL/video pe jaake code dhundta hai, yahan submit karta hai
     if (path === '/api/tasks/verify-code' && request.method === 'POST') {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
       const { task_id, code } = await request.json();
-      if (!task_id || !code) return err('task_id and code required');
-      // 3 reads in 1 batch
-      const [taskRows, alreadyRows, attemptRows] = await tursoBatch(env, [
-        { sql: 'SELECT * FROM tasks WHERE id=? AND is_active=1', args: [task_id] },
-        { sql: 'SELECT id FROM user_tasks WHERE user_id=? AND task_id=?', args: [user.id, task_id] },
-        { sql: 'SELECT * FROM quiz_attempts WHERE user_id=? AND task_id=?', args: [user.id, task_id] }
-      ]);
-      const task=taskRows?.[0], already=alreadyRows?.[0], attempt=attemptRows?.[0];
-      if (!task) return err('Task not found');
+      if (!task_id || !code) return err('Task ID aur code zaroori hain');
+      const task = await dbFirst(env, 'SELECT * FROM tasks WHERE id = ? AND is_active = 1', [task_id]);
+      if (!task) return err('Task nahi mila');
+      const already = await dbFirst(env, 'SELECT id FROM user_tasks WHERE user_id = ? AND task_id = ?', [user.id, task_id]);
       if (already) return err('Already completed');
-      if (attempt?.failed==1) return json({success:false,failed:true,message:'3 attempts used. Start task again.'});
-      const maxAttempts=3, attempts=attempt?parseInt(attempt.attempts):0;
-      const isCorrect=(task.verify_code||'').trim().toLowerCase()===(code||'').trim().toLowerCase();
+      let attempt = await dbFirst(env, 'SELECT * FROM quiz_attempts WHERE user_id = ? AND task_id = ?', [user.id, task_id]);
+      const maxAttempts = 3;
+      const attempts = attempt ? attempt.attempts : 0;
+      if (attempt && attempt.failed == 1) return json({ success: false, failed: true, message: 'Aap fail ho chuke hain. Dobara task shuru karen.' });
+      const correct = (task.verify_code || '').trim().toLowerCase();
+      const given = (code || '').trim().toLowerCase();
+      const isCorrect = correct === given;
       if (isCorrect) {
-        const stmts=[
-          {sql:"INSERT OR IGNORE INTO user_tasks (id,user_id,task_id,completed_at) VALUES (?,?,?,datetime('now'))",args:[crypto.randomUUID(),user.id,task_id]},
-          {sql:'UPDATE users SET points=points+?,total_tasks_completed=total_tasks_completed+1 WHERE id=?',args:[task.points_reward,user.id]},
-          {sql:"INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",args:[crypto.randomUUID(),user.id,'task_complete',task.points_reward,'✅ '+task.title]}
-        ];
-        if(attempt) stmts.push({sql:'DELETE FROM quiz_attempts WHERE user_id=? AND task_id=?',args:[user.id,task_id]});
-        await tursoBatch(env,stmts);
-        return json({success:true,earned:task.points_reward});
+        await dbRun(env, "INSERT INTO user_tasks (id,user_id,task_id,completed_at) VALUES (?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, task_id]);
+        await dbRun(env, 'UPDATE users SET points = points + ?, total_tasks_completed = total_tasks_completed + 1 WHERE id = ?', [task.points_reward, user.id]);
+        await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, 'task_complete', task.points_reward, '✅ ' + task.title]);
+        if (attempt) await dbRun(env, 'DELETE FROM quiz_attempts WHERE user_id = ? AND task_id = ?', [user.id, task_id]);
+        return json({ success: true, earned: task.points_reward });
+      } else {
+        const newAttempts = attempts + 1;
+        const isFailed = newAttempts >= maxAttempts;
+        if (attempt) {
+          await dbRun(env, 'UPDATE quiz_attempts SET attempts = ?, failed = ? WHERE user_id = ? AND task_id = ?', [newAttempts, isFailed ? 1 : 0, user.id, task_id]);
+        } else {
+          await dbRun(env, "INSERT INTO quiz_attempts (id,user_id,task_id,attempts,failed,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, task_id, newAttempts, isFailed ? 1 : 0]);
+        }
+        const remaining = maxAttempts - newAttempts;
+        if (isFailed) return json({ success: false, failed: true, message: 'Galat code! 3 baar fail ho gaye. Dobara task shuru karen.' });
+        return json({ success: false, failed: false, remaining, message: 'Galat code! ' + remaining + ' maukay baki hain.' });
       }
-      const newAttempts=attempts+1, isFailed=newAttempts>=maxAttempts;
-      // 1 write (upsert attempt)
-      if(attempt) await dbRun(env,'UPDATE quiz_attempts SET attempts=?,failed=? WHERE user_id=? AND task_id=?',[newAttempts,isFailed?1:0,user.id,task_id]);
-      else await dbRun(env,"INSERT INTO quiz_attempts (id,user_id,task_id,attempts,failed,created_at) VALUES (?,?,?,?,?,datetime('now'))",[crypto.randomUUID(),user.id,task_id,newAttempts,isFailed?1:0]);
-      if(isFailed) return json({success:false,failed:true,message:'Wrong code! 3 attempts failed.'});
-      return json({success:false,failed:false,remaining:maxAttempts-newAttempts,message:'Wrong code! '+(maxAttempts-newAttempts)+' attempts left.'});
     }
 
     // VERIFY CODE RESET — fail hone k baad dobara shuru
@@ -716,39 +508,40 @@ export async function onRequest({ request, env }) {
       return json({ success: true });
     }
 
-    // QUIZ VERIFY (server-side fallback — frontend checks first from cache)
     if (path === '/api/tasks/quiz-verify' && request.method === 'POST') {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
       const { task_id, answer } = await request.json();
       if (!task_id || answer === undefined) return err('Missing fields');
-      // 3 reads in 1 batch
-      const [taskRows, alreadyRows, attemptRows] = await tursoBatch(env, [
-        { sql: "SELECT * FROM tasks WHERE id=? AND is_active=1 AND task_type='quiz'", args: [task_id] },
-        { sql: 'SELECT id FROM user_tasks WHERE user_id=? AND task_id=?', args: [user.id, task_id] },
-        { sql: 'SELECT * FROM quiz_attempts WHERE user_id=? AND task_id=?', args: [user.id, task_id] }
-      ]);
-      const task=taskRows?.[0], already=alreadyRows?.[0], attempt=attemptRows?.[0];
+      const task = await dbFirst(env, "SELECT * FROM tasks WHERE id = ? AND is_active = 1 AND task_type = 'quiz'", [task_id]);
       if (!task) return err('Quiz task not found');
+      const already = await dbFirst(env, 'SELECT id FROM user_tasks WHERE user_id = ? AND task_id = ?', [user.id, task_id]);
       if (already) return err('Already completed');
-      if (attempt?.failed==1) return json({success:false,failed:true,message:'3 attempts used. Start again.'});
-      const maxAttempts=3, attempts=attempt?parseInt(attempt.attempts):0;
-      const isCorrect=(task.quiz_answer||'').trim().toLowerCase()===(answer||'').trim().toLowerCase();
+      let attempt = await dbFirst(env, 'SELECT * FROM quiz_attempts WHERE user_id = ? AND task_id = ?', [user.id, task_id]);
+      const maxAttempts = 3;
+      const attempts = attempt ? attempt.attempts : 0;
+      if (attempt && attempt.failed == 1) return json({ success: false, failed: true, message: 'Aap fail ho chuke hain. Dobara task shuru karen.' });
+      const correct = (task.quiz_answer || '').trim().toLowerCase();
+      const given = (answer || '').trim().toLowerCase();
+      const isCorrect = correct === given;
       if (isCorrect) {
-        const stmts=[
-          {sql:"INSERT OR IGNORE INTO user_tasks (id,user_id,task_id,completed_at) VALUES (?,?,?,datetime('now'))",args:[crypto.randomUUID(),user.id,task_id]},
-          {sql:'UPDATE users SET points=points+?,total_tasks_completed=total_tasks_completed+1 WHERE id=?',args:[task.points_reward,user.id]},
-          {sql:"INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",args:[crypto.randomUUID(),user.id,'task_complete',task.points_reward,'✅ Quiz: '+task.title]}
-        ];
-        if(attempt) stmts.push({sql:'DELETE FROM quiz_attempts WHERE user_id=? AND task_id=?',args:[user.id,task_id]});
-        await tursoBatch(env,stmts);
-        return json({success:true,earned:task.points_reward});
+        await dbRun(env, "INSERT INTO user_tasks (id,user_id,task_id,completed_at) VALUES (?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, task_id]);
+        await dbRun(env, 'UPDATE users SET points = points + ?, total_tasks_completed = total_tasks_completed + 1 WHERE id = ?', [task.points_reward, user.id]);
+        await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, 'task_complete', task.points_reward, '✅ Quiz: ' + task.title]);
+        if (attempt) await dbRun(env, 'DELETE FROM quiz_attempts WHERE user_id = ? AND task_id = ?', [user.id, task_id]);
+        return json({ success: true, earned: task.points_reward });
+      } else {
+        const newAttempts = attempts + 1;
+        const isFailed = newAttempts >= maxAttempts;
+        if (attempt) {
+          await dbRun(env, 'UPDATE quiz_attempts SET attempts = ?, failed = ? WHERE user_id = ? AND task_id = ?', [newAttempts, isFailed ? 1 : 0, user.id, task_id]);
+        } else {
+          await dbRun(env, "INSERT INTO quiz_attempts (id,user_id,task_id,attempts,failed,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, task_id, newAttempts, isFailed ? 1 : 0]);
+        }
+        const remaining = maxAttempts - newAttempts;
+        if (isFailed) return json({ success: false, failed: true, message: 'Galat jawab! 3 baar fail ho gaye. Dobara task shuru karen.' });
+        return json({ success: false, failed: false, remaining, message: 'Galat jawab! ' + remaining + ' maukay baki hain.' });
       }
-      const newAttempts=attempts+1, isFailed=newAttempts>=maxAttempts;
-      if(attempt) await dbRun(env,'UPDATE quiz_attempts SET attempts=?,failed=? WHERE user_id=? AND task_id=?',[newAttempts,isFailed?1:0,user.id,task_id]);
-      else await dbRun(env,"INSERT INTO quiz_attempts (id,user_id,task_id,attempts,failed,created_at) VALUES (?,?,?,?,?,datetime('now'))",[crypto.randomUUID(),user.id,task_id,newAttempts,isFailed?1:0]);
-      if(isFailed) return json({success:false,failed:true,message:'Wrong answer! 3 attempts failed.'});
-      return json({success:false,failed:false,remaining:maxAttempts-newAttempts,message:'Wrong answer! '+(maxAttempts-newAttempts)+' attempts left.'});
     }
 
     if (path === '/api/tasks/quiz-reset' && request.method === 'POST') {
@@ -760,16 +553,11 @@ export async function onRequest({ request, env }) {
     }
 
     if (path === '/api/leaderboard' && request.method === 'GET') {
-      // Top 25 by total balance (points) — highest balance first
       const results = await dbAll(env,
-        `SELECT u.username, u.wallet_address, u.wallet_type,
-                u.points AS total_points, u.total_mined, u.mining_power,
+        `SELECT u.username, u.wallet_address, u.wallet_type, u.total_mined, u.mining_power,
                 (SELECT COUNT(*) FROM users r WHERE r.referred_by = u.referral_code) AS total_referrals,
                 (SELECT COUNT(*) FROM users r WHERE r.referred_by = u.referral_code AND r.total_mined > 0) AS active_referrals
-         FROM users u
-         WHERE u.points > 0
-         ORDER BY u.points DESC
-         LIMIT 25`
+         FROM users u ORDER BY u.total_mined DESC LIMIT 25`
       );
       return json(results);
     }
@@ -796,12 +584,9 @@ export async function onRequest({ request, env }) {
     }
 
     if (path === '/api/stats' && request.method === 'GET') {
-      // OPTIMIZATION: 2 aggregates in 1 batch call
-      const [ucRows, tmRows] = await tursoBatch(env, [
-        { sql: 'SELECT COUNT(*) as c FROM users' },
-        { sql: 'SELECT SUM(total_mined) as s FROM users' }
-      ]);
-      return json({ users: parseInt(ucRows?.[0]?.c || 0), total_mined: parseInt(tmRows?.[0]?.s || 0) });
+      const uc = await dbFirst(env, 'SELECT COUNT(*) as c FROM users');
+      const tm = await dbFirst(env, 'SELECT SUM(total_mined) as s FROM users');
+      return json({ users: parseInt(uc?.c || 0), total_mined: parseInt(tm?.s || 0) });
     }
 
     // ── ADS ── Ab ads.js mein manual hain, DB se nahi aate
@@ -846,12 +631,9 @@ export async function onRequest({ request, env }) {
         return json({ success: true });
       }
       if (path === '/api/admin/settings' && request.method === 'POST') {
-        // OPTIMIZATION: all setting updates in 1 batch call
-        const stmts = Object.entries(body).map(([key, value]) => ({
-          sql: 'UPDATE settings SET value=? WHERE key=?',
-          args: [String(value), key]
-        }));
-        if (stmts.length) await tursoBatch(env, stmts);
+        for (const [key, value] of Object.entries(body)) {
+          await dbRun(env, 'UPDATE settings SET value=? WHERE key=?', [String(value), key]);
+        }
         return json({ success: true });
       }
       if (path === '/api/admin/blog' && request.method === 'GET') {
@@ -872,15 +654,14 @@ export async function onRequest({ request, env }) {
         return json({ success: true });
       }
       if (path === '/api/admin/dashboard' && request.method === 'GET') {
-        // OPTIMIZATION: 4 aggregates in 1 batch call
-        const [ucRows, tmRows, tcRows, mcRows] = await tursoBatch(env, [
-          { sql: 'SELECT COUNT(*) as c FROM users' },
-          { sql: 'SELECT SUM(total_mined) as s FROM users' },
-          { sql: 'SELECT COUNT(*) as c FROM tasks WHERE is_active=1' },
-          { sql: 'SELECT COUNT(*) as c FROM mining_sessions' }
+        const [uc, tm, tc, mc] = await Promise.all([
+          dbFirst(env, 'SELECT COUNT(*) as c FROM users'),
+          dbFirst(env, 'SELECT SUM(total_mined) as s FROM users'),
+          dbFirst(env, 'SELECT COUNT(*) as c FROM tasks WHERE is_active=1'),
+          dbFirst(env, 'SELECT COUNT(*) as c FROM mining_sessions'),
         ]);
         const recent = await dbAll(env, 'SELECT id,username,email,wallet_address,points,total_mined,mining_power,created_at,login_method,is_banned,(SELECT COUNT(*) FROM users r WHERE r.referred_by = u.referral_code AND r.total_mined > 0) AS active_referral_count FROM users u ORDER BY created_at DESC LIMIT 10');
-        return json({ users: parseInt(ucRows?.[0]?.c||0), total_mined: parseInt(tmRows?.[0]?.s||0), tasks: parseInt(tcRows?.[0]?.c||0), sessions: parseInt(mcRows?.[0]?.c||0), recent });
+        return json({ users: parseInt(uc?.c||0), total_mined: parseInt(tm?.s||0), tasks: parseInt(tc?.c||0), sessions: parseInt(mc?.c||0), recent });
       }
 
       if (path === '/api/admin/ads' && request.method === 'GET') {
