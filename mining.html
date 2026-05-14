@@ -10,13 +10,6 @@
 <meta property="og:description" content="Mine TOKEN rewards on Ai2E platform. Refer & earn more mining power."/>
 <meta property="og:url" content="https://ai2e.space/mining.html"/>
 <link rel="canonical" href="https://ai2e.space/mining.html"/>
-<!-- Favicons -->
-<link rel="icon" type="image/x-icon" href="/favicon.ico"/>
-<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png"/>
-<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png"/>
-<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"/>
-<link rel="manifest" href="/site.webmanifest"/>
-<meta name="theme-color" content="#030712"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 
@@ -781,211 +774,954 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 <div id="toast"></div>
 
 <script>
-// ============================================
-// CONFIG
-// ============================================
-const API = '';
+// ─────────────────────────────────────────────────────────
+// Ai2E Mining — Frontend JS  (ULTRA-OPTIMIZED)
+//
+// HOW IT WORKS:
+//  Login  → /api/auth/login-full → user+settings+tasks+done
+//           in ONE call, cached in localStorage
+//  Mining → Visual counter runs 100% on frontend (JS timer)
+//           DB write ONLY on claim button click
+//  Tasks  → verify_codes + quiz_answers cached in allTasks
+//           No DB read to check — verified frontend-only
+//           Points added to pendingTaskMap (localStorage)
+//  Claim  → ONE batch call: mine_earned + all pending task pts
+//           flushed together, mining auto-restarts after claim
+//  DB reads after login: ZERO within 3-min window
+//           After 3 min: only 1 read (/api/me) on re-open
+// ─────────────────────────────────────────────────────────
+
+const API     = '';
 const APP_URL = 'https://ai2e.space';
 
-// ============================================
-// STATE
-// ============================================
-let me = null;
-let cfg = {};
+// ── Global State ─────────────────────────────────────────
+let me        = null;
+let cfg       = {};
+let allTasks  = [];
 let doneTasks = new Set();
-let token = null;
-let mInt = null;
-let adTmr = null;
-let padAd = null;
+let token     = null;
+let mInt      = null;
+let adTmr     = null;
+let padAd     = null;
 const ANIMALS = ['🐹','🦫','🦦','🦝','🐿️','🦙','🐰','🦔'];
-let aidx = 0;
+let aidx      = 0;
 
-// ============================================
-// API HELPER + LOCAL CACHE (minimize Turso reads)
-// ============================================
+// Pending task pts — earned locally, saved to DB only on mine claim
+// { taskId: { pts, type } }
+let pendingTaskMap = {};
 
-// Cache TTLs (milliseconds)
-const CACHE_TTL = {
-  '/api/stats':        60 * 60 * 1000,  // 1 hour
-  '/api/settings':    120 * 60 * 1000,  // 2 hours
-  '/api/tasks':        30 * 60 * 1000,  // 30 min
-  '/api/leaderboard':  15 * 60 * 1000,  // 15 min
-  '/api/referrals':    20 * 60 * 1000,  // 20 min
-  '/api/transactions': 10 * 60 * 1000,  // 10 min
-  '/api/me':            3 * 60 * 1000,  // 3 min
+// ── LocalStorage Keys ─────────────────────────────────────
+const LS = {
+  TOKEN:   'app_token',
+  USER:    'app_user',
+  SYNC:    'app_last_sync',
+  CFG:     'app_cfg',
+  TASKS:   'app_tasks',
+  DONE:    'app_done',
+  PENDING: 'app_pending_tasks',
+  LB:      'app_lb',        // leaderboard — 24h cache
+  LB_TS:   'app_lb_ts',    // leaderboard timestamp
+  VER:     'ai2e_dv',
+  VER_VAL: 'v4',
 };
+const LB_TTL = 24 * 60 * 60 * 1000; // 24 hours
+const SYNC_TTL = 3 * 60 * 1000; // 3 min
 
-function cacheKey(path) { return 'c_' + path.replace(/\//g, '_'); }
-
-function cacheGet(path) {
+// ── Cache (leaderboard/refs/tx only) ─────────────────────
+const CACHE_TTL = {
+  '/api/referrals':    20 * 60 * 1000,
+  '/api/transactions': 10 * 60 * 1000,
+};
+function cacheKey(p) { return 'c_' + p.replace(/\//g,'_'); }
+function cacheGet(p) {
   try {
-    const raw = localStorage.getItem(cacheKey(path));
+    const raw = localStorage.getItem(cacheKey(p));
     if (!raw) return null;
-    const { ts, data } = JSON.parse(raw);
-    const ttl = CACHE_TTL[path];
-    if (!ttl || Date.now() - ts > ttl) { localStorage.removeItem(cacheKey(path)); return null; }
+    const {ts,data} = JSON.parse(raw);
+    if (!CACHE_TTL[p] || Date.now()-ts > CACHE_TTL[p]) { localStorage.removeItem(cacheKey(p)); return null; }
     return data;
   } catch { return null; }
 }
-
-function cacheSet(path, data) {
-  try {
-    const ttl = CACHE_TTL[path];
-    if (!ttl) return;
-    localStorage.setItem(cacheKey(path), JSON.stringify({ ts: Date.now(), data }));
-  } catch {}
+function cacheSet(p,d) {
+  try { if (CACHE_TTL[p]) localStorage.setItem(cacheKey(p),JSON.stringify({ts:Date.now(),data:d})); } catch {}
 }
 
-function cacheClear(path) {
-  try { localStorage.removeItem(cacheKey(path)); } catch {}
-}
-
-async function api(path, method = 'GET', body = null) {
-  // GET requests: check cache first
-  if (method === 'GET' && !body) {
-    const cached = cacheGet(path);
-    if (cached !== null) return cached;
-  }
-  const opts = {
-    method,
-    headers: { 'Content-Type': 'application/json' }
-  };
+// ── API helper ────────────────────────────────────────────
+async function api(path, method='GET', body=null) {
+  if (method==='GET' && !body) { const c=cacheGet(path); if(c!==null) return c; }
+  const opts = { method, headers: {'Content-Type':'application/json'} };
   if (token) opts.headers['Authorization'] = 'Bearer ' + token;
-  if (body) opts.body = JSON.stringify(body);
-  const res = await fetch(API + path, opts);
+  if (body)  opts.body = JSON.stringify(body);
+  const res  = await fetch(API + path, opts);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Request failed');
-  // Save GET results to cache
-  if (method === 'GET' && !body) cacheSet(path, data);
+  if (method==='GET' && !body) cacheSet(path, data);
   return data;
 }
 
-// ============================================
-// INIT
-// ============================================
-window.addEventListener('DOMContentLoaded', async () => {
-  // Clear old pages.dev token
-  if (localStorage.getItem('ai2e_dv') !== 'v2') {
-    ['app_token','app_user','app_last_sync'].forEach(k => localStorage.removeItem(k));
-    localStorage.setItem('ai2e_dv', 'v2');
+// ── Session persistence ───────────────────────────────────
+function saveUser()    { try { localStorage.setItem(LS.USER,    JSON.stringify(me)); }    catch {} }
+function saveSync()    { try { localStorage.setItem(LS.SYNC,    String(Date.now())); }    catch {} }
+function saveCfg()     { try { localStorage.setItem(LS.CFG,     JSON.stringify(cfg)); }   catch {} }
+function saveTasks()   { try { localStorage.setItem(LS.TASKS,   JSON.stringify(allTasks)); } catch {} }
+function saveDone()    { try { localStorage.setItem(LS.DONE,    JSON.stringify([...doneTasks])); } catch {} }
+function savePending() { try { localStorage.setItem(LS.PENDING, JSON.stringify(pendingTaskMap)); } catch {} }
+
+function loadPending() {
+  try { pendingTaskMap = JSON.parse(localStorage.getItem(LS.PENDING) || '{}'); }
+  catch { pendingTaskMap = {}; }
+}
+function pendingTotal()   { return Object.values(pendingTaskMap).reduce((s,v)=>s+(v.pts||0),0); }
+function pendingTaskIds() { return Object.keys(pendingTaskMap); }
+
+function clearAllSession() {
+  Object.values(LS).forEach(k => { try { localStorage.removeItem(k); } catch {} });
+  Object.keys(CACHE_TTL).forEach(p => { try { localStorage.removeItem(cacheKey(p)); } catch {} });
+  // LB keys cleared via LS.LB and LS.LB_TS above (already in LS object)
+}
+
+function applyFullSession(data) {
+  if (data.token)    token     = data.token;
+  if (data.user)     me        = data.user;
+  if (data.settings) cfg       = data.settings;
+  if (data.tasks)    allTasks  = data.tasks;
+  doneTasks = new Set(data.done || []);
+  localStorage.setItem(LS.TOKEN, token);
+  saveUser(); saveCfg(); saveTasks(); saveDone(); saveSync();
+  // Save leaderboard with 24h timestamp
+  if (data.leaderboard) {
+    try {
+      localStorage.setItem(LS.LB,    JSON.stringify(data.leaderboard));
+      localStorage.setItem(LS.LB_TS, String(Date.now()));
+    } catch {}
   }
-  // Safety — if loader still showing after 7s, show login
-  window._st = setTimeout(() => { showLogin(); }, 7000);
+  loadPending();
+}
+
+// ── Mining math (100% frontend) ───────────────────────────
+function getDur()  { return parseInt(cfg.mining_duration_hours  || '24') * 3600000; }
+function getCPMS() {
+  // mining_coins_per_hour × mining_power (1x/2x/5x) ÷ ms-per-hour
+  // mining_power comes from DB via me object, set by admin dashboard
+  return (parseFloat(cfg.mining_coins_per_hour || '10') * parseFloat(me?.mining_power || 1)) / 3600000;
+}
+function mineElapsed() {
+  if (!me?.last_mining_start) return 0;
+  return Math.min(Date.now() - new Date(me.last_mining_start).getTime(), getDur());
+}
+function mineEarned()   { return Math.floor(getCPMS() * mineElapsed()); }
+function mineIsRunning() {
+  const claimed    = (me?.mining_claimed==1 || me?.mining_claimed===true);
+  const hasSession = !!(me?.last_mining_start && me.last_mining_start!=='null' && me.last_mining_start!=='');
+  return hasSession && !claimed;
+}
+function mineCanClaim() { return mineIsRunning() && mineElapsed() >= getDur(); }
+
+// ─────────────────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', async () => {
+  // Version gate — clear stale keys on update
+  if (localStorage.getItem(LS.VER) !== LS.VER_VAL) {
+    clearAllSession();
+    localStorage.setItem(LS.VER, LS.VER_VAL);
+  }
+  window._st = setTimeout(() => showLogin(), 7000);
+
   const ref = new URLSearchParams(window.location.search).get('ref');
   if (ref) {
+    try { localStorage.setItem('app_ref', ref.toUpperCase()); } catch {}
     const el = document.getElementById('su-r');
     if (el) { el.value = ref.toUpperCase(); switchTab('up'); }
   }
 
   loadStats();
 
-  const savedToken = localStorage.getItem('app_token');
-  const savedUser = localStorage.getItem('app_user');
-  const lastSync = parseInt(localStorage.getItem('app_last_sync') || '0');
-  const SYNC_TTL = 3 * 60 * 1000; // sync from DB once every 3 min
+  const savedToken = localStorage.getItem(LS.TOKEN);
+  const savedUser  = localStorage.getItem(LS.USER);
+  if (!savedToken || !savedUser) { showLogin(); return; }
 
-  if (savedToken && savedUser) {
-    token = savedToken;
-    me = JSON.parse(savedUser);
-    setL('LOADING MINER...');
-    try {
-      // Less than 3 min since last sync — use local cached data, skip DB read
-      if (Date.now() - lastSync < SYNC_TTL) {
-        await finishLogin();
-        return;
-      }
-      // 3 min elapsed — fetch fresh data from DB
+  token = savedToken;
+  try { me = JSON.parse(savedUser); } catch { showLogin(); return; }
+  loadPending();
+  setL('LOADING...');
+
+  try {
+    const lastSync = parseInt(localStorage.getItem(LS.SYNC) || '0');
+    if (Date.now() - lastSync < SYNC_TTL) {
+      // ── Within 3 min: restore everything from localStorage, 0 DB reads ──
+      try { cfg      = JSON.parse(localStorage.getItem(LS.CFG)   || '{}'); } catch { cfg={}; }
+      try { allTasks = JSON.parse(localStorage.getItem(LS.TASKS) || '[]'); } catch { allTasks=[]; }
+      try { doneTasks= new Set(JSON.parse(localStorage.getItem(LS.DONE)||'[]')); } catch { doneTasks=new Set(); }
+      bootApp();
+    } else {
+      // ── After 3 min: 1 DB read for fresh user data ──
       me = await api('/api/me');
-      localStorage.setItem('app_user', JSON.stringify(me));
-      localStorage.setItem('app_last_sync', String(Date.now()));
-      await finishLogin();
-      return;
-    } catch(e) {
-      localStorage.removeItem('app_token');
-      localStorage.removeItem('app_user');
-      localStorage.removeItem('app_last_sync');
-      token = null; me = null;
+      saveUser(); saveSync();
+      try { cfg      = JSON.parse(localStorage.getItem(LS.CFG)   || '{}'); } catch { cfg={}; }
+      try { allTasks = JSON.parse(localStorage.getItem(LS.TASKS) || '[]'); } catch { allTasks=[]; }
+      try { doneTasks= new Set(JSON.parse(localStorage.getItem(LS.DONE)||'[]')); } catch { doneTasks=new Set(); }
+      bootApp();
     }
+  } catch(e) {
+    clearAllSession(); token=null; me=null;
+    showLogin();
   }
-
-  showLogin();
 });
 
 async function loadStats() {
   try {
     const data = await api('/api/stats');
-    setText('su-ct', fNum(data.users || 0));
-    setText('su-mn', fNum(data.total_mined || 0));
+    setText('su-ct', fNum(data.users||0));
+    setText('su-mn', fNum(data.total_mined||0));
   } catch(e) {}
 }
 
-// ============================================
-// LOGIN / AUTH
-// ============================================
+// ─────────────────────────────────────────────────────────
+// AUTH
+// ─────────────────────────────────────────────────────────
 function switchTab(t) {
-  document.getElementById('fin').style.display = t === 'in' ? 'block' : 'none';
-  document.getElementById('fup').style.display = t === 'up' ? 'block' : 'none';
-  document.querySelectorAll('.tab').forEach((el, i) => el.classList.toggle('active', (i===0&&t==='in')||(i===1&&t==='up')));
+  document.getElementById('fin').style.display  = t==='in'?'block':'none';
+  document.getElementById('fup').style.display  = t==='up'?'block':'none';
+  document.querySelectorAll('.tab').forEach((el,i) =>
+    el.classList.toggle('active',(i===0&&t==='in')||(i===1&&t==='up')));
   clrMsg();
 }
 
 async function doSignIn() {
   clrMsg();
-  const email = document.getElementById('si-e').value.trim();
+  const email    = document.getElementById('si-e').value.trim();
   const password = document.getElementById('si-p').value;
-  if (!email || !password) return showE('Please fill all fields.');
+  if (!email||!password) return showE('Please fill all fields.');
   const btn = document.getElementById('bsi');
-  btn.disabled = true; btn.textContent = 'Signing in...';
+  btn.disabled=true; btn.textContent='Signing in...';
   try {
-    const data = await api('/api/auth/login', 'POST', { email, password });
-    token = data.token; me = data.user;
-    saveSession();
-    localStorage.setItem('app_last_sync', String(Date.now()));
-    await finishLogin(true);
+    // ONE call → user + settings + tasks + done list
+    const data = await api('/api/auth/login-full','POST',{email,password});
+    applyFullSession(data);
+    bootApp();
   } catch(e) {
-    showE(e.message || 'Sign in failed');
-    btn.disabled = false; btn.textContent = 'Sign In →';
+    showE(e.message||'Sign in failed');
+    btn.disabled=false; btn.textContent='Sign In →';
   }
 }
 
 async function doSignUp() {
   clrMsg();
   const username = document.getElementById('su-n').value.trim();
-  const email = document.getElementById('su-e').value.trim();
+  const email    = document.getElementById('su-e').value.trim();
   const password = document.getElementById('su-p').value;
   const ref_code = document.getElementById('su-r').value.trim().toUpperCase();
-  if (!username || !email || !password) return showE('Please fill all fields.');
-  if (password.length < 6) return showE('Password min 6 characters.');
+  const secQ     = document.getElementById('su-q').value.trim();
+  const secA     = document.getElementById('su-qa').value.trim();
+  if (!username||!email||!password) return showE('Please fill all fields.');
+  if (password.length<6) return showE('Password min 6 characters.');
+  if (!secQ) return showE('Please select a security question.');
+  if (!secA) return showE('Please enter your security answer.');
   const btn = document.getElementById('bsu');
-  btn.disabled = true; btn.textContent = 'Creating...';
+  btn.disabled=true; btn.textContent='Creating...';
   try {
-    const secQ = document.getElementById('su-q').value.trim();
-    const secA = document.getElementById('su-qa').value.trim();
-    if (!secQ) { showErr('Please select a security question'); return; }
-    if (!secA) { showErr('Please enter your security answer'); return; }
-    const data = await api('/api/auth/register', 'POST', { username, email, password, ref_code: ref_code || null, security_question: secQ, security_answer: secA });
-    token = data.token; me = data.user;
-    saveSession();
-    localStorage.setItem('app_last_sync', String(Date.now()));
-    await finishLogin(true);
+    // Register returns user+settings+tasks in 1 response (no second call needed)
+    const data = await api('/api/auth/register','POST',{
+      username, email, password,
+      ref_code: ref_code||null,
+      security_question: secQ,
+      security_answer:   secA
+    });
+    applyFullSession(data);
+    bootApp();
   } catch(e) {
-    showE(e.message || 'Registration failed');
-    btn.disabled = false; btn.textContent = 'Create Account →';
+    showE(e.message||'Registration failed');
+    btn.disabled=false; btn.textContent='Create Account →';
   }
 }
 
-// ============================================
-// FORGOT PASSWORD
-// ============================================
-const _FRG_Q = [
-  'What city were you born in?',
-  "What was your first pet's name?",
-  "What is your mother's first name?",
-  'What primary school did you attend?',
-  'What was your favorite childhood movie?'
-];
-let _frgQ = '';
+// WALLET LOGIN
+function openWalletSheet()  { document.getElementById('wallet-modal').classList.add('show'); }
+function closeWalletSheet() { document.getElementById('wallet-modal').classList.remove('show'); }
 
+async function connectWallet(type) {
+  closeWalletSheet();
+  document.getElementById('loader').style.display='flex';
+  setL('CONNECTING WALLET...');
+  try {
+    let addr=null, wtype=type;
+    if (type==='metamask'||type==='ethereum') {
+      if (!window.ethereum) { toast('❌ MetaMask not found'); document.getElementById('loader').style.display='none'; return; }
+      const accs = await window.ethereum.request({method:'eth_requestAccounts'});
+      addr=accs[0]; wtype='metamask';
+    } else if (type==='phantom'||type==='solana') {
+      if (!window.solana?.isPhantom) { toast('❌ Phantom not found'); document.getElementById('loader').style.display='none'; return; }
+      const resp = await window.solana.connect();
+      addr=resp.publicKey.toString(); wtype='phantom';
+    } else if (type==='trustwallet') {
+      const provider = window.trustwallet?.ethereum||window.ethereum;
+      if (!provider) { toast('❌ Trust Wallet not found'); document.getElementById('loader').style.display='none'; return; }
+      const accs = await provider.request({method:'eth_requestAccounts'});
+      addr=accs[0]; wtype='trustwallet';
+    } else if (type==='walletconnect') {
+      toast('ℹ️ WalletConnect coming soon'); document.getElementById('loader').style.display='none'; return;
+    }
+    if (!addr) { document.getElementById('loader').style.display='none'; return; }
+    const ref  = localStorage.getItem('app_ref')||new URLSearchParams(window.location.search).get('ref')||null;
+    const data = await api('/api/auth/wallet','POST',{wallet_address:addr,wallet_type:wtype,ref_code:ref});
+    token=data.token; me=data.user;
+    localStorage.setItem(LS.TOKEN, token);
+    // Fetch settings+tasks for wallet users
+    try {
+      const rows = await api('/api/tasks');
+      allTasks  = rows.tasks || [];
+      doneTasks = new Set(rows.done || []);
+    } catch {}
+    try { const s=await api('/api/settings'); cfg=s||{}; } catch {}
+    saveUser(); saveCfg(); saveTasks(); saveDone(); saveSync(); loadPending();
+    bootApp();
+  } catch(e) {
+    document.getElementById('loader').style.display='none';
+    toast('❌ '+(e.message||'Wallet connection failed'));
+  }
+}
+
+// FORGOT PASSWORD
+let _frgQ='';
+async function forgotInit() {
+  const email=document.getElementById('frg-email').value.trim();
+  if (!email) return showFrgErr('Enter your email.');
+  try {
+    const data=await api('/api/auth/forgot-check','POST',{email});
+    _frgQ=data.security_question||'';
+    document.getElementById('frg-step1').style.display='none';
+    document.getElementById('frg-step2').style.display='block';
+    document.getElementById('frg-q-show').textContent=_frgQ||'(No security question set)';
+    document.getElementById('frg-reset-email').value=email;
+  } catch(e){ showFrgErr(e.message||'Account not found.'); }
+}
+async function forgotSubmit() {
+  const email=document.getElementById('frg-reset-email').value.trim();
+  const answer=document.getElementById('frg-answer').value.trim();
+  const newPw=document.getElementById('frg-newpw').value;
+  if (!answer||!newPw) return showFrgErr('All fields required.');
+  if (newPw.length<6) return showFrgErr('Password min 6 chars.');
+  try {
+    await api('/api/auth/forgot-password','POST',{email,answer,question:_frgQ,new_password:newPw});
+    document.getElementById('frg-step2').style.display='none';
+    document.getElementById('frg-step3').style.display='block';
+  } catch(e){ showFrgErr(e.message||'Failed. Check your answer.'); }
+}
+function showFrgErr(m){ const el=document.getElementById('frg-err'); if(el){el.textContent=m;el.classList.add('show');} }
+function openForgot()  { document.getElementById('forgotModal').classList.add('show'); }
+function closeForgot() { document.getElementById('forgotModal').classList.remove('show'); }
+
+// ─────────────────────────────────────────────────────────
+// BOOT APP
+// ─────────────────────────────────────────────────────────
+function bootApp() {
+  clearTimeout(window._st);
+  document.getElementById('loader').style.display='flex';
+  document.getElementById('login-screen').classList.remove('show');
+
+  if (cfg.maintenance_mode==='true') {
+    document.body.innerHTML='<div style="height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;background:#030712;color:#e6edf3;font-family:Outfit,sans-serif"><div style="font-size:64px">🔧</div><div style="font-size:24px;font-weight:800">Under Maintenance</div><div style="color:#7d8590">Back soon!</div></div>';
+    return;
+  }
+  if (cfg.announcement) {
+    const b=document.getElementById('ann-bar');
+    if(b){ b.textContent='📡 '+cfg.announcement; b.style.display='block'; }
+  }
+
+  renderTasks(allTasks);
+  renderUser();
+  updateMineUI();
+  renderRoadmap();
+  startTicker();
+  startAnimalLoop();
+  showApp();
+}
+
+function showApp() {
+  clearTimeout(window._st);
+  document.getElementById('loader').style.display='none';
+  document.getElementById('app-screen').classList.add('show');
+}
+function showLogin() {
+  clearTimeout(window._st);
+  document.getElementById('loader').style.display='none';
+  document.getElementById('login-screen').classList.add('show');
+  document.getElementById('app-screen').classList.remove('show');
+}
+function doLogout() {
+  clearAllSession();
+  me=null; token=null; cfg={}; allTasks=[]; doneTasks=new Set(); pendingTaskMap={};
+  document.getElementById('app-screen').classList.remove('show');
+  showLogin(); closeMenu();
+}
+function saveSession() { localStorage.setItem(LS.TOKEN,token); saveUser(); }
+
+// ─────────────────────────────────────────────────────────
+// MINING — pure frontend counter, DB write only on claim
+// ─────────────────────────────────────────────────────────
+function updateMineUI() {
+  const btn=document.getElementById('mine-btn');
+  const pw=document.getElementById('mpwrap');
+  const pe=document.getElementById('pendwrap');
+  const an=document.getElementById('manim');
+  const msb=document.getElementById('mining-status-box');
+  if (!me||!btn) return;
+
+  const running  = mineIsRunning();
+  const canClaim = mineCanClaim();
+
+  if (!running && !canClaim) {
+    btn.className='start'; btn.textContent='⛏️ Start Mining'; btn.disabled=false;
+    if(pw) pw.style.display='none';
+    if(pe) pe.style.display='none';
+    if(an) an.classList.remove('mactive');
+    setText('mrated','IDLE');
+    if(msb) msb.classList.remove('show','claim-ready');
+    return;
+  }
+
+  const earn      = mineEarned();
+  const pend      = pendingTotal();
+  const el        = mineElapsed();
+  const dur       = getDur();
+  const pct       = Math.min(el/dur*100,100).toFixed(1);
+  const rem       = Math.max(dur-el,0);
+  const h         = Math.floor(rem/3600000);
+  const m         = Math.floor((rem%3600000)/60000);
+  const ratePerHr = (getCPMS()*3600000).toFixed(1);
+
+  if (msb) {
+    msb.classList.add('show');
+    const startDate=new Date(me.last_mining_start);
+    setText('msb-start', startDate.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'}));
+    setText('msb-rate',  '+'+ratePerHr+'/hr');
+    setText('msb-power-lbl',(parseFloat(me.mining_power||1).toFixed(1))+'x');
+    setText('msb-earned',earn.toLocaleString()+' pts');
+    const fill=document.getElementById('msb-fill');
+    if(fill) fill.style.width=pct+'%';
+    setText('msb-pct',pct+'%');
+    if (canClaim) {
+      msb.classList.add('claim-ready');
+      setText('msb-title-txt','🏆 Ready to Claim!');
+      setText('msb-live-txt','DONE');
+      setText('msb-time','Complete!');
+      setText('msb-prog-lbl','Mining Complete');
+      const claimTot=earn+pend;
+      setText('msb-hint','✅ Tap claim to collect '+claimTot.toLocaleString()+' pts'+(pend>0?' (incl. '+pend.toLocaleString()+' task bonus)':''));
+    } else {
+      msb.classList.remove('claim-ready');
+      setText('msb-title-txt','Mining Active');
+      setText('msb-live-txt','LIVE');
+      setText('msb-time',h+'h '+m+'m left');
+      setText('msb-prog-lbl','Progress');
+      setText('msb-hint','⛏️ Earning '+ratePerHr+'/hr ... come back in '+h+'h '+m+'m to claim');
+    }
+  }
+
+  const claimTotal=earn+pend;
+  if (canClaim) {
+    btn.className='claim';
+    btn.textContent='🎁 Claim '+(claimTotal>0?claimTotal.toLocaleString():earn.toLocaleString())+' Points';
+    btn.disabled=false;
+  } else {
+    btn.className='mining';
+    btn.textContent='⏳ Mining... '+h+'h '+m+'m remaining';
+    btn.disabled=true;
+  }
+  if(pw){ pw.style.display='block'; const f=document.getElementById('mpfill'); if(f) f.style.width=(canClaim?'100':pct)+'%'; setText('mplbl',canClaim?'Mining complete!':'Mining in progress'); setText('mptime',canClaim?'Ready!':h+'h '+m+'m left'); }
+  if(pe){ setText('pendamt',earn.toLocaleString()); pe.style.display='block'; }
+  if(an) an.classList.add('mactive');
+  setText('mrated',canClaim?'DONE!':'+'+ratePerHr+'/hr');
+}
+
+function startTicker() {
+  clearInterval(mInt);
+  // Visual update every 5s — pure JS math, zero DB reads
+  mInt = setInterval(() => { if(me) updateMineUI(); }, 5000);
+  // Background DB sync every 5 min — only 1 read
+  setInterval(async () => {
+    if(!me||!token) return;
+    try { me=await api('/api/me'); saveUser(); saveSync(); renderUser(); updateMineUI(); } catch {}
+  }, 5*60*1000);
+}
+
+function startAnimalLoop() {
+  setInterval(() => {
+    aidx=(aidx+1)%ANIMALS.length;
+    const el=document.getElementById('memoji');
+    if(el){ el.style.transform='scale(1.3)'; el.textContent=ANIMALS[aidx]; setTimeout(()=>{ el.style.transform='scale(1)'; el.style.transition='transform .3s'; },300); }
+  },2000);
+}
+
+async function handleMineBtn() {
+  if (!me) return;
+  const isClaimed  = (me.mining_claimed==1||me.mining_claimed===true);
+  const hasSession = !!(me.last_mining_start&&me.last_mining_start!=='null'&&me.last_mining_start!=='');
+  if (!hasSession||isClaimed) { await startMining(); return; }
+  if (mineCanClaim()) { await claimMining(); return; }
+  const rem=getDur()-mineElapsed();
+  const h=Math.floor(rem/3600000), m2=Math.floor((rem%3600000)/60000);
+  toast('⏳ Mining in progress! Come back in '+h+'h '+m2+'m to claim.');
+}
+
+async function startMining() {
+  const btn=document.getElementById('mine-btn');
+  if(btn){ btn.disabled=true; btn.textContent='⏳ Starting...'; }
+  try {
+    const res=await api('/api/mine/start','POST');
+    // Optimistic update — no extra DB read
+    if (res.started_at) {
+      me.last_mining_start=res.started_at;
+      me.mining_claimed=0;
+    } else {
+      me=await api('/api/me');
+    }
+    saveUser(); saveSync();
+    renderUser(); updateMineUI();
+    toast('⛏️ Mining started! Come back in 24h.'); spawnCoin();
+  } catch(e) {
+    toast('❌ '+(e.message||'Failed to start'));
+    if(btn){ btn.disabled=false; btn.textContent='⛏️ Start Mining'; }
+  }
+}
+
+async function claimMining() {
+  // Guard: prevent double-claim
+  const btn=document.getElementById('mine-btn');
+  if(btn&&btn.disabled) return;
+  if(btn){ btn.disabled=true; btn.textContent='⌛ Claiming...'; }
+  try {
+    const pendIds = pendingTaskIds();
+    const pendPts = pendingTotal();
+
+    // ONE batch call: mine rewards + all pending task pts together
+    const res = await api('/api/mine/claim-all','POST',{
+      pending_task_ids: pendIds,
+      pending_task_pts: pendPts
+    });
+    const earned = res.earned  || 0;
+    const bonus  = res.task_bonus || 0;
+
+    // Optimistic local update — no extra DB read needed
+    me.points       = parseInt(me.points||0) + earned + bonus;
+    me.total_mined  = parseInt(me.total_mined||0) + earned;
+    me.mining_claimed = 0;             // auto-restart: server set new session
+    me.last_mining_start = res.started_at || new Date().toISOString();
+    saveUser(); saveSync();
+
+    // Flush pending tasks — now saved in DB
+    pendingTaskMap={};
+    savePending();
+    // Move pending to confirmed done
+    if(pendIds.length) { pendIds.forEach(id=>doneTasks.add(id)); saveDone(); }
+
+    const msb=document.getElementById('mining-status-box');
+    if(msb) msb.classList.remove('show','claim-ready');
+
+    const totalClaimed=earned+bonus;
+    toast('🎁 Claimed '+totalClaimed.toLocaleString()+' Points! Mining restarted ⛏️');
+    for(let i=0;i<6;i++) setTimeout(spawnCoin,i*150);
+    renderUser(); updateMineUI(); renderTasks(allTasks);
+  } catch(e) {
+    toast('❌ '+(e.message||'Claim failed'));
+    if(btn){ btn.disabled=false; updateMineUI(); }
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// TASKS — frontend-verified, pts pending until claim
+// ─────────────────────────────────────────────────────────
+function renderTasks(tasks) {
+  const c=document.getElementById('tasklist');
+  if(!c) return;
+  if(!tasks||!tasks.length){ c.innerHTML='<div style="color:var(--muted);font-size:13px;text-align:center;padding:16px">No tasks available.</div>'; return; }
+  c.innerHTML=tasks.map(t=>{
+    const confirmed = doneTasks.has(t.id);
+    const pending   = !!pendingTaskMap[t.id];
+    const done      = confirmed||pending;
+    let btn='';
+    if(done){
+      btn=`<button class="tbtn dbtn">${pending?'⏳ Pending':'✅ Done'}</button>`;
+    } else if(t.task_type==='ad'){
+      btn=`<button class="tbtn go" onclick="startAd('${t.id}','${esc(t.ad_url||t.url||'')}',${t.timer_seconds||15},${t.points_reward})">▶ Watch</button>`;
+    } else if(t.task_type==='quiz'){
+      // Pass quiz_answer from cached allTasks — no DB read for verification
+      btn=`<button class="tbtn go" style="background:var(--accent2);color:white" onclick="openQuizModal('${t.id}','${esc(t.title)}',${t.points_reward},'${esc(t.quiz_question||'')}','${esc(t.quiz_answer||'')}')">🧠 Quiz</button>`;
+    } else if(t.verify_code){
+      // Pass verify_code from cached allTasks — no DB read for verification
+      btn=`<button class="tbtn go" onclick="doTaskWithCode('${t.id}','${esc(t.url||'')}',${t.points_reward},'${esc(t.title)}','${esc(t.verify_code||'')}')">▶ Go & Verify</button>`;
+    } else {
+      btn=`<button class="tbtn go" onclick="doTask('${t.id}','${esc(t.url||'')}',${t.points_reward})">▶ Visit</button>`;
+    }
+    const badge=t.verify_code?' <span style="font-size:9px;background:rgba(124,58,237,.2);color:#c4b5fd;border-radius:4px;padding:1px 5px;margin-left:4px">🔐</span>':'';
+    return `<div class="tcard ${done?'done':''}" id="tc-${t.id}">
+      <div class="tico">${t.icon||'🎯'}</div>
+      <div class="tinfo"><div class="ttitle">${esc(t.title)}${badge}</div>
+      <div class="tsub">+${t.points_reward} pts${t.task_type==='quiz'?' • Quiz':t.verify_code?' • Code':t.timer_seconds?' • '+t.timer_seconds+'s':''}</div></div>
+      ${btn}
+    </div>`;
+  }).join('');
+}
+
+// Add task to pending — shown in balance immediately, flushed to DB on claim
+function markTaskDone(id, pts) {
+  if(doneTasks.has(id)||pendingTaskMap[id]) return; // double-claim guard
+  pendingTaskMap[id]={pts};
+  savePending();
+  // Show points optimistically in UI
+  if(me){ me.points=parseInt(me.points||0)+pts; saveUser(); renderUser(); }
+  // Update card UI
+  const card=document.getElementById('tc-'+id);
+  if(card){ card.classList.add('done'); const b=card.querySelector('.tbtn'); if(b){b.className='tbtn dbtn';b.textContent='⏳ Pending';} }
+  updateMineUI(); // show new total in claim button
+  toast('✅ +'+pts+' pts added! Saves to account on next claim 🎁');
+  spawnCoin();
+}
+
+async function doTask(id,url,pts) {
+  if(doneTasks.has(id)||pendingTaskMap[id]) return;
+  if(url) window.open(url,'_blank');
+  toast('⏳ Completing in 4s...');
+  setTimeout(()=>markTaskDone(id,pts),4000);
+}
+
+function startAd(id,url,sec,pts) {
+  if(doneTasks.has(id)||pendingTaskMap[id]) return;
+  padAd={id,url,sec,pts};
+  if(url) window.open(url,'_blank');
+  document.getElementById('adval').textContent=pts;
+  document.getElementById('aclbtn').classList.remove('show');
+  document.getElementById('admodal').classList.add('show');
+  let r=sec;
+  document.getElementById('tnum').textContent=r;
+  document.getElementById('tfill').style.strokeDashoffset='0';
+  clearInterval(adTmr);
+  adTmr=setInterval(()=>{
+    r--;
+    document.getElementById('tnum').textContent=r;
+    document.getElementById('tfill').style.strokeDashoffset=(213.6*(sec-r)/sec);
+    if(r<=0){ clearInterval(adTmr); document.getElementById('tnum').textContent='✓'; document.getElementById('aclbtn').classList.add('show'); }
+  },1000);
+}
+
+async function claimAd() {
+  if(!padAd) return;
+  const {id,pts}=padAd;
+  document.getElementById('admodal').classList.remove('show');
+  clearInterval(adTmr);
+  markTaskDone(id,pts);
+  padAd=null;
+}
+
+// ── Verify Code — frontend check, no DB read ──────────────
+let activeVcode=null;
+function doTaskWithCode(id,url,pts,title,correctCode) {
+  if(doneTasks.has(id)||pendingTaskMap[id]) return;
+  if(url) window.open(url,'_blank');
+  setTimeout(()=>openVcodeModal(id,title,pts,correctCode),1500);
+}
+function openVcodeModal(id,title,pts,correctCode) {
+  activeVcode={id,title,pts,correctCode,attempts:0};
+  setText('vcode-task-title',title);
+  document.getElementById('vcode-pts').textContent='+'+pts+' Points';
+  document.getElementById('vcode-inp').value='';
+  const btn=document.getElementById('vcode-submit-btn');
+  btn.disabled=false; btn.textContent='✅ Verify'; btn.onclick=submitVerifyCode;
+  const msg=document.getElementById('vcode-msg'); msg.className='vcode-msg'; msg.textContent='';
+  updateVcodeDots(0);
+  document.getElementById('vcode-modal').classList.add('show');
+  setTimeout(()=>document.getElementById('vcode-inp').focus(),300);
+}
+function closeVcodeModal(){ document.getElementById('vcode-modal').classList.remove('show'); activeVcode=null; }
+function updateVcodeDots(n){ for(let i=1;i<=3;i++){const d=document.getElementById('vcd'+i);if(d)d.className='quiz-dot '+(i<=n?'used':'active');} }
+function submitVerifyCode() {
+  if(!activeVcode) return;
+  const code=document.getElementById('vcode-inp').value.trim();
+  if(!code){ showVcodeMsg('err','Enter code first!'); return; }
+  const btn=document.getElementById('vcode-submit-btn');
+  btn.disabled=true; btn.textContent='⏳ Checking...';
+  // Frontend-only check — correctCode already in memory from allTasks cache
+  const isCorrect = activeVcode.correctCode &&
+    code.toLowerCase()===activeVcode.correctCode.toLowerCase();
+  if(isCorrect){
+    updateVcodeDots(0);
+    showVcodeMsg('suc','🎉 Correct! +'+activeVcode.pts+' Points!');
+    markTaskDone(activeVcode.id,activeVcode.pts);
+    spawnCoin(); spawnCoin();
+    setTimeout(()=>closeVcodeModal(),1800);
+  } else {
+    activeVcode.attempts=(activeVcode.attempts||0)+1;
+    updateVcodeDots(activeVcode.attempts);
+    if(activeVcode.attempts>=3){
+      showVcodeMsg('err','❌ 3 attempts failed. Try the task again.');
+      btn.textContent='🔄 Start Over'; btn.disabled=false;
+      btn.onclick=()=>{ closeVcodeModal(); toast('🔄 Go back and find the code!'); };
+    } else {
+      showVcodeMsg('err','❌ Wrong code! '+(3-activeVcode.attempts)+' attempts left.');
+      document.getElementById('vcode-inp').value='';
+      btn.disabled=false; btn.textContent='✅ Verify';
+      document.getElementById('vcode-inp').focus();
+    }
+  }
+}
+function showVcodeMsg(type,msg){ const el=document.getElementById('vcode-msg'); el.className='vcode-msg '+type+' show'; el.textContent=msg; }
+
+// ── Quiz — frontend check, no DB read ────────────────────
+let activeQuiz=null;
+function openQuizModal(id,title,pts,question,correctAnswer){
+  activeQuiz={id,title,pts,question,correctAnswer,attempts:0};
+  setText('quiz-task-title',title);
+  document.getElementById('quiz-pts').textContent='+'+pts+' Points';
+  document.getElementById('quiz-question').textContent=question||'Question not loaded...';
+  document.getElementById('quiz-answer-inp').value='';
+  document.getElementById('quiz-submit-btn').disabled=false;
+  const msg=document.getElementById('quiz-msg'); msg.className='quiz-msg'; msg.textContent='';
+  updateQuizDots(0);
+  document.getElementById('quiz-modal').classList.add('show');
+  setTimeout(()=>document.getElementById('quiz-answer-inp').focus(),300);
+}
+function closeQuizModal(){ document.getElementById('quiz-modal').classList.remove('show'); activeQuiz=null; }
+function updateQuizDots(n){ for(let i=1;i<=3;i++){const d=document.getElementById('qd'+i);if(d)d.className='quiz-dot '+(i<=n?'used':'active');} }
+function submitQuizAnswer(){
+  if(!activeQuiz) return;
+  const ans=document.getElementById('quiz-answer-inp').value.trim();
+  if(!ans){ showQuizMsg('err','Enter your answer first!'); return; }
+  const btn=document.getElementById('quiz-submit-btn');
+  btn.disabled=true; btn.textContent='⏳ Checking...';
+  // Frontend-only check — correctAnswer from allTasks cache
+  const isCorrect=activeQuiz.correctAnswer &&
+    ans.toLowerCase()===activeQuiz.correctAnswer.toLowerCase();
+  if(isCorrect){
+    updateQuizDots(0);
+    showQuizMsg('suc','🎉 Correct! +'+activeQuiz.pts+' Points!');
+    markTaskDone(activeQuiz.id,activeQuiz.pts);
+    spawnCoin(); spawnCoin();
+    setTimeout(()=>closeQuizModal(),1800);
+  } else {
+    activeQuiz.attempts=(activeQuiz.attempts||0)+1;
+    updateQuizDots(activeQuiz.attempts);
+    if(activeQuiz.attempts>=3){
+      showQuizMsg('err','❌ 3 attempts failed. Try again.');
+      btn.textContent='🔄 Reset'; btn.disabled=false;
+      btn.onclick=()=>{ closeQuizModal(); toast('🔄 Try the quiz again!'); };
+    } else {
+      showQuizMsg('err','❌ Wrong! '+(3-activeQuiz.attempts)+' attempts left.');
+      document.getElementById('quiz-answer-inp').value='';
+      btn.disabled=false; btn.textContent='✅ Submit';
+      document.getElementById('quiz-answer-inp').focus();
+    }
+  }
+}
+function showQuizMsg(type,msg){ const el=document.getElementById('quiz-msg'); el.className='quiz-msg '+type+' show'; el.textContent=msg; }
+
+// ─────────────────────────────────────────────────────────
+// LEADERBOARD / REFERRALS / TRANSACTIONS
+// ─────────────────────────────────────────────────────────
+async function loadLB() {
+  const c = document.getElementById('lblist'); if (!c) return;
+
+  const raw  = localStorage.getItem(LS.LB);
+  const ts   = parseInt(localStorage.getItem(LS.LB_TS) || '0');
+  const age  = Date.now() - ts;
+  const expired = age > LB_TTL; // 24 hours
+
+  // Fetch fresh data if cache expired or empty
+  if (!raw || expired) {
+    try {
+      c.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:16px;text-align:center">⏳ Updating leaderboard...</div>';
+      const fresh = await api('/api/leaderboard');
+      localStorage.setItem(LS.LB,    JSON.stringify(fresh));
+      localStorage.setItem(LS.LB_TS, String(Date.now()));
+      renderLB(fresh);
+    } catch(e) {
+      // If fetch fails and we have old data, show it
+      if (raw) { renderLB(JSON.parse(raw)); }
+      else c.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:16px;text-align:center">Could not load leaderboard.</div>';
+    }
+    return;
+  }
+
+  // Cache still valid — render from localStorage (no request)
+  try { renderLB(JSON.parse(raw)); } catch(e) {}
+}
+
+function renderLB(data) {
+  const c = document.getElementById('lblist'); if (!c) return;
+  if (!data || !data.length) {
+    c.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:16px;text-align:center">No miners yet. Be the first!</div>';
+    return;
+  }
+  const ts   = parseInt(localStorage.getItem(LS.LB_TS) || '0');
+  const age  = Date.now() - ts;
+  const ageH = Math.floor(age / 3600000);
+  const ageM = Math.floor((age % 3600000) / 60000);
+  const ageStr = ageH > 0 ? ageH+'h '+ageM+'m ago' : ageM > 0 ? ageM+'m ago' : 'just now';
+  const em = ['🥇','🥈','🥉'];
+  c.innerHTML =
+    `<div style="font-size:10px;color:var(--muted);text-align:right;margin-bottom:8px;font-family:'Space Mono',monospace">
+       🕐 Updated: ${ageStr} · auto-refreshes every 24h
+     </div>` +
+    data.map((u,i) => {
+      const name  = u.username ? '@'+u.username : (u.wallet_address ? u.wallet_address.slice(0,6)+'...'+u.wallet_address.slice(-4) : 'miner');
+      const isMe  = me?.username && u.username === me.username;
+      const pts   = parseInt(u.total_points || 0);
+      return `<div class="lbitem" style="${isMe?'border-color:rgba(0,255,136,.3);background:rgba(0,255,136,.04);':''}">
+        <div class="lbrank ${['gold','silver','bronze'][i]||''}">${i<3?em[i]:'#'+(i+1)}</div>
+        <div class="lbinfo">
+          <div class="lbname">${esc(name)}${isMe?' <span style="color:var(--accent);font-size:10px">(you)</span>':''}</div>
+          <div class="lbsub">⚡ ${(parseFloat(u.mining_power)||1).toFixed(1)}x · 👥 ${u.active_referrals||0} active refs</div>
+        </div>
+        <div class="lbpts">${pts.toLocaleString()}<div style="font-size:9px;color:var(--muted);text-align:right">pts</div></div>
+      </div>`;
+    }).join('');
+}
+
+async function loadRefs() {
+  try {
+    const data=await api('/api/referrals');
+    const c=document.getElementById('reflist'); if(!c) return;
+    if(!data||!data.length){ c.innerHTML='<div style="color:var(--muted);font-size:13px;padding:8px 0">No referrals yet. Share your link!</div>'; return; }
+    c.innerHTML=data.map(r=>{
+      const a=(r.total_mined||0)>0;
+      const name=r.username||(r.wallet_address?r.wallet_address.slice(0,6)+'...'+r.wallet_address.slice(-4):'miner');
+      const mined=parseInt(r.total_mined||0);
+      return `<div class="rli"><div class="rdot ${a?'on':'off'}"></div>
+        <div style="flex:1;font-size:13px">@${esc(name)}<br>
+        <span style="font-size:10px;color:var(--muted)">${a?'⚡ Active • '+mined.toLocaleString()+' pts mined':'💤 Inactive'}</span></div>
+        <div style="font-size:11px;color:var(--accent);text-align:right">+${Math.floor(mined*0.50).toLocaleString()}<br>
+        <span style="font-size:9px;color:var(--muted)">50% bonus</span></div></div>`;
+    }).join('');
+  } catch(e){}
+}
+
+function copyRef(){ if(!me?.referral_code)return; navigator.clipboard?.writeText(me.referral_code).catch(()=>{}); toast('📋 Code: '+me.referral_code); }
+function shareRef(){
+  if(!me?.referral_code) return;
+  const u=APP_URL+'?ref='+me.referral_code;
+  const t='Join Ai2E! Use my code: '+me.referral_code+'\n'+u;
+  if(navigator.share) navigator.share({title:'Ai2E — AI to Earn',text:t,url:u}).catch(()=>{});
+  else { navigator.clipboard?.writeText(t); toast('🔗 Link copied!'); }
+}
+
+async function loadTxH(){
+  try{
+    const data=await api('/api/transactions');
+    const c=document.getElementById('txlist'); if(!c) return;
+    if(!data||!data.length){ c.innerHTML='<div style="color:var(--muted);font-size:13px">No transactions yet.</div>'; return; }
+    const ic={mining_claim:'⛏️',task_complete:'✅',ad_watch:'📺',welcome_bonus:'🎉',referral_bonus:'👥',refer_mining_l1:'💰',refer_mining_l2:'🌿',refer_mining_l3:'🔥'};
+    c.innerHTML=data.map(t=>`<div class="txitem"><div class="txico">${ic[t.type]||'💰'}</div>
+      <div class="txinfo"><div class="txd">${esc(t.description||t.type)}</div>
+      <div class="txdt">${new Date(t.created_at).toLocaleDateString('en',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</div></div>
+      <div class="txamt">+${(t.amount||0).toLocaleString()}</div></div>`).join('');
+  }catch(e){}
+}
+
+// ─────────────────────────────────────────────────────────
+// ROADMAP — static HTML, zero DB reads
+// ─────────────────────────────────────────────────────────
+async function loadRoadmap(){ renderRoadmap(); }
+function renderRoadmap(){
+  const el=document.getElementById('roadlist'); if(!el) return;
+  el.innerHTML=`
+  <div style="background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="#00ff88" stroke-width="1.5"/><path d="M8 12h8M12 8v8" stroke="#00ff88" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <div><div style="font-size:15px;font-weight:800">Total Supply: 10,000,000,000 Ai2E</div><div style="font-size:11px;color:var(--muted)">Fixed supply — no inflation</div></div>
+    </div>
+    ${[{label:'Mining Rewards',pct:40,color:'#00ff88',note:'4,000,000,000'},{label:'Ecosystem Fund',pct:20,color:'#7c3aed',note:'2,000,000,000'},{label:'Team & Dev',pct:15,color:'#f59e0b',note:'1,500,000,000'},{label:'Marketing',pct:15,color:'#3b82f6',note:'1,500,000,000'},{label:'Reserve',pct:10,color:'#ef4444',note:'1,000,000,000'}].map(s=>`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span>${s.label}</span><span style="color:${s.color}">${s.pct}% · ${s.note}</span></div><div style="height:6px;background:var(--border);border-radius:3px"><div style="height:100%;width:${s.pct}%;background:${s.color};border-radius:3px"></div></div></div>`).join('')}
+  </div>
+  ${[{phase:'Phase 1',title:'Platform Launch',status:'current',items:['Free mining for all users','Referral program (3-level tree)','Daily task system','Leaderboard']},{phase:'Phase 2',title:'Token Launch',status:'upcoming',items:['Solana TOKEN deployment','Exchange listings','Mining power upgrades','Staking system']},{phase:'Phase 3',title:'Ecosystem',status:'future',items:['DeFi integration','NFT rewards','DAO governance','Cross-chain bridge']}].map(p=>`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:12px;${p.status==='current'?'border-color:rgba(0,255,136,.25)':''}"><div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><div style="background:${p.status==='current'?'var(--accent)':p.status==='upcoming'?'var(--accent2)':'var(--surface)'};color:${p.status==='current'?'#030712':'var(--text)'};border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700;font-family:'Space Mono',monospace">${p.phase}</div><div style="font-size:14px;font-weight:700">${p.title}</div><div style="margin-left:auto;font-size:10px;color:${p.status==='current'?'var(--accent)':p.status==='upcoming'?'#a78bfa':'var(--muted)'};font-family:'Space Mono',monospace">${p.status.toUpperCase()}</div></div>${p.items.map(i=>`<div style="font-size:12px;color:var(--muted);padding:4px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px"><span style="color:${p.status==='current'?'var(--accent)':'var(--muted)'}">•</span>${i}</div>`).join('')}</div>`).join('')}`;
+}
+
+// ─────────────────────────────────────────────────────────
+// RENDER USER
+// ─────────────────────────────────────────────────────────
+function renderUser(){
+  if(!me) return;
+  const pts=parseInt(me.points||0);
+  setText('u-pts',   fNum(pts));
+  setText('u-mined', fNum(parseInt(me.total_mined||0)));
+  setText('u-power', (parseFloat(me.mining_power||1).toFixed(1))+'x');
+  setText('u-refs',  me.referral_count||0);
+  setText('u-name',  '@'+(me.username||me.wallet_address?.slice(0,8)||'Miner'));
+  setText('u-ref-code', me.referral_code||'');
+  const mp=document.getElementById('u-mining-power');
+  if(mp) mp.textContent=(parseFloat(me.mining_power||1).toFixed(1))+'x';
+  // Show pending indicator
+  const pend=pendingTotal();
+  const pendEl=document.getElementById('pending-indicator');
+  if(pendEl){ pendEl.style.display=pend>0?'block':'none'; if(pend>0) pendEl.textContent='⏳ +'+pend.toLocaleString()+' pts pending (saves on claim)'; }
+}
+
+// ─────────────────────────────────────────────────────────
+// HAMBURGER MENU
+// ─────────────────────────────────────────────────────────
+function toggleMenu(){
+  const m=document.getElementById('mob-menu');
+  const b=document.querySelector('.hmbtn');
+  const open=m.classList.toggle('open');
+  if(b) b.classList.toggle('open',open);
+  document.body.style.overflow=open?'hidden':'';
+}
+function closeMenu(){
+  const m=document.getElementById('mob-menu');
+  const b=document.querySelector('.hmbtn');
+  if(m) m.classList.remove('open');
+  if(b) b.classList.remove('open');
+  document.body.style.overflow='';
+}
+
+// ─────────────────────────────────────────────────────────
+// SUPPORT
+// ─────────────────────────────────────────────────────────
+async function sendSupport(){
+  const msg=(document.getElementById('sup-msg')?.value||'').trim();
+  if(!msg||msg.length<5){ toast('❌ Message too short'); return; }
+  const btn=document.getElementById('sup-send-btn');
+  if(btn){ btn.disabled=true; btn.textContent='Sending...'; }
+  try{
+    await api('/api/support/send','POST',{message:msg});
+    toast('✅ Message sent!');
+    const el=document.getElementById('sup-msg'); if(el) el.value='';
+  }catch(e){ toast('❌ '+(e.message||'Failed')); }
+  finally{ if(btn){btn.disabled=false;btn.textContent='Send Message';} }
+}
+
+// ─────────────────────────────────────────────────────────
+// UTILITIES
+// ─────────────────────────────────────────────────────────
+function setText(id,v){ const el=document.getElementById(id); if(el) el.textContent=v; }
+function fNum(n){ if(n>=1e9)return(n/1e9).toFixed(2)+'B'; if(n>=1e6)return(n/1e6).toFixed(2)+'M'; if(n>=1e3)return(n/1e3).toFixed(1)+'K'; return String(Math.floor(n)); }
+function setL(t){ const el=document.getElementById('loader-txt'); if(el) el.textContent=t; }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#x27;'); }
+function toast(msg,dur=3000){
+  let el=document.getElementById('toast');
+  if(!el){el=document.createElement('div');el.id='toast';el.style.cssText='position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 18px;font-size:13px;z-index:9999;white-space:nowrap;max-width:90vw;text-align:center;pointer-events:none;opacity:0;transition:opacity .3s';document.body.appendChild(el);}
+  el.textContent=msg;el.style.opacity='1';
+  clearTimeout(el._t);el._t=setTimeout(()=>el.style.opacity='0',dur);
+}
+function spawnCoin(){
+  const c=document.createElement('div');
+  c.style.cssText='position:fixed;font-size:22px;pointer-events:none;z-index:9999;animation:coinFly .8s ease forwards;';
+  c.style.left=(20+Math.random()*60)+'%'; c.style.top='60%';
+  c.textContent=['⛏️','✨','💎','🪙'][Math.floor(Math.random()*4)];
+  document.body.appendChild(c); setTimeout(()=>c.remove(),900);
+}
+function clrMsg(){ const e=document.getElementById('errmsg'); if(e){e.textContent='';e.classList.remove('show');} }
+function showE(m){ const e=document.getElementById('errmsg'); if(e){e.textContent=m;e.classList.add('show');} }
+function copyAddr(){ if(!me?.wallet_address)return; navigator.clipboard?.writeText(me.wallet_address).catch(()=>{}); toast('📋 Address copied!'); }
+function switchSection(id){
+  ['home','tasks','referral','leaderboard','history','support'].forEach(s=>{
+    const el=document.getElementById('sec-'+s); if(el) el.style.display=(s===id?'block':'none');
+  });
+  if(id==='leaderboard') loadLB();
+  if(id==='referral')    loadRefs();
+  if(id==='history')     loadTxH();
+  closeMenu();
+}
+
+// ── Forgot modal (original names kept for HTML onclick compatibility) ──
 function showForgot() {
   document.getElementById('forgot-modal').style.display = 'flex';
   document.getElementById('frg-step1').style.display = 'block';
@@ -994,948 +1730,92 @@ function showForgot() {
   if (email) document.getElementById('frg-email').value = email.value || '';
 }
 function hideForgot() { document.getElementById('forgot-modal').style.display = 'none'; }
+// Aliases for updated function names
+function openForgotModal()  { openForgot();  }
+function closeForgotModal() { closeForgot(); }
 
-async function doForgotStep1() {
-  const email = document.getElementById('frg-email').value.trim();
-  if (!email) { toast('❌ Please enter your email'); return; }
-  const btn = document.getElementById('frg-next-btn');
-  btn.textContent = 'Checking...'; btn.disabled = true;
-  try {
-    const chk = await api('/api/auth/forgot-check', 'POST', { email });
-    _frgQ = (chk && chk.security_question) ? chk.security_question : _FRG_Q[Math.floor(Math.random() * _FRG_Q.length)];
-    document.getElementById('frg-question').textContent = _frgQ;
-    document.getElementById('frg-step1').style.display = 'none';
-    document.getElementById('frg-step2').style.display = 'block';
-    document.getElementById('frg-answer').value = '';
-    document.getElementById('frg-msg').style.display = 'none';
-  } catch(e) { toast('❌ ' + (e.message || 'No account found with this email')); }
-  btn.textContent = 'Next →'; btn.disabled = false;
-}
+// doForgotRequest → alias for forgotInit (HTML onclick compatibility)
+async function doForgotRequest() { await forgotInit(); }
 
-async function doForgotRequest() {
-  const email = document.getElementById('frg-email').value.trim();
-  const answer = document.getElementById('frg-answer').value.trim();
-  const newpw = document.getElementById('frg-newpw').value.trim();
-  if (!newpw || newpw.length < 6) {
-    msg.textContent = 'New password must be at least 6 characters.';
-    msg.style.cssText = 'display:block;background:rgba(248,81,73,.1);color:var(--danger);border:1px solid rgba(248,81,73,.3);padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px';
-    return;
-  }
-  const msg = document.getElementById('frg-msg');
-  const btn = document.getElementById('frg-btn');
-  if (!answer) {
-    msg.textContent = 'Please answer the verify question.';
-    msg.style.cssText = 'display:block;background:rgba(248,81,73,.1);color:var(--danger);border:1px solid rgba(248,81,73,.3);padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px';
-    return;
-  }
-  btn.textContent = 'Sending...'; btn.disabled = true;
-  try {
-    await api('/api/auth/forgot-password', 'POST', { email, answer, question: _frgQ, new_password: newpw });
-    msg.textContent = '✅ Request sent! Admin will verify and reset your password.';
-    msg.style.cssText = 'display:block;background:rgba(0,255,136,.08);color:var(--accent);border:1px solid rgba(0,255,136,.2);padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px';
-    btn.textContent = 'Sent ✓';
-  } catch(e) {
-    msg.textContent = e.message || 'Failed. Try again.';
-    msg.style.cssText = 'display:block;background:rgba(248,81,73,.1);color:var(--danger);border:1px solid rgba(248,81,73,.3);padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px';
-    btn.textContent = 'Send Reset Request →'; btn.disabled = false;
-  }
-}
-
-// SUPPORT
-// ============================================
+// ── Support modal ─────────────────────────────────────────────────────
 function showSupport() {
-  document.getElementById('support-modal').style.display = 'flex';
+  const m = document.getElementById('support-modal');
+  if (m) m.style.display = 'flex';
   loadSupportMsgs();
 }
-function hideSupport() { document.getElementById('support-modal').style.display = 'none'; }
-
+function hideSupport() {
+  const m = document.getElementById('support-modal');
+  if (m) m.style.display = 'none';
+}
 async function loadSupportMsgs() {
   const el = document.getElementById('sup-msgs');
+  if (!el) return;
   try {
     const data = await api('/api/support/my-messages');
     if (!data || !data.length) {
-      el.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">No messages yet. Send us a message!</div>';
+      el.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">No messages yet.</div>';
       return;
     }
     el.innerHTML = data.map(m => `
-      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px">
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px">
         <div style="font-size:13px;color:var(--text);margin-bottom:6px">${esc(m.message)}</div>
         <div style="display:flex;align-items:center;justify-content:space-between">
           <span style="font-size:10px;color:var(--muted)">${new Date(m.created_at).toLocaleString()}</span>
-          <span style="font-size:10px;padding:2px 8px;border-radius:99px;${m.status==='open'?'background:rgba(251,191,36,.1);color:#fbbf24;border:1px solid rgba(251,191,36,.3)':m.status==='replied'?'background:rgba(0,255,136,.1);color:#00ff88;border:1px solid rgba(0,255,136,.2)':'background:rgba(100,100,100,.1);color:#888;border:1px solid rgba(100,100,100,.2)'}">${(m.status||'open').toUpperCase()}</span>
+          <span style="font-size:10px;padding:2px 8px;border-radius:99px;${m.status==='open'?'background:rgba(251,191,36,.1);color:#fbbf24;border:1px solid rgba(251,191,36,.3)':m.status==='replied'?'background:rgba(0,255,136,.1);color:#00ff88;border:1px solid rgba(0,255,136,.2)':'background:rgba(100,100,100,.1);color:#888;border:1px solid rgba(100,100,100,.2)'}">
+            ${(m.status||'open').toUpperCase()}
+          </span>
         </div>
         ${m.admin_reply ? `<div style="margin-top:8px;padding:8px 10px;background:rgba(0,255,136,.05);border:1px solid rgba(0,255,136,.15);border-radius:7px;font-size:12px;color:var(--accent)">💬 Admin: ${esc(m.admin_reply)}</div>` : ''}
       </div>`).join('');
   } catch { el.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">Could not load messages.</div>'; }
 }
 
-async function sendSupport() {
-  const text = document.getElementById('sup-text').value.trim();
-  const status = document.getElementById('sup-status');
-  const btn = document.getElementById('sup-btn');
-  if (!text) { toast('❌ Please write a message'); return; }
-  btn.textContent = 'Sending...'; btn.disabled = true;
-  try {
-    await api('/api/support/send', 'POST', { message: text });
-    document.getElementById('sup-text').value = '';
-    status.textContent = '✅ Message sent successfully!';
-    status.style.cssText = 'display:block;background:rgba(0,255,136,.08);color:var(--accent);border:1px solid rgba(0,255,136,.2);padding:8px 12px;border-radius:8px;font-size:12px;margin-bottom:8px';
-    loadSupportMsgs();
-  } catch(e) {
-    status.textContent = e.message || 'Failed.';
-    status.style.cssText = 'display:block;background:rgba(248,81,73,.1);color:var(--danger);border:1px solid rgba(248,81,73,.3);padding:8px 12px;border-radius:8px;font-size:12px;margin-bottom:8px';
-  }
-  btn.textContent = 'Send Message →'; btn.disabled = false;
-}
+// ── Wallet modal aliases ──────────────────────────────────────────────
+function showWalletModal()  { openWalletSheet();  }
+function closeWalletModal() { closeWalletSheet(); }
 
-// WEB3 WALLET LOGIN
-// ============================================
-function showWalletModal() { document.getElementById('wallet-modal').classList.add('show'); }
-function closeWalletModal() { document.getElementById('wallet-modal').classList.remove('show'); }
-
-async function connectWallet(type) {
-  closeWalletModal();
-  const ref = document.getElementById('su-r')?.value?.trim()?.toUpperCase() || '';
-
-  try {
-    let address = null;
-    let walletType = type;
-
-    if (type === 'phantom') {
-      address = await connectPhantom();
-      walletType = 'phantom';
-    } else {
-      address = await connectEVM(type);
-      walletType = type;
-    }
-
-    if (!address) return;
-
-    setL('CONNECTING WALLET...');
-    document.getElementById('loader').style.display = 'flex';
-
-    const data = await api('/api/auth/wallet', 'POST', {
-      wallet_address: address,
-      wallet_type: walletType,
-      ref_code: ref || null
-    });
-
-    token = data.token; me = data.user;
-    saveSession();
-    localStorage.setItem('app_last_sync', String(Date.now()));
-    await finishLogin(true);
-
-  } catch(e) {
-    document.getElementById('loader').style.display = 'none';
-    toast('❌ ' + (e.message || 'Wallet connection failed'));
-  }
-}
-
+// connectByAddress — paste wallet address manually
 async function connectByAddress() {
-  const addr = document.getElementById('wallet-addr-input').value.trim();
+  const addr = document.getElementById('wallet-addr-input')?.value?.trim();
   if (!addr || addr.length < 20) { toast('❌ Please paste a valid wallet address'); return; }
-  const ref = document.getElementById('su-r')?.value?.trim()?.toUpperCase() || '';
-  closeWalletModal();
+  closeWalletSheet();
   setL('CONNECTING...');
   document.getElementById('loader').style.display = 'flex';
   try {
+    const ref  = localStorage.getItem('app_ref') || new URLSearchParams(window.location.search).get('ref') || null;
     const data = await api('/api/auth/wallet', 'POST', {
       wallet_address: addr,
       wallet_type: addr.startsWith('0x') ? 'evm' : 'solana',
       ref_code: ref || null
     });
     token = data.token; me = data.user;
-    saveSession();
-    localStorage.setItem('app_last_sync', String(Date.now()));
-    await finishLogin(true);
+    try { const s=await api('/api/settings'); cfg=s||{}; } catch {}
+    try { const t=await api('/api/tasks'); allTasks=t.tasks||[]; doneTasks=new Set(t.done||[]); } catch {}
+    saveUser(); saveCfg(); saveTasks(); saveDone(); saveSync(); loadPending();
+    bootApp();
   } catch(e) {
     document.getElementById('loader').style.display = 'none';
     toast('❌ ' + (e.message || 'Could not connect with this address'));
   }
 }
 
-async function connectEVM(type) {
-  let provider = null;
-
-  if (type === 'metamask' && window.ethereum?.isMetaMask) {
-    provider = window.ethereum;
-  } else if (type === 'trust' && window.ethereum?.isTrust) {
-    provider = window.ethereum;
-  } else if (type === 'coinbase' && window.ethereum?.isCoinbaseWallet) {
-    provider = window.ethereum;
-  } else if (type === 'okx' && window.okxwallet) {
-    provider = window.okxwallet;
-  } else if (window.ethereum) {
-    provider = window.ethereum;
-  }
-
-  if (!provider) {
-    const links = {
-      metamask: 'https://metamask.app.link/dapp/' + window.location.host,
-      trust: 'https://link.trustwallet.com/open_url?coin_id=60&url=' + encodeURIComponent(window.location.href),
-      coinbase: 'https://go.cb-w.com/dapp?cb_url=' + encodeURIComponent(window.location.href),
-      okx: 'okx://wallet/dapp/url?dappUrl=' + encodeURIComponent(window.location.href),
-      evm: 'https://metamask.app.link/dapp/' + window.location.host
-    };
-    const link = links[type] || links.evm;
-
-    if (/Android|iPhone|iPad/i.test(navigator.userAgent)) {
-      window.location.href = link;
-      return null;
-    } else {
-      toast('🦊 Install ' + type.charAt(0).toUpperCase() + type.slice(1) + ' wallet first!');
-      setTimeout(() => window.open('https://metamask.io', '_blank'), 500);
-      return null;
-    }
-  }
-
-  const accounts = await provider.request({ method: 'eth_requestAccounts' });
-  return accounts[0] || null;
+// ── Login nav menu (landing page hamburger) ───────────────────────────
+function toggleLoginMenu() {
+  const m = document.getElementById('ln-hmenu');
+  const o = document.getElementById('ln-overlay');
+  if (!m) return;
+  const isOpen = m.style.transform === 'translateX(0%)';
+  m.style.transform = isOpen ? 'translateX(110%)' : 'translateX(0%)';
+  if (o) o.style.display = isOpen ? 'none' : 'block';
+}
+function closeLoginMenu() {
+  const m = document.getElementById('ln-hmenu');
+  const o = document.getElementById('ln-overlay');
+  if (m) m.style.transform = 'translateX(110%)';
+  if (o) o.style.display = 'none';
 }
 
-async function connectPhantom() {
-  if (window.solana?.isPhantom) {
-    const resp = await window.solana.connect();
-    return resp.publicKey.toString();
-  }
-  if (/Android|iPhone|iPad/i.test(navigator.userAgent)) {
-    window.location.href = 'https://phantom.app/ul/browse/' + encodeURIComponent(window.location.href);
-    return null;
-  }
-  toast('👻 Install Phantom wallet!');
-  window.open('https://phantom.app', '_blank');
-  return null;
-}
-
-function saveSession() {
-  localStorage.setItem('app_token', token);
-  localStorage.setItem('app_user', JSON.stringify(me));
-}
-
-async function finishLogin(freshLogin = false) {
-  setL('LOADING DATA...');
-  document.getElementById('loader').style.display = 'flex';
-  document.getElementById('login-screen').classList.remove('show');
-  try {
-    // freshLogin=true (new login/register): skip cache, fetch from DB
-    if (freshLogin) { cacheClear('/api/settings'); cacheClear('/api/tasks'); }
-    let settings = {}, taskData = { tasks: [], done: [] };
-    try { settings = await api('/api/settings'); } catch(e) { console.warn('settings err:', e); }
-    try { taskData = await api('/api/tasks'); } catch(e) { console.warn('tasks err:', e); }
-    cfg = settings;
-    if (cfg.announcement) {
-      const b = document.getElementById('ann-bar');
-      b.textContent = '📡 ' + cfg.announcement;
-      b.style.display = 'block';
-    }
-    if (cfg.maintenance_mode === 'true') {
-      document.body.innerHTML = '<div style="height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;background:#030712;color:#e6edf3;font-family:Outfit,sans-serif"><div style="font-size:64px">🔧</div><div style="font-size:24px;font-weight:800">Under Maintenance</div><div style="color:#7d8590">Back soon!</div></div>';
-      return;
-    }
-    doneTasks = new Set(taskData.done || []);
-    renderTasks(taskData.tasks || []);
-    try { await loadRoadmap(); } catch(e) { console.warn('roadmap:', e); }
-    renderUser();
-    updateMineUI();
-    startTicker();
-    startAnimalLoop();
-    showApp();
-  } catch(e) {
-    console.error('finishLogin:', e);
-    showLogin();
-    showE('Error loading. Please refresh.');
-  }
-}
-
-function showApp() {
-  clearTimeout(window._st);
-  document.getElementById('loader').style.display = 'none';
-  document.getElementById('app-screen').classList.add('show');
-  const ln = document.getElementById('login-nav');
-  if (ln) ln.style.display = 'none';
-  const fab = document.getElementById('sup-fab');
-  if (fab) fab.style.display = 'none';
-}
-
-function showLogin() {
-  clearTimeout(window._st);
-  document.getElementById('loader').style.display = 'none';
-  document.getElementById('login-screen').classList.add('show');
-  const ln = document.getElementById('login-nav');
-  if (ln) ln.style.display = 'flex';
-  const fab = document.getElementById('sup-fab');
-  if (fab) fab.style.display = 'flex';
-}
-
-// ============================================
-// USER RENDER
-// ============================================
-function renderUser() {
-  if (!me) return;
-  const p = Math.floor(me.points || 0).toLocaleString();
-  const name = me.username || 'Miner';
-  setText('musr', '@' + name);
-  const hlu = document.getElementById('hlogo-username'); if (hlu) hlu.textContent = '@' + name;
-  setText('mbal', p); setText('hbal', p);
-  setText('mpow', '⚡ ' + (me.mining_power || 1).toFixed(1) + 'x Power');
-  setText('stm', Math.floor(me.total_mined || 0).toLocaleString());
-  setText('spow', (me.mining_power || 1).toFixed(1) + 'x');
-  setText('srefs', me.active_referral_count || 0);
-  setText('pnm', name); setText('phnd', '@' + name); setText('ppts', p);
-  setText('ppm', Math.floor(me.total_mined || 0).toLocaleString());
-  setText('ppt', me.total_tasks_completed || 0);
-  setText('ppr', me.referral_count || 0);
-  setText('ppow', (me.mining_power || 1).toFixed(1) + 'x');
-  if (me.created_at) setText('ppj', new Date(me.created_at).toLocaleDateString('en', {month:'short',year:'2-digit'}));
-  setText('rcode', me.referral_code || '——');
-  setText('rpb', cfg.referral_bonus || '500');
-  setText('rpa', me.active_referral_count || 0);
-  setText('rpp', (me.mining_power || 1).toFixed(1) + 'x');
-  const al = document.getElementById('avltr');
-  if (al) al.textContent = name[0]?.toUpperCase() || '👤';
-
-  const wb = document.getElementById('pwallet-badge');
-  if (wb && me.wallet_address) {
-    const addr = me.wallet_address;
-    const short = addr.slice(0, 6) + '...' + addr.slice(-4);
-    wb.innerHTML = `<span class="wallet-badge">👛 ${me.wallet_type || 'wallet'}: ${short}</span>`;
-    wb.style.display = 'block';
-  }
-
-  loadMyRank();
-}
-
-async function loadMyRank() {
-  try {
-    const lb = await api('/api/leaderboard'); // cached 5 min
-    const r = lb.findIndex(u => u.username === me?.username) + 1;
-    if (r > 0) { setText('srank', '#' + r); setText('pprank', '#' + r); }
-  } catch(e) {}
-}
-
-// ============================================
-// MINING
-// ============================================
-function getDur() { return parseInt(cfg.mining_duration_hours || '24') * 3600000; }
-function getCPMS() { return (parseFloat(cfg.mining_coins_per_hour || '10') * (me?.mining_power || 1)) / 3600000; }
-
-function updateMineUI() {
-  const btn = document.getElementById('mine-btn');
-  const pw = document.getElementById('mpwrap');
-  const pe = document.getElementById('pendwrap');
-  const an = document.getElementById('manim');
-  const msb = document.getElementById('mining-status-box');
-  if (!me || !btn) return;
-  const dur = getDur();
-
-  const isClaimed = (me.mining_claimed == 1 || me.mining_claimed === true);
-  const hasSession = !!(me.last_mining_start && me.last_mining_start !== 'null' && me.last_mining_start !== '');
-  
-  // If session is claimed or doesn't exist, show "Start Mining" button
-  if (!hasSession || isClaimed) {
-    btn.className = 'start'; btn.textContent = '⛏️ Start Mining'; btn.disabled = false;
-    pw.style.display = 'none'; pe.style.display = 'none';
-    an.classList.remove('mactive'); setText('mrated', 'IDLE');
-    if (msb) msb.classList.remove('show', 'claim-ready');
-    return;
-  }
-
-  const st = new Date(me.last_mining_start).getTime();
-  const el = Math.min(Date.now() - st, dur);
-  const earn = Math.floor(getCPMS() * el);
-  const canClaim = el >= dur; // Only allow claim after full 24 hours
-  const pct = Math.min((el / dur * 100), 100).toFixed(1);
-  const rem = Math.max(dur - el, 0);
-  const h = Math.floor(rem / 3600000), m = Math.floor((rem % 3600000) / 60000);
-  const ratePerHr = (getCPMS() * 3600000).toFixed(1);
-
-  if (msb) {
-    msb.classList.add('show');
-    const startDate = new Date(me.last_mining_start);
-    const startStr = startDate.toLocaleTimeString('en', {hour:'2-digit', minute:'2-digit'});
-    setText('msb-start', startStr);
-    setText('msb-rate', '+' + ratePerHr + '/hr');
-    setText('msb-power-lbl', (me.mining_power || 1).toFixed(1) + 'x');
-    setText('msb-earned', earn.toLocaleString() + ' pts');
-    const fill = document.getElementById('msb-fill');
-    if (fill) fill.style.width = pct + '%';
-    setText('msb-pct', pct + '%');
-
-    if (canClaim) {
-      msb.classList.add('claim-ready');
-      setText('msb-title-txt', '🏆 Ready to Claim!');
-      setText('msb-live-txt', 'DONE');
-      setText('msb-time', 'Complete!');
-      setText('msb-prog-lbl', 'Mining Complete');
-      setText('msb-hint', '✅ Tap claim button below to collect rewards');
-    } else {
-      msb.classList.remove('claim-ready');
-      setText('msb-title-txt', 'Mining Active');
-      setText('msb-live-txt', 'LIVE');
-      setText('msb-time', h + 'h ' + m + 'm left');
-      setText('msb-prog-lbl', 'Progress');
-      setText('msb-hint', '⛏️ Earning rewards continuously... come back after 24 hours to claim');
-    }
-  }
-
-  if (canClaim) {
-    btn.className = 'claim'; btn.textContent = '🎁 Claim ' + earn.toLocaleString() + ' Tokens'; btn.disabled = false;
-    pw.style.display = 'block';
-    document.getElementById('mpfill').style.width = '100%';
-    setText('mplbl', 'Mining complete!'); setText('mptime', 'Ready!');
-    setText('pendamt', earn.toLocaleString()); pe.style.display = 'block';
-    an.classList.add('mactive'); setText('mrated', 'DONE!');
-  } else {
-    btn.className = 'mining'; btn.textContent = '⏳ Mining... ' + h + 'h ' + m + 'm remaining'; btn.disabled = true;
-    pw.style.display = 'block';
-    document.getElementById('mpfill').style.width = pct + '%';
-    setText('mplbl', 'Mining in progress'); setText('mptime', h + 'h ' + m + 'm left');
-    setText('pendamt', earn.toLocaleString()); pe.style.display = 'block';
-    an.classList.add('mactive');
-    setText('mrated', '+' + ratePerHr + '/hr');
-  }
-}
-
-async function refreshMe(forceDB = false) {
-  try {
-    // forceDB=false: timer tick only — update UI from local data, no DB read
-    // forceDB=true: after claim/start/task — fetch fresh data from DB
-    if (!forceDB) {
-      // Update mining progress via local calculation only (no DB read)
-      renderUser();
-      updateMineUI();
-      return;
-    }
-    me = await api('/api/me');
-    localStorage.setItem('app_user', JSON.stringify(me));
-    localStorage.setItem('app_last_sync', String(Date.now()));
-    renderUser();
-    updateMineUI();
-  } catch(e) {}
-}
-
-function startTicker() {
-  clearInterval(mInt);
-  mInt = setInterval(() => { refreshMe(); }, 5 * 60 * 1000); // sync DB every 5 min to reduce reads
-  setInterval(() => { if (me) updateMineUI(); }, 5000);
-}
-
-function startAnimalLoop() {
-  setInterval(() => {
-    aidx = (aidx + 1) % ANIMALS.length;
-    const el = document.getElementById('memoji');
-    if (el) { el.style.transform = 'scale(1.3)'; el.textContent = ANIMALS[aidx]; setTimeout(() => { el.style.transform = 'scale(1)'; el.style.transition = 'transform .3s'; }, 300); }
-  }, 2000);
-}
-
-// Fixed bug: declared `dur` variable properly
-async function handleMineBtn() {
-  if (!me) return;
-  const dur = getDur();
-  const isClaimed = (me.mining_claimed == 1 || me.mining_claimed === true);
-  const hasSession = !!(me.last_mining_start && me.last_mining_start !== 'null' && me.last_mining_start !== '');
-  
-  // If no session or session is already claimed, start new mining
-  if (!hasSession || isClaimed) {
-    await startMining();
-    return;
-  }
-  
-  // Active session exists — check if 24 hours completed
-  const e = Math.min(Date.now() - new Date(me.last_mining_start).getTime(), dur);
-  
-  if (e >= dur) {
-    // 24 hours completed, allow claim
-    await claimMining();
-  } else {
-    // Still mining, show time remaining
-    const rem = dur - e;
-    const h = Math.floor(rem / 3600000);
-    const m = Math.floor((rem % 3600000) / 60000);
-    toast('⏳ Mining in progress! Come back in ' + h + 'h ' + m + 'm to claim.');
-  }
-}
-
-async function startMining() {
-  const btn = document.getElementById('mine-btn');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Starting...'; }
-  try {
-    await api('/api/mine/start', 'POST');
-    toast('⛏️ Mining started! Come back in 24h.'); spawnCoin();
-    cacheClear('/api/me');
-    localStorage.removeItem('app_last_sync');
-    await refreshMe(true);
-  } catch(e) {
-    toast('❌ ' + (e.message || 'Failed to start'));
-    if (btn) { btn.disabled = false; btn.textContent = '⛏️ Start Mining'; }
-  }
-}
-
-async function claimMining() {
-  const btn = document.getElementById('mine-btn');
-  btn.disabled = true; btn.textContent = '⌛ Claiming...';
-  try {
-    cacheClear('/api/me');
-    const claimRes = await api('/api/mine/claim', 'POST');
-    const earned = claimRes.earned || 0;
-    const msb = document.getElementById('mining-status-box');
-    if (msb) msb.classList.remove('show', 'claim-ready');
-    toast('🎁 Claimed ' + earned.toLocaleString() + ' Points!');
-    for (let i = 0; i < 5; i++) setTimeout(spawnCoin, i * 200);
-    await refreshMe(true);
-  } catch(e) {
-    toast('❌ ' + (e.message || 'Claim failed'));
-    btn.disabled = false; updateMineUI();
-  }
-}
-
-// ============================================
-// TASKS (English)
-// ============================================
-function renderTasks(tasks) {
-  const c = document.getElementById('tasklist');
-  if (!c) return;
-  if (!tasks || !tasks.length) { c.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:16px">No tasks available.</div>'; return; }
-  c.innerHTML = tasks.map(t => {
-    const d = doneTasks.has(t.id);
-    let btn = '';
-    if (d) {
-      btn = `<button class="tbtn dbtn">✅ Done</button>`;
-    } else if (t.task_type === 'ad') {
-      btn = `<button class="tbtn go" onclick="startAd('${t.id}','${esc(t.ad_url || t.url || '')}',${t.timer_seconds || 15},${t.points_reward})">▶ Watch</button>`;
-    } else if (t.task_type === 'quiz') {
-      btn = `<button class="tbtn go" style="background:var(--accent2);color:white" onclick="openQuizModal('${t.id}','${esc(t.title)}',${t.points_reward},'${esc(t.quiz_question||'')}')">🧠 Quiz</button>`;
-    } else if (t.verify_code) {
-      btn = `<button class="tbtn go" onclick="doTaskWithCode('${t.id}','${esc(t.url || '')}',${t.points_reward},'${esc(t.title)}')">▶ Go & Verify</button>`;
-    } else {
-      btn = `<button class="tbtn go" onclick="doTask('${t.id}','${esc(t.url || '')}',${t.points_reward})">▶ Visit</button>`;
-    }
-    const badge = t.verify_code ? ' <span style="font-size:9px;background:rgba(124,58,237,.2);color:#c4b5fd;border-radius:4px;padding:1px 5px;margin-left:4px">🔐 Code</span>' : '';
-    return `<div class="tcard ${d ? 'done' : ''}" id="tc-${t.id}">
-      <div class="tico">${t.icon || '🎯'}</div>
-      <div class="tinfo"><div class="ttitle">${esc(t.title)}${badge}</div><div class="tsub">+${t.points_reward} Points${t.task_type === 'quiz' ? ' • Quiz' : t.verify_code ? ' • Code required' : t.timer_seconds ? ' • ' + t.timer_seconds + 's' : ''}</div></div>
-      ${btn}
-    </div>`;
-  }).join('');
-}
-
-async function doTask(id, url, pts) {
-  if (doneTasks.has(id)) return;
-  if (url) window.open(url, '_blank');
-  toast('⏳ Complete in 4s...');
-  setTimeout(() => finTask(id, pts), 4000);
-}
-
-async function finTask(id, pts) {
-  if (doneTasks.has(id)) return;
-  try {
-    await api('/api/tasks/complete', 'POST', { task_id: id });
-    doneTasks.add(id);
-    const card = document.getElementById('tc-' + id);
-    if (card) { card.classList.add('done'); const b = card.querySelector('.tbtn'); if (b) { b.className = 'tbtn dbtn'; b.textContent = '✅ Done'; } }
-    toast('✅ +' + pts + ' Points earned!'); spawnCoin();
-    cacheClear('/api/me'); await refreshMe(true);
-  } catch(e) { toast('❌ ' + (e.message || 'Error')); }
-}
-
-function startAd(id, url, sec, pts) {
-  padAd = {id, url, sec, pts};
-  if (url) window.open(url, '_blank');
-  document.getElementById('adval').textContent = pts;
-  document.getElementById('aclbtn').classList.remove('show');
-  document.getElementById('admodal').classList.add('show');
-  let r = sec;
-  document.getElementById('tnum').textContent = r;
-  document.getElementById('tfill').style.strokeDashoffset = '0';
-  clearInterval(adTmr);
-  adTmr = setInterval(() => {
-    r--;
-    document.getElementById('tnum').textContent = r;
-    document.getElementById('tfill').style.strokeDashoffset = (213.6 * (sec - r) / sec);
-    if (r <= 0) { clearInterval(adTmr); document.getElementById('tnum').textContent = '✓'; document.getElementById('aclbtn').classList.add('show'); }
-  }, 1000);
-}
-
-async function claimAd() {
-  if (!padAd) return;
-  const {id, pts} = padAd;
-  document.getElementById('admodal').classList.remove('show');
-  clearInterval(adTmr);
-  await finTask(id, pts);
-  padAd = null;
-}
-
-// ============================================
-// VERIFY CODE (English)
-// ============================================
-let activeVcode = null;
-
-function doTaskWithCode(id, url, pts, title) {
-  if (doneTasks.has(id)) return;
-  if (url) window.open(url, '_blank');
-  setTimeout(() => openVcodeModal(id, title, pts), 1500);
-}
-
-function openVcodeModal(id, title, pts) {
-  activeVcode = { id, title, pts, attempts: 0 };
-  setText('vcode-task-title', title);
-  document.getElementById('vcode-pts').textContent = '+' + pts + ' Points';
-  document.getElementById('vcode-inp').value = '';
-  document.getElementById('vcode-submit-btn').disabled = false;
-  document.getElementById('vcode-submit-btn').textContent = '✅ Verify';
-  document.getElementById('vcode-submit-btn').onclick = submitVerifyCode;
-  const msg = document.getElementById('vcode-msg');
-  msg.className = 'vcode-msg'; msg.textContent = '';
-  updateVcodeDots(0);
-  document.getElementById('vcode-modal').classList.add('show');
-  setTimeout(() => document.getElementById('vcode-inp').focus(), 300);
-}
-
-function closeVcodeModal() {
-  document.getElementById('vcode-modal').classList.remove('show');
-  activeVcode = null;
-}
-
-function updateVcodeDots(usedCount) {
-  for (let i = 1; i <= 3; i++) {
-    const dot = document.getElementById('vcd' + i);
-    if (!dot) continue;
-    dot.className = 'quiz-dot ' + (i <= usedCount ? 'used' : 'active');
-  }
-}
-
-async function submitVerifyCode() {
-  if (!activeVcode) return;
-  const code = document.getElementById('vcode-inp').value.trim();
-  if (!code) { showVcodeMsg('err', 'Enter code first!'); return; }
-  const btn = document.getElementById('vcode-submit-btn');
-  btn.disabled = true; btn.textContent = '⏳ Checking...';
-  try {
-    const res = await api('/api/tasks/verify-code', 'POST', { task_id: activeVcode.id, code });
-    if (res.success) {
-      updateVcodeDots(0);
-      showVcodeMsg('suc', '🎉 Correct code! +' + res.earned + ' Points earned!');
-      doneTasks.add(activeVcode.id);
-      const card = document.getElementById('tc-' + activeVcode.id);
-      if (card) { card.classList.add('done'); const b = card.querySelector('.tbtn'); if (b) { b.className = 'tbtn dbtn'; b.textContent = '✅ Done'; } }
-      spawnCoin(); spawnCoin();
-      setTimeout(() => { closeVcodeModal(); refreshMe(true); toast('✅ +' + res.earned + ' Points earned!'); }, 1800);
-    } else {
-      activeVcode.attempts = (activeVcode.attempts || 0) + 1;
-      updateVcodeDots(activeVcode.attempts);
-      if (res.failed) {
-        showVcodeMsg('err', '❌ ' + (res.message || '3 attempts failed. Start the task again.'));
-        btn.textContent = '🔄 Start Over';
-        btn.disabled = false;
-        btn.onclick = async () => {
-          btn.disabled = true; btn.textContent = '⏳...';
-          await api('/api/tasks/verify-reset', 'POST', { task_id: activeVcode.id });
-          closeVcodeModal();
-          toast('🔄 Reset done. Do the task again!');
-        };
-      } else {
-        showVcodeMsg('err', '❌ ' + (res.message || 'Incorrect code!'));
-        document.getElementById('vcode-inp').value = '';
-        btn.disabled = false; btn.textContent = '✅ Verify';
-        document.getElementById('vcode-inp').focus();
-      }
-    }
-  } catch(e) {
-    showVcodeMsg('err', e.message || 'Error occurred. Please try again.');
-    btn.disabled = false; btn.textContent = '✅ Verify';
-  }
-}
-
-function showVcodeMsg(type, msg) {
-  const el = document.getElementById('vcode-msg');
-  el.className = 'vcode-msg ' + type + ' show';
-  el.textContent = msg;
-}
-
-// ============================================
-// QUIZ (English)
-// ============================================
-let activeQuiz = null;
-
-function openQuizModal(id, title, pts, question) {
-  activeQuiz = { id, title, pts, attempts: 0 };
-  setText('quiz-task-title', title);
-  document.getElementById('quiz-pts').textContent = '+' + pts + ' Points';
-  document.getElementById('quiz-question').textContent = question || 'Question not loaded...';
-  document.getElementById('quiz-answer-inp').value = '';
-  document.getElementById('quiz-submit-btn').disabled = false;
-  const msg = document.getElementById('quiz-msg');
-  msg.className = 'quiz-msg'; msg.textContent = '';
-  updateQuizDots(0);
-  document.getElementById('quiz-modal').classList.add('show');
-  setTimeout(() => document.getElementById('quiz-answer-inp').focus(), 300);
-}
-
-function closeQuizModal() {
-  document.getElementById('quiz-modal').classList.remove('show');
-  activeQuiz = null;
-}
-
-function updateQuizDots(usedCount) {
-  for (let i = 1; i <= 3; i++) {
-    const dot = document.getElementById('qd' + i);
-    if (!dot) continue;
-    dot.className = 'quiz-dot ' + (i <= usedCount ? 'used' : 'active');
-  }
-}
-
-async function submitQuizAnswer() {
-  if (!activeQuiz) return;
-  const ans = document.getElementById('quiz-answer-inp').value.trim();
-  if (!ans) { showQuizMsg('err', 'Enter your answer first!'); return; }
-  const btn = document.getElementById('quiz-submit-btn');
-  btn.disabled = true; btn.textContent = '⏳ Checking...';
-  try {
-    const res = await api('/api/tasks/quiz-verify', 'POST', { task_id: activeQuiz.id, answer: ans });
-    if (res.success) {
-      updateQuizDots(0);
-      showQuizMsg('suc', '🎉 Correct answer! +' + res.earned + ' Points earned!');
-      doneTasks.add(activeQuiz.id);
-      const card = document.getElementById('tc-' + activeQuiz.id);
-      if (card) { card.classList.add('done'); const b = card.querySelector('.tbtn'); if (b) { b.className = 'tbtn dbtn'; b.textContent = '✅ Done'; } }
-      spawnCoin(); spawnCoin();
-      setTimeout(() => { closeQuizModal(); refreshMe(true); toast('✅ +' + res.earned + ' Points earned!'); }, 1800);
-    } else {
-      activeQuiz.attempts = (activeQuiz.attempts || 0) + 1;
-      updateQuizDots(activeQuiz.attempts);
-      if (res.failed) {
-        showQuizMsg('err', '❌ ' + (res.message || '3 attempts failed. Please try again.'));
-        btn.textContent = '🔄 Start Over';
-        btn.disabled = false;
-        btn.onclick = async () => {
-          btn.disabled = true; btn.textContent = '⏳...';
-          await api('/api/tasks/quiz-reset', 'POST', { task_id: activeQuiz.id });
-          closeQuizModal();
-          toast('🔄 Quiz reset. Try again!');
-        };
-      } else {
-        showQuizMsg('err', '❌ ' + (res.message || 'Wrong answer!'));
-        document.getElementById('quiz-answer-inp').value = '';
-        btn.disabled = false; btn.textContent = '✅ Submit';
-        document.getElementById('quiz-answer-inp').focus();
-      }
-    }
-  } catch(e) {
-    showQuizMsg('err', e.message || 'Error occurred. Please try again.');
-    btn.disabled = false; btn.textContent = '✅ Submit';
-  }
-}
-
-function showQuizMsg(type, msg) {
-  const el = document.getElementById('quiz-msg');
-  el.className = 'quiz-msg ' + type + ' show';
-  el.textContent = msg;
-}
-
-// ============================================
-// LEADERBOARD
-// ============================================
-async function loadLB() {
-  try {
-    const data = await api('/api/leaderboard');
-    const c = document.getElementById('lblist');
-    if (!c || !data) return;
-    const em = ['🥇','🥈','🥉'];
-    c.innerHTML = data.map((u, i) => {
-      const name = u.username ? '@' + u.username : (u.email ? u.email : (u.wallet_address ? u.wallet_address.slice(0,6)+'...'+u.wallet_address.slice(-4) : 'miner'));
-      const isMe = u.username === me?.username;
-      return `<div class="lbitem" style="${isMe ? 'border-color:rgba(0,255,136,.3);background:rgba(0,255,136,.03);' : ''}">
-        <div class="lbrank ${['gold','silver','bronze'][i]||''}">${i < 3 ? em[i] : '#'+(i+1)}</div>
-        <div class="lbinfo">
-          <div class="lbname">${esc(name)} ${isMe ? '<span style="color:var(--accent);font-size:10px">(you)</span>' : ''}</div>
-          <div class="lbsub">⚡ ${(u.mining_power||1).toFixed(1)}x • 👥 ${u.active_referrals||0}/${u.total_referrals||0} active refs</div>
-        </div>
-        <div class="lbpts">${Math.floor(u.total_mined||0).toLocaleString()}</div>
-      </div>`;
-    }).join('');
-  } catch(e) {}
-}
-
-// ============================================
-// REFERRALS
-// ============================================
-async function loadRefs() {
-  try {
-    const data = await api('/api/referrals');
-    const c = document.getElementById('reflist');
-    if (!c) return;
-    if (!data || !data.length) { c.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:8px 0">No referrals yet. Share your link to start earning!</div>'; return; }
-    c.innerHTML = data.map(r => {
-      const a = (r.total_mined || 0) > 0;
-      const name = r.username || (r.wallet_address ? r.wallet_address.slice(0,6)+'...'+r.wallet_address.slice(-4) : 'miner');
-      const mined = parseInt(r.total_mined || 0);
-      const myEarn = Math.floor(mined * 0.10);
-      return `<div class="rli"><div class="rdot ${a?'on':'off'}"></div><div style="flex:1;font-size:13px">@${esc(name)}<br><span style="font-size:10px;color:var(--muted)">${a?'⚡ Active • Mined: '+mined.toLocaleString()+' pts':'💤 Inactive • Has not mined yet'}</span></div><div style="font-size:11px;color:var(--accent);text-align:right">+${myEarn.toLocaleString()}<br><span style="font-size:9px;color:var(--muted)">your 50%</span></div></div>`;
-    }).join('');
-  } catch(e) {}
-}
-
-function copyRef() {
-  if (!me?.referral_code) return;
-  navigator.clipboard?.writeText(me.referral_code).catch(() => {});
-  toast('📋 Code: ' + me.referral_code);
-}
-
-function shareRef() {
-  if (!me?.referral_code) return;
-  const u = APP_URL + '?ref=' + me.referral_code;
-  const t = 'Join Ai2E (AI to Earn)! Use my code: ' + me.referral_code + '\n' + u;
-  if (navigator.share) navigator.share({title: 'Ai2E — Artificial Intelligence to Earn', text: t, url: u}).catch(() => {});
-  else { navigator.clipboard?.writeText(t); toast('🔗 Link copied!'); }
-}
-
-// ============================================
-// TRANSACTIONS
-// ============================================
-async function loadTxH() {
-  try {
-    const data = await api('/api/transactions');
-    const c = document.getElementById('txlist');
-    if (!c) return;
-    if (!data || !data.length) { c.innerHTML = '<div style="color:var(--muted);font-size:13px">No transactions yet.</div>'; return; }
-    const ic = {mining_claim:'⛏️',task_complete:'✅',ad_watch:'📺',welcome_bonus:'🎉',referral_bonus:'👥',active_referral_bonus:'🔥',refer_mining_l1:'💰',refer_mining_l2:'🌿',refer_mining_l3:'🔥',refer_mining_10pct:'💰',refer_mining_1pct:'🌿'};
-    c.innerHTML = data.map(t => `<div class="txitem"><div class="txico">${ic[t.type]||'💰'}</div><div class="txinfo"><div class="txd">${esc(t.description||t.type)}</div><div class="txdt">${new Date(t.created_at).toLocaleDateString('en',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</div></div><div class="txamt">+${(t.amount||0).toLocaleString()}</div></div>`).join('');
-  } catch(e) {}
-}
-
-// ============================================
-// ROADMAP — static, zero DB reads
-// ============================================
-async function loadRoadmap() { renderRoadmap(); }
-
-function renderRoadmap() {
-  const el = document.getElementById('roadlist');
-  if (!el) return;
-  el.innerHTML = `
-  <div style="background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:16px">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="#00ff88" stroke-width="1.5"/><path d="M8 12h8M12 8v8" stroke="#00ff88" stroke-width="1.5" stroke-linecap="round"/></svg>
-      <div>
-        <div style="font-size:15px;font-weight:800">Total Supply: 10,000,000,000 Ai2E</div>
-        <div style="font-size:11px;color:var(--muted)">Fixed supply — no inflation</div>
-      </div>
-    </div>
-    ${[
-      {label:'Mining Rewards', pct:40, color:'#00ff88', note:'4,000,000,000'},
-      {label:'Liquidity Pool',  pct:20, color:'#7c3aed', note:'2,000,000,000'},
-      {label:'Team & Dev',      pct:15, color:'#f59e0b', note:'1,500,000,000 · 2yr vesting'},
-      {label:'Marketing',       pct:15, color:'#60a5fa', note:'1,500,000,000'},
-      {label:'Reserve',         pct:10, color:'#f87171', note:'1,000,000,000'},
-    ].map(s => `
-      <div style="margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-          <span style="font-size:12px;color:var(--muted)">${s.label}</span>
-          <span style="font-size:11px;color:${s.color};font-weight:700">${s.pct}% &nbsp;·&nbsp; ${s.note}</span>
-        </div>
-        <div style="height:7px;background:var(--border);border-radius:99px;overflow:hidden">
-          <div style="height:100%;width:${s.pct}%;background:${s.color};border-radius:99px"></div>
-        </div>
-      </div>`).join('')}
-  </div>
-
-  <div style="background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:16px">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><polyline points="2,18 8,10 13,14 20,4" stroke="#00ff88" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><polyline points="17,4 20,4 20,7" stroke="#00ff88" stroke-width="2" stroke-linecap="round"/></svg>
-      <div style="font-size:14px;font-weight:800">Projected Token Price</div>
-    </div>
-    <div style="font-size:11px;color:var(--muted);margin-bottom:14px">Estimated milestones — not financial advice</div>
-    <svg viewBox="0 0 320 110" width="100%" height="110">
-      <defs>
-        <linearGradient id="pg" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#00ff88" stop-opacity=".25"/>
-          <stop offset="100%" stop-color="#00ff88" stop-opacity="0"/>
-        </linearGradient>
-      </defs>
-      <path d="M10,98 C50,95 80,88 120,72 C160,54 200,30 260,10 L310,5 L310,105 L10,105 Z" fill="url(#pg)"/>
-      <path d="M10,98 C50,95 80,88 120,72 C160,54 200,30 260,10 L310,5" fill="none" stroke="#00ff88" stroke-width="2" stroke-linecap="round"/>
-      <circle cx="10"  cy="98" r="3.5" fill="#00ff88"/>
-      <circle cx="120" cy="72" r="3.5" fill="#00ff88"/>
-      <circle cx="200" cy="30" r="3.5" fill="#00ff88"/>
-      <circle cx="310" cy="5"  r="3.5" fill="#00ff88"/>
-      <text x="10"  y="108" font-size="7" fill="#7d8590" text-anchor="middle">Pre-launch</text>
-      <text x="10"  y="88"  font-size="7" fill="#00ff88" text-anchor="middle" font-weight="bold">$0.000001</text>
-      <text x="120" y="108" font-size="7" fill="#7d8590" text-anchor="middle">Launch</text>
-      <text x="120" y="62"  font-size="7" fill="#00ff88" text-anchor="middle" font-weight="bold">$0.0001</text>
-      <text x="200" y="108" font-size="7" fill="#7d8590" text-anchor="middle">6 months</text>
-      <text x="200" y="20"  font-size="7" fill="#00ff88" text-anchor="middle" font-weight="bold">$0.005</text>
-      <text x="305" y="108" font-size="7" fill="#7d8590" text-anchor="end">1 year+</text>
-      <text x="305" y="18"  font-size="7" fill="#00ff88" text-anchor="end" font-weight="bold">$0.05+</text>
-    </svg>
-  </div>
-
-  <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px">Launch Phases</div>
-
-  ${[
-    {phase:'Phase 1',color:'#00ff88',status:'active', title:'Mining & Community',date:'Now — Q3 2025',
-     icon:'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5',
-     items:['Free daily mining for all users','Referral reward system','Leaderboard rankings','10,000 miners target']},
-    {phase:'Phase 2',color:'#f59e0b',status:'soon',   title:'Token Preparation', date:'Q4 2025',
-     icon:'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
-     items:['Smart contract audit','Solana SPL token creation','Tokenomics finalization','Exchange partnerships']},
-    {phase:'Phase 3',color:'#7c3aed',status:'upcoming',title:'DEX Launch',        date:'Q1 2026',
-     icon:'M13 10V3L4 14h7v7l9-11h-7z',
-     items:['Raydium / Jupiter listing','Liquidity pool launch','1:1 mined token conversion','Price discovery begins']},
-    {phase:'Phase 4',color:'#60a5fa',status:'upcoming',title:'CEX & Expansion',   date:'Q2-Q3 2026',
-     icon:'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
-     items:['CEX exchange listings','Mobile app launch','DAO governance system','Full 10B token ecosystem']},
-  ].map((ph, i, arr) => `
-    <div style="display:flex;gap:12px;margin-bottom:14px">
-      <div style="display:flex;flex-direction:column;align-items:center">
-        <div style="width:38px;height:38px;border-radius:50%;background:${ph.status==='active' ? ph.color : 'var(--surface2)'};border:2px solid ${ph.color};display:flex;align-items:center;justify-content:center;flex-shrink:0">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${ph.status==='active'?'#030712':ph.color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${ph.icon}"/></svg>
-        </div>
-        ${i < arr.length-1 ? '<div style="width:2px;flex:1;min-height:16px;background:linear-gradient(to bottom,'+ph.color+'44,var(--border));margin:3px 0;border-radius:2px"></div>' : ''}
-      </div>
-      <div style="flex:1;padding-bottom:4px">
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;flex-wrap:wrap">
-          <span style="font-size:11px;font-weight:700;padding:2px 10px;border-radius:99px;background:${ph.color}18;color:${ph.color};border:1px solid ${ph.color}44">${ph.phase}</span>
-          <span style="font-size:11px;color:var(--muted)">${ph.date}</span>
-          ${ph.status==='active' ? '<span style="font-size:10px;padding:2px 8px;border-radius:99px;background:rgba(0,255,136,.12);color:#00ff88;font-weight:700">● LIVE</span>' : ''}
-        </div>
-        <div style="font-size:14px;font-weight:700;margin-bottom:6px">${ph.title}</div>
-        ${ph.items.map(item => `
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><polyline points="20,6 9,17 4,12" stroke="${ph.status==='active'?'#00ff88':'var(--muted)'}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span style="font-size:12px;color:${ph.status==='active'?'var(--text)':'var(--muted)'}">${item}</span>
-          </div>`).join('')}
-      </div>
-    </div>`).join('')}
-
-  <div style="background:linear-gradient(135deg,rgba(0,255,136,.08),rgba(124,58,237,.08));border:1px solid rgba(0,255,136,.2);border-radius:14px;padding:16px;margin-top:4px;text-align:center">
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" style="margin-bottom:8px"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" stroke="#f59e0b" stroke-width="1.5" fill="rgba(245,158,11,.15)" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    <div style="font-size:14px;font-weight:800;margin-bottom:4px">Early Miner Advantage</div>
-    <div style="font-size:12px;color:var(--muted);line-height:1.6">The earlier you mine, the more tokens you accumulate before launch. Pre-launch miners get <span style="color:#00ff88;font-weight:700">maximum allocation</span> at the lowest possible price.</div>
-  </div>`;
-}
-
-function tphase(h) {
-  const b = h.nextElementSibling;
-  if (b) { b.classList.toggle('open'); const a = h.querySelector('div:last-child'); if(a) a.textContent = b.classList.contains('open') ? '▲' : '▼'; }
-}
-
-// ============================================
-// LOGOUT
-// ============================================
-async function doLogout() {
-  clearInterval(mInt);
-  localStorage.removeItem('app_token');
-  localStorage.removeItem('app_user');
-  localStorage.removeItem('app_last_sync');
-  // Also clear cache
-  ['_api_stats','_api_settings','_api_tasks','_api_leaderboard','_api_referrals','_api_transactions'].forEach(k => localStorage.removeItem('c' + k));
-  token = null; me = null;
-  document.getElementById('app-screen').classList.remove('show');
-  window.location.reload();
-}
-
-// ============================================
-// NAVIGATION
-// ============================================
+// ── nav() — page switcher used in bottom nav ──────────────────────────
 function nav(p, btn) {
   document.querySelectorAll('.page').forEach(x => x.classList.remove('active'));
   document.querySelectorAll('.nbtn').forEach(x => x.classList.remove('active'));
@@ -1944,36 +1824,36 @@ function nav(p, btn) {
   if (btn) btn.classList.add('active');
   if (p === 'top') loadLB();
   if (p === 'ref') loadRefs();
-  if (p === 'profile') { loadTxH(); loadMyRank(); }
 }
 
-// ============================================
-// HELPERS
-// ============================================
-function toast(msg) { const el = document.getElementById('toast'); if (!el) return; el.textContent = msg; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 3000); }
-function setText(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
-function esc(s) { if (!s) return ''; return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function fNum(n) { n = parseInt(n)||0; if(n>=1000000) return (n/1000000).toFixed(1)+'M'; if(n>=1000) return (n/1000).toFixed(1)+'K'; return n.toString(); }
-function spawnCoin() { const c = document.createElement('div'); c.className='cfly'; c.textContent=['🪙','💰','⭐','✨'][Math.floor(Math.random()*4)]; c.style.left=(20+Math.random()*60)+'vw'; c.style.bottom='100px'; document.body.appendChild(c); setTimeout(()=>c.remove(),1500); }
-function setL(t) { const el = document.getElementById('ltxt'); if (el) el.textContent = t; }
-function toggleMenu() { const m=document.getElementById('hmenu'),b=document.getElementById('hmbtn'),o=document.getElementById('hmoverlay');m.classList.toggle('open');b.classList.toggle('open');o.classList.toggle('open'); }
-function closeMenu() { const m=document.getElementById('hmenu'),b=document.getElementById('hmbtn'),o=document.getElementById('hmoverlay');m?.classList.remove('open');b?.classList.remove('open');o?.classList.remove('open'); }
-function toggleLoginMenu() {
-  const m = document.getElementById('ln-hmenu'), o = document.getElementById('ln-overlay');
-  const isOpen = m.style.transform === 'translateX(0%)';
-  m.style.transform = isOpen ? 'translateX(110%)' : 'translateX(0%)';
-  o.style.display = isOpen ? 'none' : 'block';
+// ── showS — small status message ─────────────────────────────────────
+function showS(m) { const el=document.getElementById('smsg'); if(el){el.textContent=m;el.classList.add('show');} }
+
+// ── refreshMe — kept for any legacy calls ────────────────────────────
+async function refreshMe(forceDB = false) {
+  try {
+    if (!forceDB) { renderUser(); updateMineUI(); return; }
+    me = await api('/api/me'); saveUser(); saveSync();
+    renderUser(); updateMineUI();
+  } catch(e) {}
 }
-function closeLoginMenu() {
-  const m = document.getElementById('ln-hmenu'), o = document.getElementById('ln-overlay');
-  if (m) m.style.transform = 'translateX(110%)';
-  if (o) o.style.display = 'none';
+
+// ── finTask — legacy task completion alias ────────────────────────────
+async function finTask(id, pts) { markTaskDone(id, pts); }
+
+// ── loadMyRank — shows user's rank in profile ────────────────────────
+async function loadMyRank() {
+  const el = document.getElementById('my-rank');
+  if (!el || !me) return;
+  try {
+    const raw = localStorage.getItem(LS.LB);
+    if (!raw) return;
+    const lb = JSON.parse(raw);
+    const rank = lb.findIndex(u => u.username === me.username);
+    el.textContent = rank >= 0 ? '#' + (rank + 1) : 'Unranked';
+  } catch {}
 }
-function showE(m) { const el=document.getElementById('emsg');el.textContent=m;el.classList.add('show'); }
-function showS(m) { const el=document.getElementById('smsg');el.textContent=m;el.classList.add('show'); }
-function clrMsg() { document.getElementById('emsg').classList.remove('show');document.getElementById('smsg').classList.remove('show'); }
 </script>
-
 <script src="ads.js"></script>
 </body>
 </html>
