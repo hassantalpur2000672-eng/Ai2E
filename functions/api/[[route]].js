@@ -438,6 +438,69 @@ export async function onRequest({ request, env }) {
       return json({ success: true, earned });
     }
 
+    // ── MINE CLAIM+START COMBINED (ek hi request mein dono) ──────────────────
+    if (path === '/api/mine/claim-and-start' && request.method === 'POST') {
+      const user = await getUser(request, env);
+      if (!user) return err('Unauthorized', 401);
+      if (user.mining_claimed == 1) return err('Nothing to claim');
+
+      const cfgRows = await dbAll(env, "SELECT key, value FROM settings WHERE key IN ('mining_duration_hours','mining_coins_per_hour')");
+      const cfgMap = {};
+      cfgRows.forEach(r => cfgMap[r.key] = r.value);
+      const durMs = parseInt(cfgMap.mining_duration_hours || '24') * 3600000;
+      const cpm = parseFloat(cfgMap.mining_coins_per_hour || '10') * parseFloat(user.mining_power) / 3600000;
+      const start = new Date(user.last_mining_start).getTime();
+      const elapsed = Math.min(Date.now() - start, durMs);
+      const earned = Math.floor(cpm * elapsed);
+
+      if (earned < 100) return err('Mine at least 100 points first');
+
+      const newPts = parseInt(user.points || 0) + earned;
+      const newMined = parseInt(user.total_mined || 0) + earned;
+      const now = new Date().toISOString();
+
+      // Claim + auto start naya session — ek saath
+      await dbRun(env, 'UPDATE users SET points = ?, total_mined = ?, total_claimed = total_claimed + ?, mining_claimed = 0, last_mining_start = ? WHERE id = ?', [newPts, newMined, earned, now, user.id]);
+      await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, 'mining_claim', earned, '⛏️ Mining claim']);
+      await dbRun(env, "UPDATE mining_sessions SET claimed_at = datetime('now'), coins_earned = ?, is_claimed = 1 WHERE user_id = ? AND is_claimed = 0", [earned, user.id]);
+      await dbRun(env, "INSERT INTO mining_sessions (id,user_id,started_at,mining_power) VALUES (?,?,?,?)", [crypto.randomUUID(), user.id, now, user.mining_power]);
+
+      // Referral tree
+      if (user.referred_by) {
+        const L1 = await dbFirst(env, 'SELECT * FROM users WHERE referral_code = ?', [user.referred_by]);
+        if (L1) {
+          const l1Bonus = Math.floor(earned * 0.50);
+          if (l1Bonus > 0) {
+            await dbRun(env, 'UPDATE users SET points = points + ? WHERE id = ?', [l1Bonus, L1.id]);
+            await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), L1.id, 'refer_mining_l1', l1Bonus, '⛏️ L1 50%: @' + user.username]);
+            if (L1.referred_by) {
+              const L2 = await dbFirst(env, 'SELECT * FROM users WHERE referral_code = ?', [L1.referred_by]);
+              if (L2) {
+                const l2Bonus = Math.floor(earned * 0.25);
+                if (l2Bonus > 0) {
+                  await dbRun(env, 'UPDATE users SET points = points + ? WHERE id = ?', [l2Bonus, L2.id]);
+                  await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), L2.id, 'refer_mining_l2', l2Bonus, '🌿 L2 25%: @' + user.username]);
+                  if (L2.referred_by) {
+                    const L3 = await dbFirst(env, 'SELECT * FROM users WHERE referral_code = ?', [L2.referred_by]);
+                    if (L3) {
+                      const l3Bonus = Math.floor(earned * 0.10);
+                      if (l3Bonus > 0) {
+                        await dbRun(env, 'UPDATE users SET points = points + ? WHERE id = ?', [l3Bonus, L3.id]);
+                        await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), L3.id, 'refer_mining_l3', l3Bonus, '🔥 L3 10%: @' + user.username]);
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      // Fresh user data wapas bhejo — alag /api/me call ki zaroorat nahi
+      const updatedUser = await dbFirst(env, 'SELECT * FROM users WHERE id = ?', [user.id]);
+      return json({ success: true, earned, user: updatedUser, mining_started: true, last_mining_start: now });
+    }
+
     if (path === '/api/tasks' && request.method === 'GET') {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
@@ -550,16 +613,6 @@ export async function onRequest({ request, env }) {
       const { task_id } = await request.json();
       await dbRun(env, 'DELETE FROM quiz_attempts WHERE user_id = ? AND task_id = ?', [user.id, task_id]);
       return json({ success: true });
-    }
-
-    if (path === '/api/leaderboard' && request.method === 'GET') {
-      const results = await dbAll(env,
-        `SELECT u.username, u.wallet_address, u.wallet_type, u.total_mined, u.mining_power,
-                (SELECT COUNT(*) FROM users r WHERE r.referred_by = u.referral_code) AS total_referrals,
-                (SELECT COUNT(*) FROM users r WHERE r.referred_by = u.referral_code AND r.total_mined > 0) AS active_referrals
-         FROM users u ORDER BY u.total_mined DESC LIMIT 25`
-      );
-      return json(results);
     }
 
     if (path === '/api/referrals' && request.method === 'GET') {
