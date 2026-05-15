@@ -10,9 +10,9 @@
 //  Sticky rahegi — screen par hamesha nazar ayegi
 // ====================================================================
 
-/*const SOCIAL_BAR_SCRIPT = `
+const SOCIAL_BAR_SCRIPT = `
 <script src="https://pl29342089.profitablecpmratenetwork.com/e4/3b/9b/e43b9ba24a13948e1891c795dcb6715b.js"></script>
-`;*/
+`;
 
 
 // ====================================================================
