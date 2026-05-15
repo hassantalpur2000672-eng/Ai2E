@@ -805,15 +805,29 @@ let aidx = 0;
 // ============================================
 
 // Cache TTLs (milliseconds)
+// UTC midnight pe settings/tasks reset hoti hain — baaki cached rehti hain
 const CACHE_TTL = {
-  '/api/stats':        60 * 60 * 1000,  // 1 hour
-  '/api/settings':    120 * 60 * 1000,  // 2 hours
-  '/api/tasks':        30 * 60 * 1000,  // 30 min
-  '/api/leaderboard':  15 * 60 * 1000,  // 15 min
-  '/api/referrals':    20 * 60 * 1000,  // 20 min
-  '/api/transactions': 10 * 60 * 1000,  // 10 min
-  '/api/me':            3 * 60 * 1000,  // 3 min
+  '/api/stats':        120 * 60 * 1000, // 2 hours
+  '/api/settings':    999 * 60 * 1000,  // ~16 hours (UTC midnight check alag hai)
+  '/api/tasks':       360 * 60 * 1000,  // 6 hours
+  '/api/referrals':    60 * 60 * 1000,  // 1 hour
+  '/api/transactions': 30 * 60 * 1000,  // 30 min
+  '/api/me':           30 * 60 * 1000,  // 30 min (sirf action ke baad update)
 };
+
+// UTC midnight check — agar koi cache kal ka hai toh clear karo
+function clearIfOldDay() {
+  try {
+    const lastDay = localStorage.getItem('_cache_day');
+    const todayUTC = new Date().toISOString().slice(0, 10); // YYYY-MM-DD UTC
+    if (lastDay !== todayUTC) {
+      // Naya din — settings aur tasks fresh lo
+      cacheClear('/api/settings');
+      cacheClear('/api/tasks');
+      localStorage.setItem('_cache_day', todayUTC);
+    }
+  } catch {}
+}
 
 function cacheKey(path) { return 'c_' + path.replace(/\//g, '_'); }
 
@@ -877,12 +891,14 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (el) { el.value = ref.toUpperCase(); switchTab('up'); }
   }
 
+  clearIfOldDay(); // UTC midnight pe settings/tasks cache clear
+
   loadStats();
 
   const savedToken = localStorage.getItem('app_token');
   const savedUser = localStorage.getItem('app_user');
   const lastSync = parseInt(localStorage.getItem('app_last_sync') || '0');
-  const SYNC_TTL = 3 * 60 * 1000; // sync from DB once every 3 min
+  const SYNC_TTL = 30 * 60 * 1000; // sync from DB once every 30 min only
 
   if (savedToken && savedUser) {
     token = savedToken;
@@ -1301,16 +1317,6 @@ function renderUser() {
     wb.innerHTML = `<span class="wallet-badge">👛 ${me.wallet_type || 'wallet'}: ${short}</span>`;
     wb.style.display = 'block';
   }
-
-  loadMyRank();
-}
-
-async function loadMyRank() {
-  try {
-    const lb = await api('/api/leaderboard'); // cached 5 min
-    const r = lb.findIndex(u => u.username === me?.username) + 1;
-    if (r > 0) { setText('srank', '#' + r); setText('pprank', '#' + r); }
-  } catch(e) {}
 }
 
 // ============================================
@@ -1416,8 +1422,8 @@ async function refreshMe(forceDB = false) {
 
 function startTicker() {
   clearInterval(mInt);
-  mInt = setInterval(() => { refreshMe(); }, 5 * 60 * 1000); // sync DB every 5 min to reduce reads
-  setInterval(() => { if (me) updateMineUI(); }, 5000);
+  // Sirf mining UI har 5 second mein update ho — local calculation se, koi DB call nahi
+  mInt = setInterval(() => { if (me) updateMineUI(); }, 5000);
 }
 
 function startAnimalLoop() {
@@ -1476,13 +1482,23 @@ async function claimMining() {
   btn.disabled = true; btn.textContent = '⌛ Claiming...';
   try {
     cacheClear('/api/me');
-    const claimRes = await api('/api/mine/claim', 'POST');
+    // Claim + auto start ek hi request mein — 2 API calls ki bajaye 1
+    const claimRes = await api('/api/mine/claim-and-start', 'POST');
     const earned = claimRes.earned || 0;
     const msb = document.getElementById('mining-status-box');
     if (msb) msb.classList.remove('show', 'claim-ready');
-    toast('🎁 Claimed ' + earned.toLocaleString() + ' Points!');
+    toast('🎁 Claimed ' + earned.toLocaleString() + ' Points! Mining restarted ✅');
     for (let i = 0; i < 5; i++) setTimeout(spawnCoin, i * 200);
-    await refreshMe(true);
+    // Fresh user data response mein hi hai — alag /api/me call nahi
+    if (claimRes.user) {
+      me = claimRes.user;
+      localStorage.setItem('app_user', JSON.stringify(me));
+      localStorage.setItem('app_last_sync', String(Date.now()));
+      renderUser();
+      updateMineUI();
+    } else {
+      await refreshMe(true);
+    }
   } catch(e) {
     toast('❌ ' + (e.message || 'Claim failed'));
     btn.disabled = false; updateMineUI();
@@ -1733,28 +1749,8 @@ function showQuizMsg(type, msg) {
 }
 
 // ============================================
-// LEADERBOARD
+// LEADERBOARD — removed to save DB reads
 // ============================================
-async function loadLB() {
-  try {
-    const data = await api('/api/leaderboard');
-    const c = document.getElementById('lblist');
-    if (!c || !data) return;
-    const em = ['🥇','🥈','🥉'];
-    c.innerHTML = data.map((u, i) => {
-      const name = u.username ? '@' + u.username : (u.email ? u.email : (u.wallet_address ? u.wallet_address.slice(0,6)+'...'+u.wallet_address.slice(-4) : 'miner'));
-      const isMe = u.username === me?.username;
-      return `<div class="lbitem" style="${isMe ? 'border-color:rgba(0,255,136,.3);background:rgba(0,255,136,.03);' : ''}">
-        <div class="lbrank ${['gold','silver','bronze'][i]||''}">${i < 3 ? em[i] : '#'+(i+1)}</div>
-        <div class="lbinfo">
-          <div class="lbname">${esc(name)} ${isMe ? '<span style="color:var(--accent);font-size:10px">(you)</span>' : ''}</div>
-          <div class="lbsub">⚡ ${(u.mining_power||1).toFixed(1)}x • 👥 ${u.active_referrals||0}/${u.total_referrals||0} active refs</div>
-        </div>
-        <div class="lbpts">${Math.floor(u.total_mined||0).toLocaleString()}</div>
-      </div>`;
-    }).join('');
-  } catch(e) {}
-}
 
 // ============================================
 // REFERRALS
@@ -1927,7 +1923,7 @@ async function doLogout() {
   localStorage.removeItem('app_user');
   localStorage.removeItem('app_last_sync');
   // Also clear cache
-  ['_api_stats','_api_settings','_api_tasks','_api_leaderboard','_api_referrals','_api_transactions'].forEach(k => localStorage.removeItem('c' + k));
+  ['_api_stats','_api_settings','_api_tasks','_api_referrals','_api_transactions'].forEach(k => localStorage.removeItem('c' + k));
   token = null; me = null;
   document.getElementById('app-screen').classList.remove('show');
   window.location.reload();
@@ -1942,9 +1938,8 @@ function nav(p, btn) {
   const pg = document.getElementById('page-' + p);
   if (pg) pg.classList.add('active');
   if (btn) btn.classList.add('active');
-  if (p === 'top') loadLB();
   if (p === 'ref') loadRefs();
-  if (p === 'profile') { loadTxH(); loadMyRank(); }
+  if (p === 'profile') { loadTxH(); }
 }
 
 // ============================================
