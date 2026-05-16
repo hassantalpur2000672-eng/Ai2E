@@ -1,73 +1,134 @@
 // ============================================
-// Ai2E (Artificial Intelligence to Earn) — Cloudflare Pages Function
-// Database: Turso (LibSQL)
-// Updated: Secure PBKDF2 password hashing (100k iterations)
+// Ai2E — 3-DATABASE PRODUCTION BACKEND
+// DB1 (Turso): Auth & Users  →  env: TURSO_URL, TURSO_TOKEN
+// DB2 (Supabase Tasks):       →  env: SUPABASE_TASKS_URL, SUPABASE_TASKS_KEY
+// DB3 (Supabase Mining):      →  env: SUPABASE_MINING_URL, SUPABASE_MINING_KEY
+// Other:                      →  env: JWT_SECRET, ADMIN_KEY
 // ============================================
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Admin-Key',
+  'Access-Control-Expose-Headers': 'Content-Type',
 };
 
-// ── Database helper (Turso via HTTP) ─────
+// ============================================
+// DATABASE CLIENTS
+// ============================================
+
+// Turso Helper
 async function turso(env, sql, args = []) {
-  const url = env.TURSO_URL.replace('libsql://', 'https://');
-  const res = await fetch(`${url}/v2/pipeline`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${env.TURSO_TOKEN}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      requests: [
-        {
-          type: 'execute',
-          stmt: {
-            sql,
-            args: args.map(v => {
-              if (v === null || v === undefined) return { type: 'null' };
-              if (typeof v === 'number') return { type: 'integer', value: String(v) };
-              return { type: 'text', value: String(v) };
-            })
-          }
-        },
-        { type: 'close' }
-      ]
-    })
-  });
-  const data = await res.json();
-  if (data.results?.[0]?.type === 'error') throw new Error(data.results[0].error.message);
-  const result = data.results?.[0]?.response?.result;
-  if (!result) return [];
-  const cols = result.cols.map(c => c.name);
-  return result.rows.map(row => {
-    const obj = {};
-    cols.forEach((col, i) => { obj[col] = row[i]?.value ?? null; });
-    return obj;
-  });
+  try {
+    const url = env.TURSO_URL.replace('libsql://', 'https://');
+    const res = await fetch(`${url}/v2/pipeline`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${env.TURSO_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requests: [
+          { type: 'execute', stmt: { sql, args: args.map(v => {
+            if (v === null || v === undefined) return { type: 'null' };
+            if (typeof v === 'number') return { type: 'integer', value: String(v) };
+            return { type: 'text', value: String(v) };
+          })}},
+          { type: 'close' }
+        ]
+      })
+    });
+    const data = await res.json();
+    if (data.results?.[0]?.type === 'error') throw new Error(data.results[0].error.message);
+    const result = data.results?.[0]?.response?.result;
+    if (!result) return [];
+    const cols = result.cols.map(c => c.name);
+    return result.rows.map(row => {
+      const obj = {};
+      cols.forEach((col, i) => { obj[col] = row[i]?.value ?? null; });
+      return obj;
+    });
+  } catch (e) { console.error('Turso Error:', e); throw e; }
 }
 
-async function dbFirst(env, sql, args = []) {
-  const rows = await turso(env, sql, args);
-  return rows[0] || null;
+async function dbFirst(env, sql, args = []) { return (await turso(env, sql, args))[0] || null; }
+async function dbAll(env, sql, args = []) { return await turso(env, sql, args); }
+async function dbRun(env, sql, args = []) { return await turso(env, sql, args); }
+
+// Supabase Tasks Helper
+async function sbTasks(env, endpoint, method = 'GET', body = null) {
+  try {
+    const res = await fetch(`${env.SUPABASE_TASKS_URL}/rest/v1/${endpoint}`, {
+      method,
+      headers: {
+        'apikey': env.SUPABASE_TASKS_KEY,
+        'Authorization': `Bearer ${env.SUPABASE_TASKS_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      },
+      body: body ? JSON.stringify(body) : null
+    });
+    if (!res.ok) throw new Error(`SB Tasks: ${res.status}`);
+    return method === 'DELETE' || method === 'PATCH' ? { ok: true } : await res.json();
+  } catch (e) { console.error('Supabase Tasks Error:', e); return method === 'GET' ? [] : { ok: false }; }
 }
 
-async function dbAll(env, sql, args = []) {
-  return await turso(env, sql, args);
+// Supabase Mining Helper
+async function sbMining(env, endpoint, method = 'GET', body = null) {
+  try {
+    const res = await fetch(`${env.SUPABASE_MINING_URL}/rest/v1/${endpoint}`, {
+      method,
+      headers: {
+        'apikey': env.SUPABASE_MINING_KEY,
+        'Authorization': `Bearer ${env.SUPABASE_MINING_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      },
+      body: body ? JSON.stringify(body) : null
+    });
+    if (!res.ok) throw new Error(`SB Mining: ${res.status}`);
+    return method === 'DELETE' || method === 'PATCH' ? { ok: true } : await res.json();
+  } catch (e) { console.error('Supabase Mining Error:', e); return method === 'GET' ? [] : { ok: false }; }
 }
 
-async function dbRun(env, sql, args = []) {
-  return await turso(env, sql, args);
+// Safe call wrapper
+async function safe(fn, def = null) {
+  try { return await fn(); } catch (e) { console.error('Safe call failed:', e); return def; }
 }
 
-// ── Token helpers (JWT-like) ─────────────
+// ============================================
+// PASSWORD & TOKEN UTILS
+// ============================================
+
+async function legacyHash(password) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password + 'AI2E_SALT_2025'));
+  return btoa(String.fromCharCode(...new Uint8Array(buf)));
+}
+
+async function hashPassword(password) {
+  const encoder = new TextEncoder();
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const keyMaterial = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']);
+  const derived = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' }, keyMaterial, 256);
+  const hashHex = Array.from(new Uint8Array(derived)).map(b => b.toString(16).padStart(2, '0')).join('');
+  const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
+  return `${saltHex}:${hashHex}`;
+}
+
+async function verifyPassword(password, storedHash) {
+  if (!storedHash) return false;
+  if (!storedHash.includes(':')) return (await legacyHash(password)) === storedHash;
+  const [saltHex, hashHex] = storedHash.split(':');
+  if (!saltHex || !hashHex) return false;
+  const salt = new Uint8Array(saltHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+  const keyMaterial = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
+  const derived = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' }, keyMaterial, 256);
+  const newHash = Array.from(new Uint8Array(derived)).map(b => b.toString(16).padStart(2, '0')).join('');
+  return newHash === hashHex;
+}
+
 async function makeToken(userId, env) {
   const data = JSON.stringify({ id: userId, ts: Date.now() });
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(env.JWT_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(data));
-  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sig)));
-  return btoa(data) + '.' + sigB64;
+  return btoa(data) + '.' + btoa(String.fromCharCode(...new Uint8Array(sig)));
 }
 
 async function verifyToken(token, env) {
@@ -79,75 +140,65 @@ async function verifyToken(token, env) {
     const valid = await crypto.subtle.verify('HMAC', key, sig, new TextEncoder().encode(data));
     if (!valid) return null;
     const parsed = JSON.parse(data);
-    if (Date.now() - parsed.ts > 30 * 24 * 60 * 60 * 1000) return null; // 30 days
+    if (Date.now() - parsed.ts > 30 * 24 * 60 * 60 * 1000) return null;
     return parsed;
   } catch { return null; }
 }
 
-// ── Password hashing (NEW: PBKDF2, per-user random salt, max 100k iter) ─
-async function legacyHash(password) {
-  // Old method (for migration only)
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password + 'AI2E_SALT_2025'));
-  return btoa(String.fromCharCode(...new Uint8Array(buf)));
+// ============================================
+// UTILITIES
+// ============================================
+
+// Cache helper — browser/Cloudflare cache headers set karo
+// private = sirf user ka browser cache kare (Cloudflare nahi)
+// public  = Cloudflare bhi cache kare (unauthenticated endpoints)
+function json(data, status = 200, cacheSeconds = 0) {
+  const cacheHeader = cacheSeconds > 0
+    ? { 'Cache-Control': `private, max-age=${cacheSeconds}` }
+    : { 'Cache-Control': 'no-store' };
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...CORS, 'Content-Type': 'application/json', ...cacheHeader }
+  });
 }
 
-async function hashPassword(password) {
-  const encoder = new TextEncoder();
-  const salt = crypto.getRandomValues(new Uint8Array(16)); // 16-byte random salt
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']
-  );
-  const derived = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },  // Cloudflare limit
-    keyMaterial, 256
-  );
-  const hashArray = Array.from(new Uint8Array(derived));
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
-  return `${saltHex}:${hashHex}`;
+function jsonPublic(data, status = 200, cacheSeconds = 60) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      ...CORS,
+      'Content-Type': 'application/json',
+      'Cache-Control': `public, max-age=${cacheSeconds}, stale-while-revalidate=${cacheSeconds * 2}`
+    }
+  });
 }
 
-async function verifyPassword(password, storedHash) {
-  if (!storedHash) return false;
-  // Check if old format (no colon)
-  if (!storedHash.includes(':')) {
-    const old = await legacyHash(password);
-    return old === storedHash;
-  }
-  // New format: salt:hash
-  const [saltHex, hashHex] = storedHash.split(':');
-  if (!saltHex || !hashHex) return false;
-  const encoder = new TextEncoder();
-  const salt = new Uint8Array(saltHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']
-  );
-  const derived = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },  // Cloudflare limit
-    keyMaterial, 256
-  );
-  const newHash = Array.from(new Uint8Array(derived))
-    .map(b => b.toString(16).padStart(2, '0')).join('');
-  return newHash === hashHex;
-}
-
-// ── Utilities ────────────────────────────
-function json(data, status = 200) {
-  return new Response(JSON.stringify(data), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
-}
 function err(msg, status = 400) {
-  return json({ error: msg }, status);
+  return new Response(JSON.stringify({ error: msg }), {
+    status,
+    headers: { ...CORS, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
+  });
 }
+
+// getUser — in-memory token cache (ek request ke andar dobara DB nahi jaata)
+const _tokenCache = new Map();
 async function getUser(req, env) {
   const auth = req.headers.get('Authorization') || '';
   const token = auth.replace('Bearer ', '');
   if (!token) return null;
+  // Same token same request mein dobara verify nahi hoga
+  if (_tokenCache.has(token)) return _tokenCache.get(token);
   const parsed = await verifyToken(token, env);
   if (!parsed) return null;
-  return await dbFirst(env, 'SELECT * FROM users WHERE id = ?', [parsed.id]);
+  const user = await dbFirst(env, 'SELECT * FROM users WHERE id = ?', [parsed.id]);
+  _tokenCache.set(token, user);
+  return user;
 }
 
 // ============================================
+// MAIN REQUEST HANDLER
+// ============================================
+
 export async function onRequest({ request, env }) {
   if (request.method === 'OPTIONS') return new Response(null, { headers: CORS });
 
@@ -155,554 +206,288 @@ export async function onRequest({ request, env }) {
   const path = url.pathname;
 
   try {
-    // ── AUTH ──────────────────────────────────────
-    if (path === '/api/auth/register' && request.method === 'POST') {
-      const { username, email, password, ref_code, security_question, security_answer } = await request.json();
-      if (!username || !email || !password) return err('All fields required');
+
+    // ============================================
+    // AUTH ENDPOINTS (Turso DB)
+    // Dono paths support: /api/register aur /api/auth/register
+    // ============================================
+
+    if ((path === '/api/register' || path === '/api/auth/register') && request.method === 'POST') {
+      const { username, email, password, referralCode, ref_code, wallet, walletType, wallet_address, wallet_type, securityQuestion, security_question, securityAnswer, security_answer } = await request.json();
+
+      const refCode = referralCode || ref_code || null;
+      const walletAddr = wallet || wallet_address || null;
+      const walletT = walletType || wallet_type || null;
+      const secQ = securityQuestion || security_question || null;
+      const secA = securityAnswer || security_answer || null;
+
+      if (!username || !email || !password) return err('Missing fields');
       if (password.length < 6) return err('Password min 6 chars');
 
       const emailNorm = email.toLowerCase().trim();
-      const exists = await dbFirst(env, 'SELECT id FROM users WHERE LOWER(email) = ?', [emailNorm]);
-      if (exists) return err('Email already registered');
+      const exists = await dbFirst(env, 'SELECT id FROM users WHERE LOWER(email) = ? OR LOWER(username) = ?', [emailNorm, username.toLowerCase()]);
+      if (exists) return err('Email or username exists', 409);
 
-      const uExists = await dbFirst(env, 'SELECT id FROM users WHERE username = ?', [username.toLowerCase()]);
-      if (uExists) return err('Username taken');
-
-      const hashed = await hashPassword(password); // new secure hash (100k iter)
-      const myRef = 'AI2E' + Math.random().toString(36).substr(2, 6).toUpperCase();
-      const id = crypto.randomUUID();
-      const cfg = await dbFirst(env, "SELECT value FROM settings WHERE key = 'welcome_bonus'");
-      const bonus = parseInt(cfg?.value || '1000');
+      const hashedPassword = await hashPassword(password);
+      const userId = crypto.randomUUID();
+      const userRefCode = 'AI2E' + Math.random().toString(36).substr(2, 6).toUpperCase();
 
       await dbRun(env,
-        `INSERT INTO users (id,username,email,password_hash,referral_code,referred_by,points,total_mined,mining_power,login_method,mining_claimed,security_question,security_answer,created_at)
-         VALUES (?,?,?,?,?,?,?,0,1.0,'email',1,?,?,datetime('now'))`,
-        [id, username.toLowerCase(), emailNorm, hashed, myRef, ref_code || null, bonus, security_question||null, security_answer||null]
+        ,
+        [userId, username.toLowerCase(), emailNorm, hashedPassword, walletAddr, walletT, userRefCode, refCode, secQ, secA]
       );
 
-      await dbRun(env,
-        "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",
-        [crypto.randomUUID(), id, 'welcome_bonus', bonus, '🎉 Welcome bonus']
-      );
-
-      // Refer system: registration pe sirf count badhe — asli faida mining claim par (10% + 1% tree)
-      if (ref_code) {
-        const refUser = await dbFirst(env, 'SELECT * FROM users WHERE referral_code = ?', [ref_code]);
-        if (refUser && refUser.id !== id) {
-          await dbRun(env, 'UPDATE users SET referral_count = referral_count + 1 WHERE id = ?', [refUser.id]);
-        }
+      // Referral count update in Turso + Mining DB log (non-blocking)
+      if (refCode) {
+        safe(async () => {
+          const ref = await dbFirst(env, 'SELECT id, email FROM users WHERE referral_code = ?', [refCode]);
+          if (ref && ref.id !== userId) {
+            await dbRun(env, 'UPDATE users SET referral_count = COALESCE(referral_count, 0) + 1 WHERE id = ?', [ref.id]);
+            await sbMining(env, 'referrals', 'POST', { referrer_email: ref.email, referred_email: emailNorm, referral_code: refCode, bonus_points: 500 });
+          }
+        });
       }
 
-            const token = await makeToken(id, env);
-      const user = await dbFirst(env, 'SELECT * FROM users WHERE id = ?', [id]);
-      return json({ token, user });
+      // Init user in Mining DB (non-blocking)
+      safe(async () => {
+        await sbMining(env, 'user_points', 'POST', { user_email: emailNorm, total_points: 0, mining_balance: 0, daily_streak: 0 });
+      });
+
+      const token = await makeToken(userId, env);
+      return json({ success: true, token, user: { id: userId, username: username.toLowerCase(), email: emailNorm, referralCode: userRefCode } });
     }
 
-    if (path === '/api/auth/login' && request.method === 'POST') {
+    // /api/login aur /api/auth/login dono support
+    if ((path === '/api/login' || path === '/api/auth/login') && request.method === 'POST') {
       const { email, password } = await request.json();
-      if (!email || !password) return err('Email and password required');
+      if (!email || !password) return err('Missing credentials');
+
       const emailNorm = email.toLowerCase().trim();
-      let user = await dbFirst(env, 'SELECT * FROM users WHERE email = ?', [emailNorm]);
-      if (!user) user = await dbFirst(env, 'SELECT * FROM users WHERE LOWER(email) = ?', [emailNorm]);
-      if (!user) return err('Wrong email or password');
-      if (user.is_banned == 1) return err('Account banned');
+      let user = await dbFirst(env, 'SELECT * FROM users WHERE LOWER(email) = ?', [emailNorm]);
+      if (!user) return err('Invalid credentials', 401);
+      if (user.is_banned == 1) return err('Account banned', 403);
 
-      // Verify password (handles old/new format + automatic upgrade)
-      const valid = await verifyPassword(password, user.password_hash);
-      if (!valid) return err('Wrong email or password');
+      // password column (old DB) ya password_hash (agar migrate kiya ho) — dono handle
+      const storedHash = user.password || user.password_hash;
+      const valid = await verifyPassword(password, storedHash);
+      if (!valid) return err('Invalid credentials', 401);
 
-      // If old format, upgrade to new format on-the-fly
-      if (!user.password_hash.includes(':')) {
+      // Auto-upgrade: agar old simple hash hai to PBKDF2 mein upgrade karo
+      if (storedHash && !storedHash.includes(':')) {
         const newHash = await hashPassword(password);
-        await dbRun(env, 'UPDATE users SET password_hash = ? WHERE id = ?', [newHash, user.id]);
+        safe(async () => {
+          await dbRun(env, 'UPDATE users SET password = ? WHERE id = ?', [newHash, user.id]);
+        });
       }
+
+      await dbRun(env, 'UPDATE users SET last_login = datetime('now') WHERE id = ?', [user.id]);
 
       const token = await makeToken(user.id, env);
-      return json({ token, user });
-    }
-
-    if (path === '/api/auth/wallet' && request.method === 'POST') {
-      const { wallet_address, wallet_type, ref_code } = await request.json();
-      if (!wallet_address) return err('Wallet address required');
-      const addr = wallet_address.toLowerCase();
-      let user = await dbFirst(env, 'SELECT * FROM users WHERE wallet_address = ?', [addr]);
-
-      if (!user) {
-        const id = crypto.randomUUID();
-        const username = 'w_' + wallet_address.slice(2, 10).toLowerCase();
-        const myRef = 'AI2E' + Math.random().toString(36).substr(2, 6).toUpperCase();
-        const cfg = await dbFirst(env, "SELECT value FROM settings WHERE key = 'welcome_bonus'");
-        const bonus = parseInt(cfg?.value || '1000');
-
-        await dbRun(env,
-          `INSERT INTO users (id,username,wallet_address,wallet_type,referral_code,referred_by,points,total_mined,mining_power,login_method,mining_claimed,created_at)
-           VALUES (?,?,?,?,?,?,?,0,1.0,?,1,datetime('now'))`,
-          [id, username, addr, wallet_type || 'web3', myRef, ref_code || null, bonus, wallet_type || 'wallet']
-        );
-
-        await dbRun(env,
-          "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",
-          [crypto.randomUUID(), id, 'welcome_bonus', bonus, '🎉 Welcome bonus']
-        );
-
-        // Refer: sirf count update
-        if (ref_code) {
-          const refUser = await dbFirst(env, 'SELECT * FROM users WHERE referral_code = ?', [ref_code]);
-          if (refUser) {
-            await dbRun(env, 'UPDATE users SET referral_count = referral_count + 1 WHERE id = ?', [refUser.id]);
-          }
+      return json({
+        success: true,
+        token,
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          walletAddress: user.wallet_address,
+          walletType: user.wallet_type,
+          referralCode: user.referral_code
         }
-                user = await dbFirst(env, 'SELECT * FROM users WHERE id = ?', [id]);
-      }
-
-      if (user.is_banned == 1) return err('Account banned');
-      const token = await makeToken(user.id, env);
-      return json({ token, user });
+      });
     }
 
-    // ── FORGOT PASSWORD CHECK ─────────────────────
-    if (path === '/api/auth/forgot-check' && request.method === 'POST') {
-      const { email } = await request.json();
-      if (!email) return err('Email required');
-      const user = await dbFirst(env, 'SELECT id, security_question FROM users WHERE LOWER(email) = ?', [email.toLowerCase().trim()]);
-      if (!user) return err('Is email pe koi account nahi mila');
-      return json({ ok: true, security_question: user.security_question || null });
-    }
-
-    // ── FORGOT PASSWORD REQUEST ────────────────────
-    if (path === '/api/auth/forgot-password' && request.method === 'POST') {
-      const { email, answer, question, new_password } = await request.json();
-      if (!email || !answer) return err('Email aur answer zaroor chahiye');
-      if (!new_password || new_password.length < 6) return err('New password min 6 characters');
-      const emailNorm = email.toLowerCase().trim();
-      const user = await dbFirst(env, 'SELECT id, username FROM users WHERE LOWER(email) = ?', [emailNorm]);
-      if (!user) return err('Account nahi mila');
-      const existing = await dbFirst(env, "SELECT id FROM password_resets WHERE user_id = ? AND status = 'pending'", [user.id]);
-      if (existing) return err('Reset request already pending hai. Admin jald review karega.');
-      const hashedNew = await hashPassword(new_password);
-      await dbRun(env,
-        "INSERT INTO password_resets (id,user_id,username,email,verify_question,verify_answer,new_password_hash,status,created_at) VALUES (?,?,?,?,?,?,?,'pending',datetime('now'))",
-        [crypto.randomUUID(), user.id, user.username, emailNorm, question||'', answer, hashedNew]
-      );
-      return json({ ok: true });
-    }
-
-    // ── SUPPORT: USER SEND MESSAGE (1 per 24h) ────
-    if (path === '/api/support/send' && request.method === 'POST') {
+    if ((path === '/api/profile' || path === '/api/me') && request.method === 'GET') {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
-      const { message } = await request.json();
-      if (!message || message.trim().length < 5) return err('Message bahut chota hai');
-      const last = await dbFirst(env, "SELECT id FROM support_messages WHERE user_id = ? AND created_at > datetime('now','-24 hours')", [user.id]);
-      if (last) return err('24 ghante mein sirf 1 message bhej sakte hain');
-      await dbRun(env,
-        "INSERT INTO support_messages (id,user_id,username,email,message,status,created_at) VALUES (?,?,?,?,?,'open',datetime('now'))",
-        [crypto.randomUUID(), user.id, user.username, user.email||'', message.trim()]
-      );
-      return json({ ok: true });
+
+      const miningData = await safe(async () => {
+        const data = await sbMining(env, `user_points?user_email=eq.${user.email}`);
+        return data[0] || {};
+      }, {});
+
+      return json({
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        walletAddress: user.wallet_address,
+        walletType: user.wallet_type,
+        referralCode: user.referral_code,
+        totalMined: miningData.total_points || 0,
+        miningBalance: miningData.mining_balance || 0,
+        dailyStreak: miningData.daily_streak || 0,
+        createdAt: user.created_at
+      }, 200, 300); // 5 min browser cache
     }
 
-    // ── SUPPORT: USER GET OWN MESSAGES ────────────
-    if (path === '/api/support/my-messages' && request.method === 'GET') {
-      const user = await getUser(request, env);
-      if (!user) return err('Unauthorized', 401);
-      const msgs = await dbAll(env, 'SELECT * FROM support_messages WHERE user_id = ? ORDER BY created_at DESC LIMIT 10', [user.id]);
-      return json(msgs);
-    }
-
-    // ── ADMIN: SUPPORT MESSAGES ───────────────────
-    if (path === '/api/admin/support' && request.method === 'GET') {
-      const k = request.headers.get('X-Admin-Key');
-      if (k !== (env.ADMIN_KEY||'Admin@2026')) return err('Forbidden',403);
-      return json({ messages: await dbAll(env, 'SELECT * FROM support_messages ORDER BY created_at DESC LIMIT 100') });
-    }
-
-    if (path === '/api/admin/support/reply' && request.method === 'POST') {
-      const k = request.headers.get('X-Admin-Key');
-      if (k !== (env.ADMIN_KEY||'Admin@2026')) return err('Forbidden',403);
-      const { msg_id, reply } = await request.json();
-      await dbRun(env, "UPDATE support_messages SET admin_reply=?,status='replied',replied_at=datetime('now') WHERE id=?", [reply, msg_id]);
-      return json({ ok: true });
-    }
-
-    if (path === '/api/admin/support/close' && request.method === 'POST') {
-      const k = request.headers.get('X-Admin-Key');
-      if (k !== (env.ADMIN_KEY||'Admin@2026')) return err('Forbidden',403);
-      const { msg_id } = await request.json();
-      await dbRun(env, "UPDATE support_messages SET status='closed' WHERE id=?", [msg_id]);
-      return json({ ok: true });
-    }
-
-    // ── ADMIN: RESET REQUESTS ─────────────────────
-    if (path === '/api/admin/reset-requests' && request.method === 'GET') {
-      const k = request.headers.get('X-Admin-Key');
-      if (k !== (env.ADMIN_KEY||'Admin@2026')) return err('Forbidden',403);
-      return json({ requests: await dbAll(env, "SELECT * FROM password_resets ORDER BY created_at DESC LIMIT 50") });
-    }
-
-    if (path === '/api/admin/reset-approve' && request.method === 'POST') {
-      const k = request.headers.get('X-Admin-Key');
-      if (k !== (env.ADMIN_KEY||'Admin@2026')) return err('Forbidden',403);
-      const { reset_id, new_password } = await request.json();
-      if (!reset_id) return err('Invalid');
-      const reset = await dbFirst(env, 'SELECT * FROM password_resets WHERE id=?', [reset_id]);
-      if (!reset) return err('Request nahi mili');
-      const pwHash = reset.new_password_hash || await hashPassword('reset123');
-      await dbRun(env, 'UPDATE users SET password_hash=? WHERE id=?', [pwHash, reset.user_id]);
-      await dbRun(env, "UPDATE password_resets SET status='approved',resolved_at=datetime('now') WHERE id=?", [reset_id]);
-      return json({ ok: true });
-    }
-
-    if (path === '/api/admin/reset-reject' && request.method === 'POST') {
-      const k = request.headers.get('X-Admin-Key');
-      if (k !== (env.ADMIN_KEY||'Admin@2026')) return err('Forbidden',403);
-      const { reset_id } = await request.json();
-      await dbRun(env, "UPDATE password_resets SET status='rejected',resolved_at=datetime('now') WHERE id=?", [reset_id]);
-      return json({ ok: true });
-    }
-
-    // ── USER ──────────────────────────────────────
-    if (path === '/api/me' && request.method === 'GET') {
-      const user = await getUser(request, env);
-      if (!user) return err('Unauthorized', 401);
-      const refs = await dbFirst(env, 'SELECT COUNT(*) as c FROM users WHERE referred_by = ? AND total_mined > 0', [user.referral_code]);
-      const activeRefs = parseInt(refs?.c || 0);
-      try { await dbRun(env, 'UPDATE users SET active_referral_count = ? WHERE id = ?', [activeRefs, user.id]); } catch(e) {}
-      const updated = await dbFirst(env, 'SELECT * FROM users WHERE id = ?', [user.id]);
-      return json({ ...updated, active_referral_count: activeRefs });
-    }
-
-    if (path === '/api/mine/start' && request.method === 'POST') {
-      const user = await getUser(request, env);
-      if (!user) return err('Unauthorized', 401);
-      if (user.mining_claimed != 1) return err('Already mining');
-      const now = new Date().toISOString();
-      await dbRun(env, "UPDATE users SET last_mining_start = ?, mining_claimed = 0 WHERE id = ?", [now, user.id]);
-      await dbRun(env, "INSERT INTO mining_sessions (id,user_id,started_at,mining_power) VALUES (?,?,?,?)", [crypto.randomUUID(), user.id, now, user.mining_power]);
-      return json({ success: true });
-    }
-
-    if (path === '/api/mine/claim' && request.method === 'POST') {
-      const user = await getUser(request, env);
-      if (!user) return err('Unauthorized', 401);
-      if (user.mining_claimed == 1) return err('Nothing to claim');
-
-      const cfgRows = await dbAll(env, "SELECT key, value FROM settings WHERE key IN ('mining_duration_hours','mining_coins_per_hour')");
-      const cfgMap = {};
-      cfgRows.forEach(r => cfgMap[r.key] = r.value);
-      const durMs = parseInt(cfgMap.mining_duration_hours || '24') * 3600000;
-      const cpm = parseFloat(cfgMap.mining_coins_per_hour || '10') * parseFloat(user.mining_power) / 3600000;
-      const start = new Date(user.last_mining_start).getTime();
-      const elapsed = Math.min(Date.now() - start, durMs);
-      const earned = Math.floor(cpm * elapsed);
-
-      if (earned < 100) return err('Mine at least 100 points first');
-
-      const newPts = parseInt(user.points || 0) + earned;
-      const newMined = parseInt(user.total_mined || 0) + earned;
-      await dbRun(env, 'UPDATE users SET points = ?, total_mined = ?, total_claimed = total_claimed + ?, mining_claimed = 1 WHERE id = ?', [newPts, newMined, earned, user.id]);
-      await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, 'mining_claim', earned, '⛏️ Mining claim']);
-      await dbRun(env, "UPDATE mining_sessions SET claimed_at = datetime('now'), coins_earned = ?, is_claimed = 1 WHERE user_id = ? AND is_claimed = 0", [earned, user.id]);
-
-      // ── Refer Mining Tree: L1=50%, L2=25%, L3=10% ──────────────────────────────
-      if (user.referred_by) {
-        const L1 = await dbFirst(env, 'SELECT * FROM users WHERE referral_code = ?', [user.referred_by]);
-        if (L1) {
-          const l1Bonus = Math.floor(earned * 0.50);
-          if (l1Bonus > 0) {
-            await dbRun(env, 'UPDATE users SET points = points + ? WHERE id = ?', [l1Bonus, L1.id]);
-            await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), L1.id, 'refer_mining_l1', l1Bonus, '⛏️ L1 50%: @' + user.username]);
-            if (L1.referred_by) {
-              const L2 = await dbFirst(env, 'SELECT * FROM users WHERE referral_code = ?', [L1.referred_by]);
-              if (L2) {
-                const l2Bonus = Math.floor(earned * 0.25);
-                if (l2Bonus > 0) {
-                  await dbRun(env, 'UPDATE users SET points = points + ? WHERE id = ?', [l2Bonus, L2.id]);
-                  await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), L2.id, 'refer_mining_l2', l2Bonus, '🌿 L2 25%: @' + user.username]);
-                  if (L2.referred_by) {
-                    const L3 = await dbFirst(env, 'SELECT * FROM users WHERE referral_code = ?', [L2.referred_by]);
-                    if (L3) {
-                      const l3Bonus = Math.floor(earned * 0.10);
-                      if (l3Bonus > 0) {
-                        await dbRun(env, 'UPDATE users SET points = points + ? WHERE id = ?', [l3Bonus, L3.id]);
-                        await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), L3.id, 'refer_mining_l3', l3Bonus, '🔥 L3 10%: @' + user.username]);
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-      return json({ success: true, earned });
-    }
+    // ============================================
+    // TASKS ENDPOINTS (Supabase Tasks DB)
+    // ============================================
 
     if (path === '/api/tasks' && request.method === 'GET') {
-      const user = await getUser(request, env);
-      if (!user) return err('Unauthorized', 401);
-      const tasks = await dbAll(env, 'SELECT * FROM tasks WHERE is_active = 1 ORDER BY display_order');
-      const done = await dbAll(env, 'SELECT task_id FROM user_tasks WHERE user_id = ?', [user.id]);
-      return json({ tasks, done: done.map(d => d.task_id) });
+      const tasks = await safe(async () => {
+        return await sbTasks(env, 'tasks?is_active=eq.true&order=display_order.asc');
+      }, []);
+      return json(tasks, 200, 1800); // 30 min cache
     }
 
     if (path === '/api/tasks/complete' && request.method === 'POST') {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
-      const { task_id } = await request.json();
-      const task = await dbFirst(env, 'SELECT * FROM tasks WHERE id = ? AND is_active = 1', [task_id]);
-      if (!task) return err('Task not found');
-      const already = await dbFirst(env, 'SELECT id FROM user_tasks WHERE user_id = ? AND task_id = ?', [user.id, task_id]);
-      if (already) return err('Already completed');
-      if (task.task_type === 'quiz') return err('Quiz tasks require answer verification');
-      if (task.verify_code && task.verify_code.trim() !== '') return err('This task requires a secret code to complete');
-      await dbRun(env, "INSERT INTO user_tasks (id,user_id,task_id,completed_at) VALUES (?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, task_id]);
-      await dbRun(env, 'UPDATE users SET points = points + ?, total_tasks_completed = total_tasks_completed + 1 WHERE id = ?', [task.points_reward, user.id]);
-      await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, 'task_complete', task.points_reward, '✅ ' + task.title]);
-      return json({ success: true, earned: task.points_reward });
-    }
 
-    // VERIFY CODE — user URL/video pe jaake code dhundta hai, yahan submit karta hai
-    if (path === '/api/tasks/verify-code' && request.method === 'POST') {
-      const user = await getUser(request, env);
-      if (!user) return err('Unauthorized', 401);
-      const { task_id, code } = await request.json();
-      if (!task_id || !code) return err('Task ID aur code zaroori hain');
-      const task = await dbFirst(env, 'SELECT * FROM tasks WHERE id = ? AND is_active = 1', [task_id]);
-      if (!task) return err('Task nahi mila');
-      const already = await dbFirst(env, 'SELECT id FROM user_tasks WHERE user_id = ? AND task_id = ?', [user.id, task_id]);
-      if (already) return err('Already completed');
-      let attempt = await dbFirst(env, 'SELECT * FROM quiz_attempts WHERE user_id = ? AND task_id = ?', [user.id, task_id]);
-      const maxAttempts = 3;
-      const attempts = attempt ? attempt.attempts : 0;
-      if (attempt && attempt.failed == 1) return json({ success: false, failed: true, message: 'Aap fail ho chuke hain. Dobara task shuru karen.' });
-      const correct = (task.verify_code || '').trim().toLowerCase();
-      const given = (code || '').trim().toLowerCase();
-      const isCorrect = correct === given;
-      if (isCorrect) {
-        await dbRun(env, "INSERT INTO user_tasks (id,user_id,task_id,completed_at) VALUES (?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, task_id]);
-        await dbRun(env, 'UPDATE users SET points = points + ?, total_tasks_completed = total_tasks_completed + 1 WHERE id = ?', [task.points_reward, user.id]);
-        await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, 'task_complete', task.points_reward, '✅ ' + task.title]);
-        if (attempt) await dbRun(env, 'DELETE FROM quiz_attempts WHERE user_id = ? AND task_id = ?', [user.id, task_id]);
-        return json({ success: true, earned: task.points_reward });
-      } else {
-        const newAttempts = attempts + 1;
-        const isFailed = newAttempts >= maxAttempts;
-        if (attempt) {
-          await dbRun(env, 'UPDATE quiz_attempts SET attempts = ?, failed = ? WHERE user_id = ? AND task_id = ?', [newAttempts, isFailed ? 1 : 0, user.id, task_id]);
-        } else {
-          await dbRun(env, "INSERT INTO quiz_attempts (id,user_id,task_id,attempts,failed,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, task_id, newAttempts, isFailed ? 1 : 0]);
-        }
-        const remaining = maxAttempts - newAttempts;
-        if (isFailed) return json({ success: false, failed: true, message: 'Galat code! 3 baar fail ho gaye. Dobara task shuru karen.' });
-        return json({ success: false, failed: false, remaining, message: 'Galat code! ' + remaining + ' maukay baki hain.' });
-      }
-    }
+      const { taskId } = await request.json();
+      const result = await safe(async () => {
+        return await sbTasks(env, 'task_completions', 'POST', {
+          user_email: user.email,
+          task_id: taskId,
+          completed_at: new Date().toISOString()
+        });
+      }, { ok: false });
 
-    // VERIFY CODE RESET — fail hone k baad dobara shuru
-    if (path === '/api/tasks/verify-reset' && request.method === 'POST') {
-      const user = await getUser(request, env);
-      if (!user) return err('Unauthorized', 401);
-      const { task_id } = await request.json();
-      await dbRun(env, 'DELETE FROM quiz_attempts WHERE user_id = ? AND task_id = ?', [user.id, task_id]);
-      return json({ success: true });
-    }
-
-    if (path === '/api/tasks/quiz-verify' && request.method === 'POST') {
-      const user = await getUser(request, env);
-      if (!user) return err('Unauthorized', 401);
-      const { task_id, answer } = await request.json();
-      if (!task_id || answer === undefined) return err('Missing fields');
-      const task = await dbFirst(env, "SELECT * FROM tasks WHERE id = ? AND is_active = 1 AND task_type = 'quiz'", [task_id]);
-      if (!task) return err('Quiz task not found');
-      const already = await dbFirst(env, 'SELECT id FROM user_tasks WHERE user_id = ? AND task_id = ?', [user.id, task_id]);
-      if (already) return err('Already completed');
-      let attempt = await dbFirst(env, 'SELECT * FROM quiz_attempts WHERE user_id = ? AND task_id = ?', [user.id, task_id]);
-      const maxAttempts = 3;
-      const attempts = attempt ? attempt.attempts : 0;
-      if (attempt && attempt.failed == 1) return json({ success: false, failed: true, message: 'Aap fail ho chuke hain. Dobara task shuru karen.' });
-      const correct = (task.quiz_answer || '').trim().toLowerCase();
-      const given = (answer || '').trim().toLowerCase();
-      const isCorrect = correct === given;
-      if (isCorrect) {
-        await dbRun(env, "INSERT INTO user_tasks (id,user_id,task_id,completed_at) VALUES (?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, task_id]);
-        await dbRun(env, 'UPDATE users SET points = points + ?, total_tasks_completed = total_tasks_completed + 1 WHERE id = ?', [task.points_reward, user.id]);
-        await dbRun(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, 'task_complete', task.points_reward, '✅ Quiz: ' + task.title]);
-        if (attempt) await dbRun(env, 'DELETE FROM quiz_attempts WHERE user_id = ? AND task_id = ?', [user.id, task_id]);
-        return json({ success: true, earned: task.points_reward });
-      } else {
-        const newAttempts = attempts + 1;
-        const isFailed = newAttempts >= maxAttempts;
-        if (attempt) {
-          await dbRun(env, 'UPDATE quiz_attempts SET attempts = ?, failed = ? WHERE user_id = ? AND task_id = ?', [newAttempts, isFailed ? 1 : 0, user.id, task_id]);
-        } else {
-          await dbRun(env, "INSERT INTO quiz_attempts (id,user_id,task_id,attempts,failed,created_at) VALUES (?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, task_id, newAttempts, isFailed ? 1 : 0]);
-        }
-        const remaining = maxAttempts - newAttempts;
-        if (isFailed) return json({ success: false, failed: true, message: 'Galat jawab! 3 baar fail ho gaye. Dobara task shuru karen.' });
-        return json({ success: false, failed: false, remaining, message: 'Galat jawab! ' + remaining + ' maukay baki hain.' });
-      }
-    }
-
-    if (path === '/api/tasks/quiz-reset' && request.method === 'POST') {
-      const user = await getUser(request, env);
-      if (!user) return err('Unauthorized', 401);
-      const { task_id } = await request.json();
-      await dbRun(env, 'DELETE FROM quiz_attempts WHERE user_id = ? AND task_id = ?', [user.id, task_id]);
-      return json({ success: true });
+      return json(result);
     }
 
     if (path === '/api/leaderboard' && request.method === 'GET') {
-      const results = await dbAll(env,
-        `SELECT u.username, u.wallet_address, u.wallet_type, u.total_mined, u.mining_power,
-                (SELECT COUNT(*) FROM users r WHERE r.referred_by = u.referral_code) AS total_referrals,
-                (SELECT COUNT(*) FROM users r WHERE r.referred_by = u.referral_code AND r.total_mined > 0) AS active_referrals
-         FROM users u ORDER BY u.total_mined DESC LIMIT 25`
-      );
-      return json(results);
+      const lb = await safe(async () => {
+        return await sbTasks(env, 'leaderboard?order=total_points.desc&limit=100');
+      }, []);
+      return json(lb, 200, 600); // 10 min cache
+    }
+
+    // ============================================
+    // MINING ENDPOINTS (Supabase Mining DB)
+    // ============================================
+
+    if ((path === '/api/mining/start' || path === '/api/mine/start') && request.method === 'POST') {
+      const user = await getUser(request, env);
+      if (!user) return err('Unauthorized', 401);
+
+      const sessionId = crypto.randomUUID();
+      await safe(async () => {
+        await sbMining(env, 'mining_sessions', 'POST', {
+          session_id: sessionId,
+          user_email: user.email,
+          status: 'active',
+          started_at: new Date().toISOString()
+        });
+      });
+
+      return json({ success: true, sessionId });
+    }
+
+    if ((path === '/api/mining/claim' || path === '/api/mine/claim') && request.method === 'POST') {
+      const user = await getUser(request, env);
+      if (!user) return err('Unauthorized', 401);
+
+      const { points } = await request.json();
+      if (!points || points <= 0) return err('Invalid points');
+
+      await safe(async () => {
+        await sbMining(env, 'mining_claims', 'POST', {
+          user_email: user.email,
+          points_claimed: points,
+          claim_type: 'manual'
+        });
+      });
+
+      await safe(async () => {
+        const current = await sbMining(env, `user_points?user_email=eq.${user.email}`);
+        const pts = (current[0]?.total_points || 0) + points;
+        await sbMining(env, `user_points?user_email=eq.${user.email}`, 'PATCH', {
+          total_points: pts,
+          last_claim_at: new Date().toISOString()
+        });
+      });
+
+      return json({ success: true, points });
     }
 
     if (path === '/api/referrals' && request.method === 'GET') {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
-      const results = await dbAll(env, 'SELECT username,wallet_address,total_mined,created_at FROM users WHERE referred_by = ? ORDER BY created_at DESC LIMIT 30', [user.referral_code]);
-      return json(results);
+
+      const refs = await safe(async () => {
+        return await sbMining(env, `referrals?referrer_email=eq.${user.email}&order=created_at.desc&limit=30`);
+      }, []);
+
+      return json(refs, 200, 600); // 10 min cache
     }
 
-    if (path === '/api/transactions' && request.method === 'GET') {
-      const user = await getUser(request, env);
-      if (!user) return err('Unauthorized', 401);
-      const results = await dbAll(env, 'SELECT * FROM transactions WHERE user_id = ? ORDER BY created_at DESC LIMIT 30', [user.id]);
-      return json(results);
-    }
-
-    if (path === '/api/settings' && request.method === 'GET') {
-      const results = await dbAll(env, 'SELECT key, value FROM settings');
-      const map = {};
-      results.forEach(r => map[r.key] = r.value);
-      return json(map);
-    }
+    // ============================================
+    // PUBLIC STATS
+    // ============================================
 
     if (path === '/api/stats' && request.method === 'GET') {
-      const uc = await dbFirst(env, 'SELECT COUNT(*) as c FROM users');
-      const tm = await dbFirst(env, 'SELECT SUM(total_mined) as s FROM users');
-      return json({ users: parseInt(uc?.c || 0), total_mined: parseInt(tm?.s || 0) });
+      const uc = await safe(async () => {
+        const r = await dbFirst(env, 'SELECT COUNT(*) as c FROM users');
+        return parseInt(r?.c || 0);
+      }, 0);
+
+      const tm = await safe(async () => {
+        const data = await sbMining(env, 'user_points?select=total_points');
+        return data.reduce((sum, u) => sum + (u.total_points || 0), 0);
+      }, 0);
+
+      return jsonPublic({ users: uc, total_mined: tm }, 200, 900); // 15 min public cache
     }
 
-    // ── ADS ── Ab ads.js mein manual hain, DB se nahi aate
-    // /api/ads removed — ads directly ads.js mein hardcode karo
+    // ============================================
+    // ADMIN ENDPOINTS
+    // ============================================
 
-    // ── ADMIN ─────────────────────────────────────
     if (path.startsWith('/api/admin/')) {
       const adminPass = request.headers.get('X-Admin-Key');
       if (adminPass !== (env.ADMIN_KEY || "Admin@2026")) return err('Forbidden', 403);
+
       const body = request.method !== 'GET' ? await request.json().catch(() => ({})) : {};
 
-      if (path === '/api/admin/users' && request.method === 'GET') {
-        return json(await dbAll(env, `SELECT u.*,
-          (SELECT COUNT(*) FROM users r WHERE r.referred_by = u.referral_code) AS referral_count,
-          (SELECT COUNT(*) FROM users r WHERE r.referred_by = u.referral_code AND r.total_mined > 0) AS active_referral_count
-          FROM users u ORDER BY u.created_at DESC LIMIT 100`));
+      if (path === '/api/admin/dashboard') {
+        const uc = await safe(async () => parseInt((await dbFirst(env, 'SELECT COUNT(*) as c FROM users'))?.c || 0), 0);
+        const tm = await safe(async () => {
+          const data = await sbMining(env, 'user_points?select=total_points');
+          return data.reduce((sum, u) => sum + (u.total_points || 0), 0);
+        }, 0);
+        const tc = await safe(async () => (await sbTasks(env, 'tasks?is_active=eq.true')).length, 0);
+        const recent = await safe(async () => await dbAll(env, 'SELECT * FROM users ORDER BY created_at DESC LIMIT 10'), []);
+
+        return json({ users: uc, total_mined: tm, tasks: tc, recent });
       }
+
+      if (path === '/api/admin/users') {
+        const users = await dbAll(env, 'SELECT * FROM users ORDER BY created_at DESC LIMIT 100');
+        return json(users);
+      }
+
       if (path === '/api/admin/users/ban' && request.method === 'POST') {
-        const { id, is_banned } = body;
-        if (!id) return err('Invalid');
-        await dbRun(env, 'UPDATE users SET is_banned=? WHERE id=?', [is_banned ? 1 : 0, id]);
+        await dbRun(env, 'UPDATE users SET is_banned=? WHERE id=?', [body.is_banned ? 1 : 0, body.id]);
         return json({ ok: true });
       }
-      if (path === '/api/admin/users/update' && request.method === 'POST') {
-        await dbRun(env, 'UPDATE users SET username=?,points=?,mining_power=?,is_banned=? WHERE id=?', [body.username, body.points, body.mining_power, body.is_banned ? 1 : 0, body.id]);
-        return json({ success: true });
-      }
-      if (path === '/api/admin/tasks' && request.method === 'GET') {
-        return json(await dbAll(env, 'SELECT * FROM tasks ORDER BY display_order'));
-      }
-      if (path === '/api/admin/tasks/save' && request.method === 'POST') {
-        const { id, title, description, icon, task_type, url, ad_url, quiz_question, quiz_answer, verify_code, points_reward, timer_seconds, display_order, is_active } = body;
-        if (id) {
-          await dbRun(env, 'UPDATE tasks SET title=?,description=?,icon=?,task_type=?,url=?,ad_url=?,quiz_question=?,quiz_answer=?,verify_code=?,points_reward=?,timer_seconds=?,display_order=?,is_active=? WHERE id=?', [title, description||null, icon||'🎯', task_type, url||null, ad_url||null, quiz_question||null, quiz_answer||null, verify_code||null, points_reward, timer_seconds||0, display_order||99, is_active?1:0, id]);
-        } else {
-          await dbRun(env, "INSERT INTO tasks (id,title,description,icon,task_type,url,ad_url,quiz_question,quiz_answer,verify_code,points_reward,timer_seconds,display_order,is_active,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), title, description||null, icon||'🎯', task_type, url||null, ad_url||null, quiz_question||null, quiz_answer||null, verify_code||null, points_reward, timer_seconds||0, display_order||99, is_active?1:0]);
-        }
-        return json({ success: true });
-      }
-      if (path === '/api/admin/tasks/delete' && request.method === 'POST') {
-        await dbRun(env, 'DELETE FROM tasks WHERE id=?', [body.id]);
-        return json({ success: true });
-      }
-      if (path === '/api/admin/settings' && request.method === 'POST') {
-        for (const [key, value] of Object.entries(body)) {
-          await dbRun(env, 'UPDATE settings SET value=? WHERE key=?', [String(value), key]);
-        }
-        return json({ success: true });
-      }
-      if (path === '/api/admin/blog' && request.method === 'GET') {
-        return json(await dbAll(env, 'SELECT * FROM blog_posts ORDER BY display_order'));
-      }
-      if (path === '/api/admin/blog/save' && request.method === 'POST') {
-        const { id, title, slug, category, phase, excerpt, content, display_order, status } = body;
-        const sl = slug || title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-        if (id) {
-          await dbRun(env, 'UPDATE blog_posts SET title=?,slug=?,category=?,phase=?,excerpt=?,content=?,display_order=?,status=? WHERE id=?', [title, sl, category||'roadmap', phase||null, excerpt||null, content||null, display_order||99, status||'published', id]);
-        } else {
-          await dbRun(env, "INSERT INTO blog_posts (id,title,slug,category,phase,excerpt,content,display_order,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), title, sl, category||'roadmap', phase||null, excerpt||null, content||null, display_order||99, status||'published']);
-        }
-        return json({ success: true });
-      }
-      if (path === '/api/admin/blog/delete' && request.method === 'POST') {
-        await dbRun(env, 'DELETE FROM blog_posts WHERE id=?', [body.id]);
-        return json({ success: true });
-      }
-      if (path === '/api/admin/dashboard' && request.method === 'GET') {
-        const [uc, tm, tc, mc] = await Promise.all([
-          dbFirst(env, 'SELECT COUNT(*) as c FROM users'),
-          dbFirst(env, 'SELECT SUM(total_mined) as s FROM users'),
-          dbFirst(env, 'SELECT COUNT(*) as c FROM tasks WHERE is_active=1'),
-          dbFirst(env, 'SELECT COUNT(*) as c FROM mining_sessions'),
-        ]);
-        const recent = await dbAll(env, 'SELECT id,username,email,wallet_address,points,total_mined,mining_power,created_at,login_method,is_banned,(SELECT COUNT(*) FROM users r WHERE r.referred_by = u.referral_code AND r.total_mined > 0) AS active_referral_count FROM users u ORDER BY created_at DESC LIMIT 10');
-        return json({ users: parseInt(uc?.c||0), total_mined: parseInt(tm?.s||0), tasks: parseInt(tc?.c||0), sessions: parseInt(mc?.c||0), recent });
+
+      if (path === '/api/admin/tasks') {
+        const tasks = await safe(async () => await sbTasks(env, 'tasks?order=display_order.asc'), []);
+        return json(tasks);
       }
 
-      if (path === '/api/admin/ads' && request.method === 'GET') {
-        return json(await dbAll(env, 'SELECT * FROM ads ORDER BY created_at DESC'));
-      }
-      if (path === '/api/admin/ads/save' && request.method === 'POST') {
-        const { id, name, network, position, code, url, pages, is_active, type } = body;
-        const pg = Array.isArray(pages) ? pages.join(',') : (pages || 'index,blog,policies,vision');
-        const net = network || type || 'script';
+      if (path === '/api/admin/tasks/save' && request.method === 'POST') {
+        const { id, title, task_type, points_reward, display_order, is_active } = body;
         if (id) {
-          await dbRun(env, 'UPDATE ads SET name=?,network=?,position=?,code=?,url=?,pages=?,is_active=? WHERE id=?', [name, net, position||'bottom', code||'', url||'', pg, is_active!=null?is_active:1, id]);
+          await sbTasks(env, `tasks?id=eq.${id}`, 'PATCH', { title, task_type, points_reward, display_order, is_active });
         } else {
-          await dbRun(env, "INSERT INTO ads (id,name,network,position,code,url,pages,is_active,created_at) VALUES (?,?,?,?,?,?,?,?,datetime('now'))", [crypto.randomUUID(), name, net, position||'bottom', code||'', url||'', pg, is_active!=null?is_active:1]);
+          await sbTasks(env, 'tasks', 'POST', { id: crypto.randomUUID(), title, task_type, points_reward, display_order: display_order || 99, is_active: is_active !== false });
         }
-        return json({ success: true });
+        return json({ ok: true });
       }
-      if (path === '/api/admin/ads/delete' && request.method === 'POST') {
-        await dbRun(env, 'DELETE FROM ads WHERE id=?', [body.id]);
-        return json({ success: true });
-      }
-      if (path === '/api/admin/mining' && request.method === 'GET') {
-        return json(await dbAll(env, 'SELECT ms.*,u.username FROM mining_sessions ms LEFT JOIN users u ON ms.user_id=u.id ORDER BY ms.started_at DESC LIMIT 100'));
-      }
-      if (path === '/api/admin/transactions' && request.method === 'GET') {
-        return json(await dbAll(env, 'SELECT t.*,u.username FROM transactions t LEFT JOIN users u ON t.user_id=u.id ORDER BY t.created_at DESC LIMIT 100'));
+
+      if (path === '/api/admin/tasks/delete' && request.method === 'POST') {
+        await sbTasks(env, `tasks?id=eq.${body.id}`, 'DELETE');
+        return json({ ok: true });
       }
     }
-
-      if (path === '/api/admin/db-init' && request.method === 'POST') {
-        await dbRun(env, `CREATE TABLE IF NOT EXISTS password_resets (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, username TEXT, email TEXT, verify_question TEXT, verify_answer TEXT, new_password_hash TEXT, status TEXT DEFAULT 'pending', created_at TEXT, resolved_at TEXT)`);
-        await dbRun(env, `CREATE TABLE IF NOT EXISTS support_messages (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, username TEXT, email TEXT, message TEXT, status TEXT DEFAULT 'open', admin_reply TEXT, replied_at TEXT, created_at TEXT)`);
-        try { await dbRun(env, 'ALTER TABLE users ADD COLUMN security_question TEXT'); } catch(e) {}
-        try { await dbRun(env, 'ALTER TABLE users ADD COLUMN security_answer TEXT'); } catch(e) {}
-        try { await dbRun(env, 'ALTER TABLE users ADD COLUMN active_referral_count INTEGER DEFAULT 0'); } catch(e) {}
-        try { await dbRun(env, 'ALTER TABLE password_resets ADD COLUMN new_password_hash TEXT'); } catch(e) {}
-        return json({ success: true, message: 'Tables ready' });
-      }
 
     return err('Not found', 404);
 
   } catch (e) {
+    console.error('Server error:', e);
     return err('Server error: ' + e.message, 500);
   }
 }
