@@ -101,31 +101,56 @@ async function sbMining(env, endpoint, method = 'GET', body = null) {
 // ============================================
 
 async function ensureUserInMiningDB(env, user) {
-  // user_points row check karo
-  const existing = await sbMining(env, `user_points?user_email=eq.${encodeURIComponent(user.email)}&limit=1`);
-  if (existing && existing.length > 0) return; // already hai
+  try {
+    // Email ya wallet address use karo identifier ke liye
+    const userIdentifier = user.email || user.wallet_address;
+    if (!userIdentifier) {
+      console.log('No valid identifier for user init in mining DB');
+      return;
+    }
+    
+    // user_points row check karo
+    const existing = await sbMining(env, `user_points?user_email=eq.${encodeURIComponent(userIdentifier)}&limit=1`);
+    if (existing && existing.length > 0) return; // already hai
 
-  // Nahi hai — old user hai, Turso se data lekar init karo
-  await sbMining(env, 'user_points', 'POST', {
-    user_email: user.email,
-    total_points: parseInt(user.total_mined || 0),   // Turso ka purana total
-    mining_balance: parseInt(user.points || 0),        // Turso ka points balance
-    daily_streak: 0
-  });
-  console.log(`Auto-init mining DB for old user: ${user.email}`);
+    // Nahi hai — old user hai, Turso se data lekar init karo
+    await sbMining(env, 'user_points', 'POST', {
+      user_email: userIdentifier,
+      total_points: parseInt(user.total_mined || 0),   // Turso ka purana total
+      mining_balance: parseInt(user.points || 0),        // Turso ka points balance
+      daily_streak: 0
+    });
+    console.log(`Auto-init mining DB for old user: ${userIdentifier}`);
+  } catch (e) {
+    console.error('ensureUserInMiningDB error:', e);
+  }
 }
 
 async function ensureUserInTasksDB(env, user) {
-  // Tasks mein user-specific row nahi hoti (task_completions mein email se track hota hai)
-  // Leaderboard row ensure karo
-  const existing = await sbTasks(env, `leaderboard?user_email=eq.${encodeURIComponent(user.email)}&limit=1`);
-  if (existing && existing.length > 0) return;
+  try {
+    // Email ya wallet address use karo
+    const userIdentifier = user.email || user.wallet_address;
+    const username = user.username || 'user_' + (userIdentifier || '').substring(0, 8);
+    
+    if (!userIdentifier) {
+      console.log('No valid identifier for user init in tasks DB');
+      return;
+    }
+    
+    // Tasks mein user-specific row nahi hoti (task_completions mein email se track hota hai)
+    // Leaderboard row ensure karo
+    const existing = await sbTasks(env, `leaderboard?user_email=eq.${encodeURIComponent(userIdentifier)}&limit=1`);
+    if (existing && existing.length > 0) return;
 
-  await sbTasks(env, 'leaderboard', 'POST', {
-    user_email: user.email,
-    username: user.username,
-    total_points: parseInt(user.total_mined || 0)
-  });
+    await sbTasks(env, 'leaderboard', 'POST', {
+      user_email: userIdentifier,
+      username: username,
+      total_points: parseInt(user.total_mined || 0)
+    });
+    console.log(`Auto-init tasks DB for old user: ${userIdentifier}`);
+  } catch (e) {
+    console.error('ensureUserInTasksDB error:', e);
+  }
 }
 
 // ============================================
@@ -278,6 +303,7 @@ export async function onRequest({ request, env }) {
       const cfg   = await dbFirst(env, "SELECT value FROM settings WHERE key = 'welcome_bonus'");
       const bonus = parseInt(cfg?.value || '1000');
 
+      // Register query — sirf wo columns use karo jo exist karte hain
       await dbRun(env,
         `INSERT INTO users (id, username, email, password, wallet_address, wallet_type,
          referral_code, referred_by, security_question, security_answer,
@@ -286,6 +312,7 @@ export async function onRequest({ request, env }) {
         [userId, username.toLowerCase(), email, hashed, walletAddr, walletType,
          myRefCode, refCode, secQ, secA, bonus]
       );
+      
       await dbRun(env,
         "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",
         [crypto.randomUUID(), userId, 'welcome_bonus', bonus, '🎉 Welcome bonus']
@@ -342,19 +369,34 @@ export async function onRequest({ request, env }) {
       if (!user) return err('Wrong email or password', 401);
       if (user.is_banned == 1) return err('Account banned', 403);
 
+      // Password field flexible — password ya password_hash dono check karo
       const storedHash = user.password || user.password_hash;
+      if (!storedHash) return err('Password not set for this account', 500);
+      
       const valid = await verifyPassword(password, storedHash);
       if (!valid) return err('Wrong email or password', 401);
 
-      // Old hash format? Upgrade silently
+      // Old hash format? Upgrade silently (column exist kare toh hi)
       if (storedHash && !storedHash.includes(':')) {
         safe(async () => {
           const newHash = await hashPassword(password);
-          await dbRun(env, 'UPDATE users SET password = ? WHERE id = ?', [newHash, user.id]);
+          // Try password column, agar nahi hai toh password_hash try karo
+          try {
+            await dbRun(env, 'UPDATE users SET password = ? WHERE id = ?', [newHash, user.id]);
+          } catch (e1) {
+            try {
+              await dbRun(env, 'UPDATE users SET password_hash = ? WHERE id = ?', [newHash, user.id]);
+            } catch (e2) {
+              console.log('Could not update password hash:', e2.message);
+            }
+          }
         });
       }
 
-      await dbRun(env, "UPDATE users SET last_login = datetime('now') WHERE id = ?", [user.id]);
+      // Last login update (safe wrapper — column missing ho toh crash na ho)
+      safe(async () => {
+        await dbRun(env, "UPDATE users SET last_login = datetime('now') WHERE id = ?", [user.id]);
+      });
 
       // Auto-init old user in Supabase DBs (background mein — login slow nahi hoga)
       safe(() => ensureUserInMiningDB(env, user));
@@ -385,13 +427,24 @@ export async function onRequest({ request, env }) {
           [id, username, addr, wallet_type||'web3', myRef, ref_code||null, bonus, wallet_type||'wallet']
         );
         safe(async () => {
-          await sbMining(env, 'user_points', 'POST', { user_email: addr, total_points: 0, mining_balance: 0, daily_streak: 0 });
+          await sbMining(env, 'user_points', 'POST', { 
+            user_email: addr, 
+            total_points: 0, 
+            mining_balance: 0, 
+            daily_streak: 0 
+          });
+          await sbTasks(env, 'leaderboard', 'POST', {
+            user_email: addr,
+            username: username,
+            total_points: 0
+          });
         });
         user = await dbFirst(env, 'SELECT * FROM users WHERE id = ?', [id]);
       }
 
       if (user.is_banned == 1) return err('Account banned', 403);
       safe(() => ensureUserInMiningDB(env, user));
+      safe(() => ensureUserInTasksDB(env, user));
       const token = await makeToken(user.id, env);
       return json({ success: true, token, user });
     }
@@ -474,6 +527,7 @@ export async function onRequest({ request, env }) {
       if (user.mining_claimed != 1) return err('Already mining');
 
       const now = new Date().toISOString();
+      const userIdentifier = user.email || user.wallet_address;
 
       // DB1 Turso — core mining start
       await dbRun(env, "UPDATE users SET last_mining_start = ?, mining_claimed = 0 WHERE id = ?", [now, user.id]);
@@ -483,12 +537,14 @@ export async function onRequest({ request, env }) {
       // DB3 Supabase Mining — auto-init old user + session log (background)
       safe(async () => {
         await ensureUserInMiningDB(env, user);
-        await sbMining(env, 'mining_sessions', 'POST', {
-          session_id: crypto.randomUUID(),
-          user_email: user.email,
-          status: 'active',
-          started_at: now
-        });
+        if (userIdentifier) {
+          await sbMining(env, 'mining_sessions', 'POST', {
+            session_id: crypto.randomUUID(),
+            user_email: userIdentifier,
+            status: 'active',
+            started_at: now
+          });
+        }
       });
 
       return json({ success: true, last_mining_start: now });
@@ -498,6 +554,8 @@ export async function onRequest({ request, env }) {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
       if (user.mining_claimed == 1) return err('Nothing to claim');
+
+      const userIdentifier = user.email || user.wallet_address;
 
       // Mining calculation
       const cfgRows = await dbAll(env, "SELECT key, value FROM settings WHERE key IN ('mining_duration_hours','mining_coins_per_hour')");
@@ -562,19 +620,21 @@ export async function onRequest({ request, env }) {
       // DB3 Supabase Mining — auto-init old user + points log (background)
       safe(async () => {
         await ensureUserInMiningDB(env, user);
-        // Claim log
-        await sbMining(env, 'mining_claims', 'POST', {
-          user_email: user.email,
-          points_claimed: earned,
-          claim_type: 'manual'
-        });
-        // user_points update (total_points Supabase mein bhi sync karo)
-        const current = await sbMining(env, `user_points?user_email=eq.${encodeURIComponent(user.email)}`);
-        if (current && current[0]) {
-          await sbMining(env, `user_points?user_email=eq.${encodeURIComponent(user.email)}`, 'PATCH', {
-            total_points: (current[0].total_points || 0) + earned,
-            last_claim_at: new Date().toISOString()
+        if (userIdentifier) {
+          // Claim log
+          await sbMining(env, 'mining_claims', 'POST', {
+            user_email: userIdentifier,
+            points_claimed: earned,
+            claim_type: 'manual'
           });
+          // user_points update (total_points Supabase mein bhi sync karo)
+          const current = await sbMining(env, `user_points?user_email=eq.${encodeURIComponent(userIdentifier)}`);
+          if (current && current[0]) {
+            await sbMining(env, `user_points?user_email=eq.${encodeURIComponent(userIdentifier)}`, 'PATCH', {
+              total_points: (current[0].total_points || 0) + earned,
+              last_claim_at: new Date().toISOString()
+            });
+          }
         }
       });
 
@@ -587,6 +647,8 @@ export async function onRequest({ request, env }) {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
       if (user.mining_claimed == 1) return err('Nothing to claim');
+
+      const userIdentifier = user.email || user.wallet_address;
 
       const cfgRows = await dbAll(env, "SELECT key, value FROM settings WHERE key IN ('mining_duration_hours','mining_coins_per_hour')");
       const cfg = {};
@@ -654,17 +716,19 @@ export async function onRequest({ request, env }) {
       // DB3 Supabase Mining — background sync
       safe(async () => {
         await ensureUserInMiningDB(env, user);
-        await sbMining(env, 'mining_claims', 'POST', { user_email: user.email, points_claimed: earned, claim_type: 'manual' });
-        const current = await sbMining(env, `user_points?user_email=eq.${encodeURIComponent(user.email)}`);
-        if (current && current[0]) {
-          await sbMining(env, `user_points?user_email=eq.${encodeURIComponent(user.email)}`, 'PATCH', {
-            total_points: (current[0].total_points || 0) + earned,
-            last_claim_at: now
+        if (userIdentifier) {
+          await sbMining(env, 'mining_claims', 'POST', { user_email: userIdentifier, points_claimed: earned, claim_type: 'manual' });
+          const current = await sbMining(env, `user_points?user_email=eq.${encodeURIComponent(userIdentifier)}`);
+          if (current && current[0]) {
+            await sbMining(env, `user_points?user_email=eq.${encodeURIComponent(userIdentifier)}`, 'PATCH', {
+              total_points: (current[0].total_points || 0) + earned,
+              last_claim_at: now
+            });
+          }
+          await sbMining(env, 'mining_sessions', 'POST', {
+            session_id: crypto.randomUUID(), user_email: userIdentifier, status: 'active', started_at: now
           });
         }
-        await sbMining(env, 'mining_sessions', 'POST', {
-          session_id: crypto.randomUUID(), user_email: user.email, status: 'active', started_at: now
-        });
       });
 
       const updatedUser = await dbFirst(env, 'SELECT * FROM users WHERE id = ?', [user.id]);
@@ -680,8 +744,10 @@ export async function onRequest({ request, env }) {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
 
+      const userIdentifier = user.email || user.wallet_address;
+
       const tasks = await safe(() => sbTasks(env, 'tasks?is_active=eq.true&order=display_order.asc'), []);
-      const done  = await safe(() => sbTasks(env, `task_completions?user_email=eq.${encodeURIComponent(user.email)}`), []);
+      const done  = await safe(() => sbTasks(env, `task_completions?user_email=eq.${encodeURIComponent(userIdentifier)}`), []);
 
       return json({ tasks, done: done.map(d => d.task_id) }, 200, 1800); // 30 min cache
     }
@@ -691,9 +757,12 @@ export async function onRequest({ request, env }) {
       if (!user) return err('Unauthorized', 401);
       const { taskId } = await request.json();
 
+      const userIdentifier = user.email || user.wallet_address;
+      if (!userIdentifier) return err('Invalid user identifier');
+
       // DB2 Supabase Tasks — completion save
       const result = await safe(() => sbTasks(env, 'task_completions', 'POST', {
-        user_email: user.email,
+        user_email: userIdentifier,
         task_id: taskId,
         completed_at: new Date().toISOString()
       }), { ok: false });
@@ -701,11 +770,11 @@ export async function onRequest({ request, env }) {
       // Leaderboard update (auto-init old user)
       safe(async () => {
         await ensureUserInTasksDB(env, user);
-        const lb = await sbTasks(env, `leaderboard?user_email=eq.${encodeURIComponent(user.email)}`);
+        const lb = await sbTasks(env, `leaderboard?user_email=eq.${encodeURIComponent(userIdentifier)}`);
         const task = await safe(() => sbTasks(env, `tasks?id=eq.${taskId}`), []);
         const pts  = task[0]?.points_reward || 0;
         if (lb[0]) {
-          await sbTasks(env, `leaderboard?user_email=eq.${encodeURIComponent(user.email)}`, 'PATCH', {
+          await sbTasks(env, `leaderboard?user_email=eq.${encodeURIComponent(userIdentifier)}`, 'PATCH', {
             total_points: (lb[0].total_points || 0) + pts
           });
         }
@@ -726,8 +795,11 @@ export async function onRequest({ request, env }) {
     if (path === '/api/referrals' && request.method === 'GET') {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
+      const userIdentifier = user.email || user.wallet_address;
+      if (!userIdentifier) return json([], 200, 600);
+      
       const refs = await safe(() =>
-        sbMining(env, `referrals?referrer_email=eq.${encodeURIComponent(user.email)}&order=created_at.desc&limit=30`), []);
+        sbMining(env, `referrals?referrer_email=eq.${encodeURIComponent(userIdentifier)}&order=created_at.desc&limit=30`), []);
       return json(refs, 200, 600); // 10 min cache
     }
 
@@ -829,7 +901,14 @@ export async function onRequest({ request, env }) {
       if (path === '/api/admin/reset-approve' && request.method === 'POST') {
         const reset = await dbFirst(env, 'SELECT * FROM password_resets WHERE id=?', [body.reset_id]);
         if (!reset) return err('Request nahi mili');
-        await dbRun(env, 'UPDATE users SET password=? WHERE id=?', [reset.new_password_hash, reset.user_id]);
+        
+        // Try password column first, fallback to password_hash
+        try {
+          await dbRun(env, 'UPDATE users SET password=? WHERE id=?', [reset.new_password_hash, reset.user_id]);
+        } catch (e) {
+          await dbRun(env, 'UPDATE users SET password_hash=? WHERE id=?', [reset.new_password_hash, reset.user_id]);
+        }
+        
         await dbRun(env, "UPDATE password_resets SET status='approved',resolved_at=datetime('now') WHERE id=?", [body.reset_id]);
         return json({ ok: true });
       }
