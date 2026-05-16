@@ -1,5 +1,5 @@
 // ============================================
-// Ai2E — 3-DATABASE PRODUCTION BACKEND
+// Ai2E — 3-DATABASE PRODUCTION BACKEND (FIXED)
 // DB1 (Turso): Auth & Users | DB2 (Supabase): Tasks & Leaderboard | DB3 (Supabase): Mining & Referrals
 // ============================================
 
@@ -44,7 +44,11 @@ async function turso(env, sql, args = []) {
   } catch (e) { console.error('Turso Error:', e); throw e; }
 }
 
-async function dbFirst(env, sql, args = []) { return (await turso(env, sql, args))[0] || null; }
+// Fixed: dbFirst explicitly returns the first record safely
+async function dbFirst(env, sql, args = []) { 
+  const res = await turso(env, sql, args);
+  return Array.isArray(res) && res.length > 0 ? res[0] : null; 
+}
 async function dbAll(env, sql, args = []) { return await turso(env, sql, args); }
 async function dbRun(env, sql, args = []) { return await turso(env, sql, args); }
 
@@ -170,6 +174,10 @@ export async function onRequest({ request, env }) {
   const path = url.pathname;
 
   try {
+    // Environment variables verification check
+    if (!env.TURSO_URL || !env.TURSO_TOKEN || !env.SUPABASE_TASKS_URL || !env.SUPABASE_MINING_URL) {
+      return err('Critical Environment Variables missing in Cloudflare Dashboard!', 500);
+    }
 
     // ============================================
     // AUTH ENDPOINTS (Turso DB)
@@ -214,7 +222,8 @@ export async function onRequest({ request, env }) {
       const { email, password } = await request.json();
       if (!email || !password) return err('Missing credentials');
 
-      const user = await dbFirst(env, 'SELECT * FROM users WHERE email = ?', [email]);
+      // Fixed query to accurately look into Turso DB users table
+      const user = await dbFirst(env, 'SELECT * FROM users WHERE email = ? OR username = ?', [email, email]);
       if (!user) return err('Invalid credentials', 401);
       if (user.is_banned === 1 || user.is_banned === '1') return err('Account banned', 403);
 
@@ -243,7 +252,7 @@ export async function onRequest({ request, env }) {
       if (!user) return err('Unauthorized', 401);
 
       const miningData = await safe(async () => {
-        const data = await sbMining(env, `user_points?user_email=eq.${user.email}`);
+        const data = await sbMining(env, `user_points?user_email=eq.${encodeURIComponent(user.email)}`);
         return data[0] || {};
       }, {});
 
@@ -332,9 +341,9 @@ export async function onRequest({ request, env }) {
       });
 
       await safe(async () => {
-        const current = await sbMining(env, `user_points?user_email=eq.${user.email}`);
+        const current = await sbMining(env, `user_points?user_email=eq.${encodeURIComponent(user.email)}`);
         const pts = (current[0]?.total_points || 0) + points;
-        await sbMining(env, `user_points?user_email=eq.${user.email}`, 'PATCH', {
+        await sbMining(env, `user_points?user_email=eq.${encodeURIComponent(user.email)}`, 'PATCH', {
           total_points: pts,
           last_claim_at: new Date().toISOString()
         });
@@ -348,7 +357,7 @@ export async function onRequest({ request, env }) {
       if (!user) return err('Unauthorized', 401);
 
       const refs = await safe(async () => {
-        return await sbMining(env, `referrals?referrer_email=eq.${user.email}&order=created_at.desc&limit=30`);
+        return await sbMining(env, `referrals?referrer_email=eq.${encodeURIComponent(user.email)}&order=created_at.desc&limit=30`);
       }, []);
 
       return json(refs);
@@ -388,7 +397,7 @@ export async function onRequest({ request, env }) {
           const data = await sbMining(env, 'user_points?select=total_points');
           return data.reduce((sum, u) => sum + (u.total_points || 0), 0);
         }, 0);
-        const tc = await safe(async () => (await sbTasks(env, 'tasks?is_active=eq.true')).length, 0);
+        const tc = await safe(async () => (await sbTasks(env, 'tasks?is_active=eq.true')), []).length;
         const recent = await safe(async () => await dbAll(env, 'SELECT * FROM users ORDER BY created_at DESC LIMIT 10'), []);
 
         return json({ users: uc, total_mined: tm, tasks: tc, recent });
