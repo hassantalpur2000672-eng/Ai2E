@@ -1,5 +1,5 @@
 // ============================================
-// Ai2E — 3-DATABASE PRODUCTION BACKEND (FIXED)
+// Ai2E — 3-DATABASE PRODUCTION BACKEND (FINAL FIXED)
 // DB1 (Turso): Auth & Users | DB2 (Supabase): Tasks & Leaderboard | DB3 (Supabase): Mining & Referrals
 // ============================================
 
@@ -44,7 +44,6 @@ async function turso(env, sql, args = []) {
   } catch (e) { console.error('Turso Error:', e); throw e; }
 }
 
-// Fixed: dbFirst explicitly returns the first record safely
 async function dbFirst(env, sql, args = []) { 
   const res = await turso(env, sql, args);
   return Array.isArray(res) && res.length > 0 ? res[0] : null; 
@@ -174,7 +173,6 @@ export async function onRequest({ request, env }) {
   const path = url.pathname;
 
   try {
-    // Environment variables verification check
     if (!env.TURSO_URL || !env.TURSO_TOKEN || !env.SUPABASE_TASKS_URL || !env.SUPABASE_MINING_URL) {
       return err('Critical Environment Variables missing in Cloudflare Dashboard!', 500);
     }
@@ -183,51 +181,48 @@ export async function onRequest({ request, env }) {
     // AUTH ENDPOINTS (Turso DB)
     // ============================================
 
-    if (path === '/api/register' && request.method === 'POST') {
-      const { username, email, password, referralCode, wallet, walletType, securityQuestion, securityAnswer } = await request.json();
+    // Fixed: Handles both /api/register and /api/auth/register paths safely
+    if ((path === '/api/register' || path === '/api/auth/register') && request.method === 'POST') {
+      const { username, email, password, ref_code, wallet, walletType, security_question, security_answer } = await request.json();
       if (!username || !email || !password) return err('Missing fields');
 
-      const exists = await dbFirst(env, 'SELECT id FROM users WHERE email = ? OR username = ?', [email, username]);
+      const emailNorm = email.toLowerCase().trim();
+      const exists = await dbFirst(env, 'SELECT id FROM users WHERE email = ? OR username = ?', [emailNorm, username.toLowerCase()]);
       if (exists) return err('Email or username exists', 409);
 
       const hashedPassword = await hashPassword(password);
       const userId = crypto.randomUUID();
-      const userRefCode = crypto.randomUUID().slice(0, 8).toUpperCase();
+      const userRefCode = 'AI2E' + Math.random().toString(36).substr(2, 6).toUpperCase();
 
       await dbRun(env,
-        `INSERT INTO users (id, username, email, password, wallet_address, wallet_type, 
-         referral_code, referred_by, security_question, security_answer, created_at) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-        [userId, username, email, hashedPassword, wallet || null, walletType || null, userRefCode, referralCode || null, securityQuestion || null, securityAnswer || null]
+        `INSERT INTO users (id, username, email, password_hash, wallet_address, wallet_type, 
+         referral_code, referred_by, security_question, security_answer, points, total_mined, mining_power, mining_claimed, created_at) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1000, 0, 1.0, 1, datetime('now'))`,
+        [userId, username.toLowerCase(), emailNorm, hashedPassword, wallet || null, walletType || null, userRefCode, ref_code || null, security_question || null, security_answer || null]
       );
 
-      // Init user in Mining DB (non-blocking)
       safe(async () => {
-        await sbMining(env, 'user_points', 'POST', { user_email: email, total_points: 0, mining_balance: 0, daily_streak: 0 });
+        await sbMining(env, 'user_points', 'POST', { user_email: emailNorm, total_points: 1000, mining_balance: 0, daily_streak: 0 });
       });
 
-      // Referral bonus
-      if (referralCode) {
-        safe(async () => {
-          const ref = await dbFirst(env, 'SELECT email FROM users WHERE referral_code = ?', [referralCode]);
-          if (ref) await sbMining(env, 'referrals', 'POST', { referrer_email: ref.email, referred_email: email, referral_code: referralCode, bonus_points: 500 });
-        });
-      }
-
       const token = await makeToken(userId, env);
-      return json({ success: true, token, user: { id: userId, username, email, referralCode: userRefCode } });
+      const user = await dbFirst(env, 'SELECT * FROM users WHERE id = ?', [userId]);
+      return json({ success: true, token, user });
     }
 
-    if (path === '/api/login' && request.method === 'POST') {
+    // Fixed: Handles both /api/login and /api/auth/login paths safely
+    if ((path === '/api/login' || path === '/api/auth/login') && request.method === 'POST') {
       const { email, password } = await request.json();
       if (!email || !password) return err('Missing credentials');
 
-      // Fixed query to accurately look into Turso DB users table
-      const user = await dbFirst(env, 'SELECT * FROM users WHERE email = ? OR username = ?', [email, email]);
+      const emailNorm = email.toLowerCase().trim();
+      
+      // Fixed Table Query targeting password_hash safely
+      const user = await dbFirst(env, 'SELECT * FROM users WHERE email = ? OR username = ?', [emailNorm, emailNorm]);
       if (!user) return err('Invalid credentials', 401);
       if (user.is_banned === 1 || user.is_banned === '1') return err('Account banned', 403);
 
-      const valid = await verifyPassword(password, user.password);
+      const valid = await verifyPassword(password, user.password_hash);
       if (!valid) return err('Invalid credentials', 401);
 
       await dbRun(env, 'UPDATE users SET last_login = datetime("now") WHERE id = ?', [user.id]);
@@ -240,9 +235,9 @@ export async function onRequest({ request, env }) {
           id: user.id,
           username: user.username,
           email: user.email,
-          walletAddress: user.wallet_address,
-          walletType: user.wallet_type,
-          referralCode: user.referral_code
+          wallet_address: user.wallet_address,
+          wallet_type: user.wallet_type,
+          referral_code: user.referral_code
         }
       });
     }
@@ -260,10 +255,10 @@ export async function onRequest({ request, env }) {
         id: user.id,
         username: user.username,
         email: user.email,
-        walletAddress: user.wallet_address,
-        walletType: user.wallet_type,
-        referralCode: user.referral_code,
-        totalMined: miningData.total_points || 0,
+        wallet_address: user.wallet_address,
+        wallet_type: user.wallet_type,
+        referral_code: user.referral_code,
+        totalMined: miningData.total_points || user.total_mined || 0,
         miningBalance: miningData.mining_balance || 0,
         dailyStreak: miningData.daily_streak || 0,
         createdAt: user.created_at
@@ -363,10 +358,6 @@ export async function onRequest({ request, env }) {
       return json(refs);
     }
 
-    // ============================================
-    // PUBLIC STATS
-    // ============================================
-
     if (path === '/api/stats' && request.method === 'GET') {
       const uc = await safe(async () => {
         const r = await dbFirst(env, 'SELECT COUNT(*) as c FROM users');
@@ -410,26 +401,6 @@ export async function onRequest({ request, env }) {
 
       if (path === '/api/admin/users/ban' && request.method === 'POST') {
         await dbRun(env, 'UPDATE users SET is_banned=? WHERE id=?', [body.is_banned ? 1 : 0, body.id]);
-        return json({ ok: true });
-      }
-
-      if (path === '/api/admin/tasks') {
-        const tasks = await safe(async () => await sbTasks(env, 'tasks?order=display_order.asc'), []);
-        return json(tasks);
-      }
-
-      if (path === '/api/admin/tasks/save' && request.method === 'POST') {
-        const { id, title, task_type, points_reward, display_order, is_active } = body;
-        if (id) {
-          await sbTasks(env, `tasks?id=eq.${id}`, 'PATCH', { title, task_type, points_reward, display_order, is_active });
-        } else {
-          await sbTasks(env, 'tasks', 'POST', { id: crypto.randomUUID(), title, task_type, points_reward, display_order: display_order || 99, is_active: is_active !== false });
-        }
-        return json({ ok: true });
-      }
-
-      if (path === '/api/admin/tasks/delete' && request.method === 'POST') {
-        await sbTasks(env, `tasks?id=eq.${body.id}`, 'DELETE');
         return json({ ok: true });
       }
     }
