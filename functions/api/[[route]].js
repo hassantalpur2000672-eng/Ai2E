@@ -65,26 +65,31 @@ async function dbRun(env, sql, args = [])   { return await turso(env, sql, args)
 
 async function sbTasks(env, endpoint, method = 'GET', body = null) {
   try {
-    const res = await fetch(`${env.SUPABASE_TASKS_URL}/rest/v1/${endpoint}`, {
+    if (!env.SUPABASE_TASKS_URL || !env.SUPABASE_TASKS_KEY) {
+      console.error('SB Tasks: env vars missing!');
+      return method === 'GET' ? [] : { ok: false, error: 'env missing' };
+    }
+    const fullUrl = `${env.SUPABASE_TASKS_URL}/rest/v1/${endpoint}`;
+    const res = await fetch(fullUrl, {
       method,
       headers: {
         'apikey': env.SUPABASE_TASKS_KEY,
         'Authorization': `Bearer ${env.SUPABASE_TASKS_KEY}`,
         'Content-Type': 'application/json',
-        'Prefer': method === 'POST' ? 'return=representation' : 'return=minimal',
+        'Prefer': 'return=representation',
       },
       body: body ? JSON.stringify(body) : null,
     });
-    if (method === 'DELETE' || method === 'PATCH') return { ok: true };
+    const txt = await res.text();
     if (!res.ok) {
-      const txt = await res.text();
-      console.error('SB Tasks Error:', res.status, txt);
-      return method === 'GET' ? [] : { ok: false, error: txt };
+      console.error(`SB Tasks [${method}] ${endpoint} → ${res.status}:`, txt);
+      return method === 'GET' ? [] : { ok: false, error: txt, status: res.status };
     }
-    return await res.json();
+    if (method === 'DELETE') return { ok: true };
+    try { return JSON.parse(txt); } catch { return method === 'GET' ? [] : { ok: true }; }
   } catch (e) {
     console.error('SB Tasks Exception:', e.message);
-    return method === 'GET' ? [] : { ok: false };
+    return method === 'GET' ? [] : { ok: false, error: e.message };
   }
 }
 
@@ -794,18 +799,40 @@ export async function onRequest({ request, env }) {
 
       // DB2 Supabase Tasks — task management
       if (path === '/api/admin/tasks' && request.method === 'GET') {
-        return json(await sbTasks(env, 'tasks?order=display_order.asc'));
+        // Pehle bina filter try karo
+        const tasks = await sbTasks(env, 'tasks?order=display_order.asc&limit=500');
+        console.log('Admin tasks fetched:', JSON.stringify(tasks).slice(0,200));
+        return json(tasks);
       }
 
       if (path === '/api/admin/tasks/save' && request.method === 'POST') {
         const { id, title, description, icon, task_type, url, ad_url, quiz_question, quiz_answer, verify_code, points_reward, timer_seconds, display_order, is_active } = body;
-        const taskData = { title, description: description||null, icon: icon||'🎯', task_type, url: url||null, ad_url: ad_url||null, quiz_question: quiz_question||null, quiz_answer: quiz_answer||null, verify_code: verify_code||null, points_reward, timer_seconds: timer_seconds||0, display_order: display_order||99, is_active: is_active !== false };
+        if (!title) return err('Title required');
+        const taskData = {
+          title,
+          description: description || null,
+          icon: icon || '🎯',
+          task_type: task_type || 'link',
+          url: url || null,
+          ad_url: ad_url || null,
+          quiz_question: quiz_question || null,
+          quiz_answer: quiz_answer || null,
+          verify_code: verify_code || null,
+          points_reward: parseInt(points_reward) || 0,
+          timer_seconds: parseInt(timer_seconds) || 0,
+          display_order: parseInt(display_order) || 99,
+          is_active: is_active === false ? false : true,
+        };
+        let result;
         if (id) {
-          await sbTasks(env, `tasks?id=eq.${id}`, 'PATCH', taskData);
+          result = await sbTasks(env, `tasks?id=eq.${id}`, 'PATCH', taskData);
         } else {
-          await sbTasks(env, 'tasks', 'POST', { id: crypto.randomUUID(), ...taskData, created_at: new Date().toISOString() });
+          result = await sbTasks(env, 'tasks', 'POST', { id: crypto.randomUUID(), ...taskData, created_at: new Date().toISOString() });
         }
-        return json({ success: true });
+        console.log('Task save result:', JSON.stringify(result).slice(0,200));
+        // Verify — dobara fetch karo
+        const verify = await sbTasks(env, 'tasks?order=display_order.asc&limit=500');
+        return json({ success: true, total_tasks: verify.length, tasks: verify });
       }
 
       if (path === '/api/admin/tasks/delete' && request.method === 'POST') {
