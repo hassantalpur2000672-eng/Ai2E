@@ -1307,10 +1307,10 @@ function renderUser() {
 
 async function loadMyRank() {
   try {
-    const lb = await api('/api/leaderboard');
-    const r = lb.findIndex(u => u.username && u.username === me?.username) + 1;
+    const lb = await api('/api/leaderboard'); // cached 5 min
+    const r = lb.findIndex(u => u.username === me?.username) + 1;
     if (r > 0) { setText('srank', '#' + r); setText('pprank', '#' + r); }
-  } catch(e) { console.error('loadMyRank:', e); }
+  } catch(e) {}
 }
 
 // ============================================
@@ -1534,7 +1534,7 @@ async function finTask(id, pts) {
     const card = document.getElementById('tc-' + id);
     if (card) { card.classList.add('done'); const b = card.querySelector('.tbtn'); if (b) { b.className = 'tbtn dbtn'; b.textContent = '✅ Done'; } }
     toast('✅ +' + pts + ' Points earned!'); spawnCoin();
-    cacheClear('/api/me'); await refreshMe(true);
+    cacheClear('/api/me'); cacheClear('/api/tasks'); await refreshMe(true);
   } catch(e) { toast('❌ ' + (e.message || 'Error')); }
 }
 
@@ -1619,7 +1619,7 @@ async function submitVerifyCode() {
       const card = document.getElementById('tc-' + activeVcode.id);
       if (card) { card.classList.add('done'); const b = card.querySelector('.tbtn'); if (b) { b.className = 'tbtn dbtn'; b.textContent = '✅ Done'; } }
       spawnCoin(); spawnCoin();
-      setTimeout(() => { closeVcodeModal(); refreshMe(true); toast('✅ +' + res.earned + ' Points earned!'); }, 1800);
+      setTimeout(() => { closeVcodeModal(); cacheClear('/api/tasks'); refreshMe(true); toast('✅ +' + res.earned + ' Points earned!'); }, 1800);
     } else {
       activeVcode.attempts = (activeVcode.attempts || 0) + 1;
       updateVcodeDots(activeVcode.attempts);
@@ -1699,7 +1699,7 @@ async function submitQuizAnswer() {
       const card = document.getElementById('tc-' + activeQuiz.id);
       if (card) { card.classList.add('done'); const b = card.querySelector('.tbtn'); if (b) { b.className = 'tbtn dbtn'; b.textContent = '✅ Done'; } }
       spawnCoin(); spawnCoin();
-      setTimeout(() => { closeQuizModal(); refreshMe(true); toast('✅ +' + res.earned + ' Points earned!'); }, 1800);
+      setTimeout(() => { closeQuizModal(); cacheClear('/api/tasks'); refreshMe(true); toast('✅ +' + res.earned + ' Points earned!'); }, 1800);
     } else {
       activeQuiz.attempts = (activeQuiz.attempts || 0) + 1;
       updateQuizDots(activeQuiz.attempts);
@@ -1736,30 +1736,24 @@ function showQuizMsg(type, msg) {
 // LEADERBOARD
 // ============================================
 async function loadLB() {
-  const c = document.getElementById('lblist');
-  if (!c) return;
   try {
     const data = await api('/api/leaderboard');
-    if (!data || !data.length) { c.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:16px;text-align:center">No miners yet.</div>'; return; }
+    const c = document.getElementById('lblist');
+    if (!c || !data) return;
     const em = ['🥇','🥈','🥉'];
     c.innerHTML = data.map((u, i) => {
-      const name = u.username ? '@' + u.username : (u.wallet_address ? u.wallet_address.slice(0,6)+'...'+u.wallet_address.slice(-4) : 'miner');
-      const isMe = u.username && u.username === me?.username;
-      const activeRefs = u.active_referral_count || u.active_referrals || 0;
-      const totalRefs  = u.referral_count || u.total_referrals || 0;
+      const name = u.username ? '@' + u.username : (u.email ? u.email : (u.wallet_address ? u.wallet_address.slice(0,6)+'...'+u.wallet_address.slice(-4) : 'miner'));
+      const isMe = u.username === me?.username;
       return `<div class="lbitem" style="${isMe ? 'border-color:rgba(0,255,136,.3);background:rgba(0,255,136,.03);' : ''}">
         <div class="lbrank ${['gold','silver','bronze'][i]||''}">${i < 3 ? em[i] : '#'+(i+1)}</div>
         <div class="lbinfo">
           <div class="lbname">${esc(name)} ${isMe ? '<span style="color:var(--accent);font-size:10px">(you)</span>' : ''}</div>
-          <div class="lbsub">⚡ ${(u.mining_power||1).toFixed(1)}x • 👥 ${activeRefs}/${totalRefs} active refs</div>
+          <div class="lbsub">⚡ ${(u.mining_power||1).toFixed(1)}x • 👥 ${u.active_referrals||0}/${u.total_referrals||0} active refs</div>
         </div>
         <div class="lbpts">${Math.floor(u.total_mined||0).toLocaleString()}</div>
       </div>`;
     }).join('');
-  } catch(e) {
-    c.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:16px;text-align:center">Could not load leaderboard. Try again.</div>';
-    console.error('loadLB:', e);
-  }
+  } catch(e) {}
 }
 
 // ============================================
@@ -1799,17 +1793,14 @@ function shareRef() {
 // TRANSACTIONS
 // ============================================
 async function loadTxH() {
-  const c = document.getElementById('txlist');
-  if (!c) return;
   try {
     const data = await api('/api/transactions');
+    const c = document.getElementById('txlist');
+    if (!c) return;
     if (!data || !data.length) { c.innerHTML = '<div style="color:var(--muted);font-size:13px">No transactions yet.</div>'; return; }
     const ic = {mining_claim:'⛏️',task_complete:'✅',ad_watch:'📺',welcome_bonus:'🎉',referral_bonus:'👥',active_referral_bonus:'🔥',refer_mining_l1:'💰',refer_mining_l2:'🌿',refer_mining_l3:'🔥',refer_mining_10pct:'💰',refer_mining_1pct:'🌿'};
     c.innerHTML = data.map(t => `<div class="txitem"><div class="txico">${ic[t.type]||'💰'}</div><div class="txinfo"><div class="txd">${esc(t.description||t.type)}</div><div class="txdt">${new Date(t.created_at).toLocaleDateString('en',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</div></div><div class="txamt">+${(t.amount||0).toLocaleString()}</div></div>`).join('');
-  } catch(e) {
-    c.innerHTML = '<div style="color:var(--muted);font-size:13px">Could not load history. Try again.</div>';
-    console.error('loadTxH:', e);
-  }
+  } catch(e) {}
 }
 
 // ============================================
