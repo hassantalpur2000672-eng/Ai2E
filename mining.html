@@ -812,7 +812,7 @@ const CACHE_TTL = {
   '/api/leaderboard':  15 * 60 * 1000,  // 15 min
   '/api/referrals':    20 * 60 * 1000,  // 20 min
   '/api/transactions': 10 * 60 * 1000,  // 10 min
-  '/api/me':            3 * 60 * 1000,  // 3 min
+  '/api/me':            5 * 60 * 1000,  // 5 min
 };
 
 function cacheKey(path) { return 'c_' + path.replace(/\//g, '_'); }
@@ -882,22 +882,22 @@ window.addEventListener('DOMContentLoaded', async () => {
   const savedToken = localStorage.getItem('app_token');
   const savedUser = localStorage.getItem('app_user');
   const lastSync = parseInt(localStorage.getItem('app_last_sync') || '0');
-  const SYNC_TTL = 3 * 60 * 1000; // sync from DB once every 3 min
+  const SYNC_TTL = 5 * 60 * 1000; // sync from DB once every 5 min
 
   if (savedToken && savedUser) {
     token = savedToken;
     me = JSON.parse(savedUser);
     setL('LOADING MINER...');
     try {
-      // Less than 3 min since last sync — use local cached data, skip DB read
-      if (Date.now() - lastSync < SYNC_TTL) {
-        await finishLogin();
-        return;
+      const sinceSync = Date.now() - lastSync;
+      // Agar mining active thi aur 5 min se zyada ho gaya — fresh fetch karo state match k liye
+      const miningActive = me && me.mining_claimed == 0 && me.last_mining_start;
+      const needFresh = sinceSync > 5 * 60 * 1000 || (miningActive && sinceSync > 60 * 1000);
+      if (needFresh) {
+        me = await api('/api/me');
+        localStorage.setItem('app_user', JSON.stringify(me));
+        localStorage.setItem('app_last_sync', String(Date.now()));
       }
-      // 3 min elapsed — fetch fresh data from DB
-      me = await api('/api/me');
-      localStorage.setItem('app_user', JSON.stringify(me));
-      localStorage.setItem('app_last_sync', String(Date.now()));
       await finishLogin();
       return;
     } catch(e) {
@@ -1217,11 +1217,25 @@ async function finishLogin(freshLogin = false) {
   document.getElementById('loader').style.display = 'flex';
   document.getElementById('login-screen').classList.remove('show');
   try {
-    // freshLogin=true (new login/register): skip cache, fetch from DB
-    if (freshLogin) { cacheClear('/api/settings'); cacheClear('/api/tasks'); }
-    let settings = {}, taskData = { tasks: [], done: [] };
-    try { settings = await api('/api/settings'); } catch(e) { console.warn('settings err:', e); }
-    try { taskData = await api('/api/tasks'); } catch(e) { console.warn('tasks err:', e); }
+    if (freshLogin) { cacheClear('/api/settings'); cacheClear('/api/tasks'); cacheClear('/api/init'); }
+
+    // BATCHED: ek hi call mein settings + tasks — DB reads kam
+    let initData = null;
+    try {
+      const cached = cacheGet('/api/init');
+      if (cached) {
+        initData = cached;
+      } else {
+        initData = await (await fetch(API + '/api/init', {
+          headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+        })).json();
+        cacheSet('/api/init', initData);
+      }
+    } catch(e) { console.warn('init batch err:', e); }
+
+    const settings = initData?.settings || {};
+    const taskData = initData?.tasks || { tasks: [], done: [] };
+
     cfg = settings;
     if (cfg.announcement) {
       const b = document.getElementById('ann-bar');
@@ -1476,16 +1490,42 @@ async function claimMining() {
   btn.disabled = true; btn.textContent = '⌛ Claiming...';
   try {
     cacheClear('/api/me');
-    const claimRes = await api('/api/mine/claim', 'POST');
+    // claim-and-start: ek hi request mein claim + naya session shuru
+    const claimRes = await api('/api/mine/claim-and-start', 'POST');
     const earned = claimRes.earned || 0;
+    if (claimRes.user) {
+      me = claimRes.user;
+      me.last_mining_start = claimRes.last_mining_start || me.last_mining_start;
+      localStorage.setItem('app_user', JSON.stringify(me));
+      localStorage.setItem('app_last_sync', String(Date.now()));
+    }
     const msb = document.getElementById('mining-status-box');
-    if (msb) msb.classList.remove('show', 'claim-ready');
-    toast('🎁 Claimed ' + earned.toLocaleString() + ' Points!');
+    if (msb) msb.classList.remove('claim-ready');
+    toast('🎁 Claimed ' + earned.toLocaleString() + ' Points! ⛏️ New session started!');
     for (let i = 0; i < 5; i++) setTimeout(spawnCoin, i * 200);
-    await refreshMe(true);
+    renderUser();
+    updateMineUI();
   } catch(e) {
-    toast('❌ ' + (e.message || 'Claim failed'));
-    btn.disabled = false; updateMineUI();
+    // fallback: agar claim-and-start nahi chala toh normal claim try karo
+    try {
+      cacheClear('/api/me');
+      const claimRes = await api('/api/mine/claim', 'POST');
+      const earned = claimRes.earned || 0;
+      if (claimRes.user) {
+        me = claimRes.user;
+        localStorage.setItem('app_user', JSON.stringify(me));
+        localStorage.setItem('app_last_sync', String(Date.now()));
+      }
+      const msb = document.getElementById('mining-status-box');
+      if (msb) msb.classList.remove('show', 'claim-ready');
+      toast('🎁 Claimed ' + earned.toLocaleString() + ' Points!');
+      for (let i = 0; i < 5; i++) setTimeout(spawnCoin, i * 200);
+      renderUser();
+      updateMineUI();
+    } catch(e2) {
+      toast('❌ ' + (e2.message || 'Claim failed'));
+      btn.disabled = false; updateMineUI();
+    }
   }
 }
 
@@ -1534,7 +1574,7 @@ async function finTask(id, pts) {
     const card = document.getElementById('tc-' + id);
     if (card) { card.classList.add('done'); const b = card.querySelector('.tbtn'); if (b) { b.className = 'tbtn dbtn'; b.textContent = '✅ Done'; } }
     toast('✅ +' + pts + ' Points earned!'); spawnCoin();
-    cacheClear('/api/me'); cacheClear('/api/tasks'); await refreshMe(true);
+    cacheClear('/api/me'); await refreshMe(true);
   } catch(e) { toast('❌ ' + (e.message || 'Error')); }
 }
 
@@ -1619,7 +1659,7 @@ async function submitVerifyCode() {
       const card = document.getElementById('tc-' + activeVcode.id);
       if (card) { card.classList.add('done'); const b = card.querySelector('.tbtn'); if (b) { b.className = 'tbtn dbtn'; b.textContent = '✅ Done'; } }
       spawnCoin(); spawnCoin();
-      setTimeout(() => { closeVcodeModal(); cacheClear('/api/tasks'); refreshMe(true); toast('✅ +' + res.earned + ' Points earned!'); }, 1800);
+      setTimeout(() => { closeVcodeModal(); refreshMe(true); toast('✅ +' + res.earned + ' Points earned!'); }, 1800);
     } else {
       activeVcode.attempts = (activeVcode.attempts || 0) + 1;
       updateVcodeDots(activeVcode.attempts);
@@ -1699,7 +1739,7 @@ async function submitQuizAnswer() {
       const card = document.getElementById('tc-' + activeQuiz.id);
       if (card) { card.classList.add('done'); const b = card.querySelector('.tbtn'); if (b) { b.className = 'tbtn dbtn'; b.textContent = '✅ Done'; } }
       spawnCoin(); spawnCoin();
-      setTimeout(() => { closeQuizModal(); cacheClear('/api/tasks'); refreshMe(true); toast('✅ +' + res.earned + ' Points earned!'); }, 1800);
+      setTimeout(() => { closeQuizModal(); refreshMe(true); toast('✅ +' + res.earned + ' Points earned!'); }, 1800);
     } else {
       activeQuiz.attempts = (activeQuiz.attempts || 0) + 1;
       updateQuizDots(activeQuiz.attempts);
