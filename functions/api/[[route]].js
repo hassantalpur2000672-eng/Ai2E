@@ -2,12 +2,6 @@
 // Ai2E — Dual Turso Database Backend (FULLY FIXED)
 // DB1 (TURSO_URL, TURSO_TOKEN): Users, Auth, Tasks, Referrals, Settings, Support, Password Resets
 // DB2 (TURSO_1_URL, TURSO_1_TOKEN): Mining Sessions, Transactions, Mining Cache (no points)
-// 
-// FIXES:
-// - All numeric operations use parseInt/parseFloat to avoid string concatenation
-// - User points only stored in DB1 (users table)
-// - DB2 cache does NOT store points
-// - Task rewards, mining claims, referral bonuses all work correctly
 // ============================================
 
 const CORS = {
@@ -16,9 +10,6 @@ const CORS = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Admin-Key',
 };
 
-// ──────────────────────────────────────────
-// Turso HTTP Helper (generic)
-// ──────────────────────────────────────────
 async function tursoRequest(url, token, sql, args = []) {
   const endpoint = url.replace('libsql://', 'https://');
   const res = await fetch(`${endpoint}/v2/pipeline`, {
@@ -47,42 +38,26 @@ async function tursoRequest(url, token, sql, args = []) {
   });
 }
 
-// DB1 helpers (original Turso)
-async function db1(env, sql, args = []) {
-  return tursoRequest(env.TURSO_URL, env.TURSO_TOKEN, sql, args);
-}
+async function db1(env, sql, args = []) { return tursoRequest(env.TURSO_URL, env.TURSO_TOKEN, sql, args); }
 async function db1First(env, sql, args = []) { return (await db1(env, sql, args))[0] || null; }
 async function db1All(env, sql, args = [])   { return db1(env, sql, args); }
 async function db1Run(env, sql, args = [])   { return db1(env, sql, args); }
 
-// DB2 helpers (new Turso)
-async function db2(env, sql, args = []) {
-  return tursoRequest(env.TURSO_1_URL, env.TURSO_1_TOKEN, sql, args);
-}
+async function db2(env, sql, args = []) { return tursoRequest(env.TURSO_1_URL, env.TURSO_1_TOKEN, sql, args); }
 async function db2First(env, sql, args = []) { return (await db2(env, sql, args))[0] || null; }
 async function db2All(env, sql, args = [])   { return db2(env, sql, args); }
 async function db2Run(env, sql, args = [])   { return db2(env, sql, args); }
 
-// ──────────────────────────────────────────
-// AUTO-INIT: Ensure user exists in DB2 (no points stored)
-// ──────────────────────────────────────────
 async function ensureUserInDb2(env, userId) {
   try {
     const exists = await db2First(env, 'SELECT 1 FROM user_mining_cache WHERE user_id = ? LIMIT 1', [userId]);
     if (exists) return;
-    await db2Run(env, `
-      INSERT INTO user_mining_cache (user_id, last_sync)
-      VALUES (?, datetime('now'))
-    `, [userId]);
-    console.log(`Auto-init DB2 for user ${userId}`);
+    await db2Run(env, `INSERT INTO user_mining_cache (user_id, last_sync) VALUES (?, datetime('now'))`, [userId]);
   } catch (e) {
     console.error('ensureUserInDb2 error:', e);
   }
 }
 
-// ──────────────────────────────────────────
-// Password & Token Utilities
-// ──────────────────────────────────────────
 async function legacyHash(password) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password + 'AI2E_SALT_2025'));
   return btoa(String.fromCharCode(...new Uint8Array(buf)));
@@ -125,15 +100,11 @@ async function verifyToken(token, env) {
   } catch { return null; }
 }
 
-// ──────────────────────────────────────────
-// Utilities
-// ──────────────────────────────────────────
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
 }
-function err(msg, status = 400) {
-  return json({ error: msg }, status);
-}
+function err(msg, status = 400) { return json({ error: msg }, status); }
+
 const _tokenCache = new Map();
 async function getUser(req, env) {
   const auth = req.headers.get('Authorization') || '';
@@ -151,9 +122,6 @@ function esc(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-// ──────────────────────────────────────────
-// MAIN HANDLER
-// ──────────────────────────────────────────
 export async function onRequest({ request, env }) {
   if (request.method === 'OPTIONS') return new Response(null, { headers: CORS });
 
@@ -161,44 +129,35 @@ export async function onRequest({ request, env }) {
   const path = url.pathname;
 
   try {
-    // ========== AUTH & USER (DB1) ==========
+    // ========== AUTH ==========
     if ((path === '/api/register' || path === '/api/auth/register') && request.method === 'POST') {
       const body = await request.json();
       const { username, email, password, ref_code, security_question, security_answer } = body;
       if (!username || !email || !password) return err('All fields required');
       if (password.length < 6) return err('Password min 6 chars');
-
       const emailNorm = email.toLowerCase().trim();
       const exists = await db1First(env, 'SELECT id FROM users WHERE email = ?', [emailNorm]);
       if (exists) return err('Email already registered');
       const uExists = await db1First(env, 'SELECT id FROM users WHERE username = ?', [username.toLowerCase()]);
       if (uExists) return err('Username taken');
-
       const hashed = await hashPassword(password);
       const myRef = 'AI2E' + Math.random().toString(36).substr(2, 6).toUpperCase();
       const id = crypto.randomUUID();
       const cfg = await db1First(env, "SELECT value FROM settings WHERE key = 'welcome_bonus'");
       const bonus = parseInt(cfg?.value || '1000');
-
       await db1Run(env, `
         INSERT INTO users (id, username, email, password, referral_code, referred_by, points, total_mined,
           mining_power, login_method, mining_claimed, security_question, security_answer, created_at)
         VALUES (?,?,?,?,?,?,?,0,1.0,'email',1,?,?,datetime('now'))
       `, [id, username.toLowerCase(), emailNorm, hashed, myRef, ref_code || null, bonus, security_question||null, security_answer||null]);
-
-      // DB2: welcome bonus transaction
-      await db2Run(env, `
-        INSERT INTO transactions (id, user_id, type, amount, description, created_at)
-        VALUES (?,?,?,?,?,datetime('now'))
-      `, [crypto.randomUUID(), id, 'welcome_bonus', bonus, '🎉 Welcome bonus']);
-
+      await db2Run(env, `INSERT INTO transactions (id, user_id, type, amount, description, created_at) VALUES (?,?,?,?,?,datetime('now'))`,
+        [crypto.randomUUID(), id, 'welcome_bonus', bonus, '🎉 Welcome bonus']);
       if (ref_code) {
         const refUser = await db1First(env, 'SELECT id FROM users WHERE referral_code = ?', [ref_code]);
         if (refUser && refUser.id !== id) {
           await db1Run(env, 'UPDATE users SET referral_count = referral_count + 1 WHERE id = ?', [refUser.id]);
         }
       }
-
       await ensureUserInDb2(env, id);
       const token = await makeToken(id, env);
       const user = await db1First(env, 'SELECT * FROM users WHERE id = ?', [id]);
@@ -211,15 +170,12 @@ export async function onRequest({ request, env }) {
       let user = await db1First(env, 'SELECT * FROM users WHERE email = ?', [emailNorm]);
       if (!user) return err('Wrong email or password', 401);
       if (user.is_banned == 1) return err('Account banned', 403);
-
       const valid = await verifyPassword(password, user.password || user.password_hash);
       if (!valid) return err('Wrong email or password', 401);
-
       if (user.password && !user.password.includes(':')) {
         const newHash = await hashPassword(password);
         await db1Run(env, 'UPDATE users SET password = ? WHERE id = ?', [newHash, user.id]);
       }
-
       await ensureUserInDb2(env, user.id);
       const token = await makeToken(user.id, env);
       return json({ token, user });
@@ -241,10 +197,8 @@ export async function onRequest({ request, env }) {
             points, total_mined, mining_power, login_method, mining_claimed, created_at)
           VALUES (?,?,?,?,?,?,?,0,1.0,?,1,datetime('now'))
         `, [id, username, addr, wallet_type||'web3', myRef, ref_code||null, bonus, wallet_type||'wallet']);
-        await db2Run(env, `
-          INSERT INTO transactions (id, user_id, type, amount, description, created_at)
-          VALUES (?,?,?,?,?,datetime('now'))
-        `, [crypto.randomUUID(), id, 'welcome_bonus', bonus, '🎉 Welcome bonus']);
+        await db2Run(env, `INSERT INTO transactions (id, user_id, type, amount, description, created_at) VALUES (?,?,?,?,?,datetime('now'))`,
+          [crypto.randomUUID(), id, 'welcome_bonus', bonus, '🎉 Welcome bonus']);
         await ensureUserInDb2(env, id);
         user = await db1First(env, 'SELECT * FROM users WHERE id = ?', [id]);
       }
@@ -254,7 +208,7 @@ export async function onRequest({ request, env }) {
       return json({ token, user });
     }
 
-    // ========== FORGOT PASSWORD (DB1) ==========
+    // ========== FORGOT PASSWORD ==========
     if (path === '/api/auth/forgot-check' && request.method === 'POST') {
       const { email } = await request.json();
       const user = await db1First(env, 'SELECT id, security_question FROM users WHERE LOWER(email) = ?', [email.toLowerCase()]);
@@ -276,7 +230,7 @@ export async function onRequest({ request, env }) {
       return json({ ok: true });
     }
 
-    // ========== SUPPORT (DB1) ==========
+    // ========== SUPPORT ==========
     if (path === '/api/support/send' && request.method === 'POST') {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
@@ -284,10 +238,8 @@ export async function onRequest({ request, env }) {
       if (!message || message.trim().length < 5) return err('Message too short');
       const last = await db1First(env, "SELECT id FROM support_messages WHERE user_id = ? AND created_at > datetime('now','-24 hours')", [user.id]);
       if (last) return err('Only one message per 24 hours');
-      await db1Run(env, `
-        INSERT INTO support_messages (id,user_id,username,email,message,status,created_at)
-        VALUES (?,?,?,?,?,'open',datetime('now'))
-      `, [crypto.randomUUID(), user.id, user.username, user.email||'', message.trim()]);
+      await db1Run(env, `INSERT INTO support_messages (id,user_id,username,email,message,status,created_at) VALUES (?,?,?,?,?,'open',datetime('now'))`,
+        [crypto.randomUUID(), user.id, user.username, user.email||'', message.trim()]);
       return json({ ok: true });
     }
     if (path === '/api/support/my-messages' && request.method === 'GET') {
@@ -297,7 +249,7 @@ export async function onRequest({ request, env }) {
       return json(msgs);
     }
 
-    // ========== MINING (DB1 + DB2) ==========
+    // ========== MINING ==========
     if ((path === '/api/mine/start' || path === '/api/mining/start') && request.method === 'POST') {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
@@ -314,7 +266,6 @@ export async function onRequest({ request, env }) {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
       if (user.mining_claimed == 1) return err('Nothing to claim');
-
       const cfgRows = await db1All(env, "SELECT key, value FROM settings WHERE key IN ('mining_duration_hours','mining_coins_per_hour')");
       const cfg = {};
       cfgRows.forEach(r => cfg[r.key] = r.value);
@@ -325,36 +276,22 @@ export async function onRequest({ request, env }) {
       const elapsed = Math.min(Date.now() - new Date(user.last_mining_start).getTime(), durMs);
       const earned = Math.floor(cpm * elapsed);
       if (earned < 1) return err('Nothing mined yet');
+      const newPoints = (parseInt(user.points) || 0) + earned;
+      const newMined  = (parseInt(user.total_mined) || 0) + earned;
+      await db1Run(env, `UPDATE users SET points = ?, total_mined = ?, total_claimed = COALESCE(total_claimed,0) + ?, mining_claimed = 1 WHERE id = ?`,
+        [newPoints, newMined, earned, user.id]);
+      await db2Run(env, `INSERT INTO transactions (id, user_id, type, amount, description, created_at) VALUES (?,?,?,?,?,datetime('now'))`,
+        [crypto.randomUUID(), user.id, 'mining_claim', earned, '⛏️ Mining claim']);
+      await db2Run(env, `UPDATE mining_sessions SET claimed_at = datetime('now'), coins_earned = ?, is_claimed = 1 WHERE user_id = ? AND is_claimed = 0`,
+        [earned, user.id]);
 
-      // ✅ FIX: parseInt to avoid concatenation
-      const currentPoints = parseInt(user.points) || 0;
-      const currentMined = parseInt(user.total_mined) || 0;
-      const newPoints = currentPoints + earned;
-      const newMined = currentMined + earned;
-
-      await db1Run(env, `
-        UPDATE users SET points = ?, total_mined = ?, total_claimed = COALESCE(total_claimed,0) + ?, mining_claimed = 1
-        WHERE id = ?
-      `, [newPoints, newMined, earned, user.id]);
-
-      await db2Run(env, `
-        INSERT INTO transactions (id, user_id, type, amount, description, created_at)
-        VALUES (?,?,?,?,?,datetime('now'))
-      `, [crypto.randomUUID(), user.id, 'mining_claim', earned, '⛏️ Mining claim']);
-
-      await db2Run(env, `
-        UPDATE mining_sessions SET claimed_at = datetime('now'), coins_earned = ?, is_claimed = 1
-        WHERE user_id = ? AND is_claimed = 0
-      `, [earned, user.id]);
-
-      // Referral tree (L1=50%, L2=25%, L3=10%) – all with parseInt
+      // Referral tree L1=50%, L2=25%, L3=10%
       if (user.referred_by) {
         const L1 = await db1First(env, 'SELECT * FROM users WHERE referral_code = ?', [user.referred_by]);
         if (L1) {
           const l1Bonus = Math.floor(earned * 0.50);
           if (l1Bonus > 0) {
-            const L1new = (parseInt(L1.points) || 0) + l1Bonus;
-            await db1Run(env, 'UPDATE users SET points = ? WHERE id = ?', [L1new, L1.id]);
+            await db1Run(env, 'UPDATE users SET points = ? WHERE id = ?', [(parseInt(L1.points)||0) + l1Bonus, L1.id]);
             await db2Run(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",
               [crypto.randomUUID(), L1.id, 'refer_mining_l1', l1Bonus, '⛏️ L1 50%: @' + user.username]);
             if (L1.referred_by) {
@@ -362,8 +299,7 @@ export async function onRequest({ request, env }) {
               if (L2) {
                 const l2Bonus = Math.floor(earned * 0.25);
                 if (l2Bonus > 0) {
-                  const L2new = (parseInt(L2.points) || 0) + l2Bonus;
-                  await db1Run(env, 'UPDATE users SET points = ? WHERE id = ?', [L2new, L2.id]);
+                  await db1Run(env, 'UPDATE users SET points = ? WHERE id = ?', [(parseInt(L2.points)||0) + l2Bonus, L2.id]);
                   await db2Run(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",
                     [crypto.randomUUID(), L2.id, 'refer_mining_l2', l2Bonus, '🌿 L2 25%: @' + user.username]);
                   if (L2.referred_by) {
@@ -371,8 +307,7 @@ export async function onRequest({ request, env }) {
                     if (L3) {
                       const l3Bonus = Math.floor(earned * 0.10);
                       if (l3Bonus > 0) {
-                        const L3new = (parseInt(L3.points) || 0) + l3Bonus;
-                        await db1Run(env, 'UPDATE users SET points = ? WHERE id = ?', [L3new, L3.id]);
+                        await db1Run(env, 'UPDATE users SET points = ? WHERE id = ?', [(parseInt(L3.points)||0) + l3Bonus, L3.id]);
                         await db2Run(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",
                           [crypto.randomUUID(), L3.id, 'refer_mining_l3', l3Bonus, '🔥 L3 10%: @' + user.username]);
                       }
@@ -395,7 +330,6 @@ export async function onRequest({ request, env }) {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
       if (user.mining_claimed == 1) return err('Nothing to claim');
-
       const cfgRows = await db1All(env, "SELECT key, value FROM settings WHERE key IN ('mining_duration_hours','mining_coins_per_hour')");
       const cfg = {};
       cfgRows.forEach(r => cfg[r.key] = r.value);
@@ -406,18 +340,11 @@ export async function onRequest({ request, env }) {
       const elapsed = Math.min(Date.now() - new Date(user.last_mining_start).getTime(), durMs);
       const earned = Math.floor(cpm * elapsed);
       if (earned < 1) return err('Nothing mined yet');
-
-      const currentPoints = parseInt(user.points) || 0;
-      const currentMined = parseInt(user.total_mined) || 0;
-      const newPoints = currentPoints + earned;
-      const newMined = currentMined + earned;
+      const newPoints = (parseInt(user.points) || 0) + earned;
+      const newMined  = (parseInt(user.total_mined) || 0) + earned;
       const now = new Date().toISOString();
-
-      await db1Run(env, `
-        UPDATE users SET points = ?, total_mined = ?, total_claimed = COALESCE(total_claimed,0) + ?, mining_claimed = 0, last_mining_start = ?
-        WHERE id = ?
-      `, [newPoints, newMined, earned, now, user.id]);
-
+      await db1Run(env, `UPDATE users SET points = ?, total_mined = ?, total_claimed = COALESCE(total_claimed,0) + ?, mining_claimed = 0, last_mining_start = ? WHERE id = ?`,
+        [newPoints, newMined, earned, now, user.id]);
       await db2Run(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",
         [crypto.randomUUID(), user.id, 'mining_claim', earned, '⛏️ Mining claim']);
       await db2Run(env, "UPDATE mining_sessions SET claimed_at = datetime('now'), coins_earned = ?, is_claimed = 1 WHERE user_id = ? AND is_claimed = 0",
@@ -425,8 +352,40 @@ export async function onRequest({ request, env }) {
       await db2Run(env, "INSERT INTO mining_sessions (id,user_id,started_at,mining_power) VALUES (?,?,?,?)",
         [crypto.randomUUID(), user.id, now, power]);
 
-      // Referral tree (same as claim – omitted for brevity but same pattern)
-      // ... (copy from claim if needed)
+      // Referral tree (same as claim)
+      if (user.referred_by) {
+        const L1 = await db1First(env, 'SELECT * FROM users WHERE referral_code = ?', [user.referred_by]);
+        if (L1) {
+          const l1Bonus = Math.floor(earned * 0.50);
+          if (l1Bonus > 0) {
+            await db1Run(env, 'UPDATE users SET points = ? WHERE id = ?', [(parseInt(L1.points)||0) + l1Bonus, L1.id]);
+            await db2Run(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",
+              [crypto.randomUUID(), L1.id, 'refer_mining_l1', l1Bonus, '⛏️ L1 50%: @' + user.username]);
+            if (L1.referred_by) {
+              const L2 = await db1First(env, 'SELECT * FROM users WHERE referral_code = ?', [L1.referred_by]);
+              if (L2) {
+                const l2Bonus = Math.floor(earned * 0.25);
+                if (l2Bonus > 0) {
+                  await db1Run(env, 'UPDATE users SET points = ? WHERE id = ?', [(parseInt(L2.points)||0) + l2Bonus, L2.id]);
+                  await db2Run(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",
+                    [crypto.randomUUID(), L2.id, 'refer_mining_l2', l2Bonus, '🌿 L2 25%: @' + user.username]);
+                  if (L2.referred_by) {
+                    const L3 = await db1First(env, 'SELECT * FROM users WHERE referral_code = ?', [L2.referred_by]);
+                    if (L3) {
+                      const l3Bonus = Math.floor(earned * 0.10);
+                      if (l3Bonus > 0) {
+                        await db1Run(env, 'UPDATE users SET points = ? WHERE id = ?', [(parseInt(L3.points)||0) + l3Bonus, L3.id]);
+                        await db2Run(env, "INSERT INTO transactions (id,user_id,type,amount,description,created_at) VALUES (?,?,?,?,?,datetime('now'))",
+                          [crypto.randomUUID(), L3.id, 'refer_mining_l3', l3Bonus, '🔥 L3 10%: @' + user.username]);
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
 
       await ensureUserInDb2(env, user.id);
       const updatedUser = await db1First(env, 'SELECT * FROM users WHERE id = ?', [user.id]);
@@ -434,7 +393,7 @@ export async function onRequest({ request, env }) {
       return json({ success: true, earned, user: updatedUser, last_mining_start: now });
     }
 
-    // ========== TASKS (DB1) ==========
+    // ========== TASKS ==========
     if (path === '/api/tasks' && request.method === 'GET') {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
@@ -454,7 +413,6 @@ export async function onRequest({ request, env }) {
       if (task.task_type === 'quiz') return err('Use /api/tasks/quiz-verify for quiz tasks');
       if (task.task_type === 'ad') return err('Use /api/tasks/ad-complete for ad tasks');
       if (task.verify_code && task.verify_code.trim() !== '') return err('Use /api/tasks/verify-code for code tasks');
-
       const reward = parseInt(task.points_reward) || 0;
       await db1Run(env, "INSERT INTO user_tasks (id,user_id,task_id,completed_at) VALUES (?,?,?,datetime('now'))", [crypto.randomUUID(), user.id, task_id]);
       const newPoints = (parseInt(user.points) || 0) + reward;
@@ -463,7 +421,6 @@ export async function onRequest({ request, env }) {
       return json({ success: true, earned: reward });
     }
 
-    // Quiz verify
     if (path === '/api/tasks/quiz-verify' && request.method === 'POST') {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
@@ -500,7 +457,6 @@ export async function onRequest({ request, env }) {
       }
     }
 
-    // Quiz reset
     if (path === '/api/tasks/quiz-reset' && request.method === 'POST') {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
@@ -509,7 +465,6 @@ export async function onRequest({ request, env }) {
       return json({ success: true });
     }
 
-    // Verify code task
     if (path === '/api/tasks/verify-code' && request.method === 'POST') {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
@@ -546,7 +501,6 @@ export async function onRequest({ request, env }) {
       }
     }
 
-    // Verify code reset
     if (path === '/api/tasks/verify-reset' && request.method === 'POST') {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
@@ -555,7 +509,6 @@ export async function onRequest({ request, env }) {
       return json({ success: true });
     }
 
-    // Ad task complete
     if (path === '/api/tasks/ad-complete' && request.method === 'POST') {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
@@ -572,23 +525,32 @@ export async function onRequest({ request, env }) {
       return json({ success: true, earned: reward });
     }
 
-    // ========== OTHER USER ENDPOINTS ==========
+    // ========== USER ENDPOINTS ==========
     if (path === '/api/leaderboard' && request.method === 'GET') {
-      const lb = await db1All(env, 'SELECT username, total_mined, mining_power FROM users ORDER BY total_mined DESC LIMIT 100');
+      // FIXED: now includes referral_count and active_referral_count for frontend display
+      const lb = await db1All(env, `
+        SELECT username, total_mined, mining_power, referral_count, active_referral_count
+        FROM users
+        ORDER BY total_mined DESC
+        LIMIT 100
+      `);
       return json(lb);
     }
+
     if (path === '/api/referrals' && request.method === 'GET') {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
       const refs = await db1All(env, 'SELECT username, wallet_address, total_mined, created_at FROM users WHERE referred_by = ? ORDER BY created_at DESC LIMIT 30', [user.referral_code]);
       return json(refs);
     }
+
     if (path === '/api/transactions' && request.method === 'GET') {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
       const txs = await db2All(env, 'SELECT * FROM transactions WHERE user_id = ? ORDER BY created_at DESC LIMIT 30', [user.id]);
       return json(txs);
     }
+
     if (path === '/api/me' && request.method === 'GET') {
       const user = await getUser(request, env);
       if (!user) return err('Unauthorized', 401);
@@ -600,11 +562,13 @@ export async function onRequest({ request, env }) {
       if (updated) updated.points = parseInt(updated.points) || 0;
       return json(updated);
     }
+
     if (path === '/api/stats' && request.method === 'GET') {
       const uc = await db1First(env, 'SELECT COUNT(*) as c FROM users');
       const tm = await db1First(env, 'SELECT SUM(total_mined) as s FROM users');
       return json({ users: parseInt(uc?.c || 0), total_mined: parseInt(tm?.s || 0) });
     }
+
     if (path === '/api/settings' && request.method === 'GET') {
       const rows = await db1All(env, 'SELECT key, value FROM settings');
       const map = {};
@@ -612,7 +576,7 @@ export async function onRequest({ request, env }) {
       return json(map);
     }
 
-    // ========== ADMIN (mix of DB1 and DB2) ==========
+    // ========== ADMIN ==========
     if (path.startsWith('/api/admin/')) {
       if (request.headers.get('X-Admin-Key') !== (env.ADMIN_KEY || 'Admin@2026')) return err('Forbidden', 403);
       const body = request.method !== 'GET' ? await request.json().catch(() => ({})) : {};
@@ -626,9 +590,10 @@ export async function onRequest({ request, env }) {
         return json({ users: uc?.c || 0, total_mined: tm?.s || 0, tasks: tc?.c || 0, sessions: mc?.c || 0, recent });
       }
       if (path === '/api/admin/users' && request.method === 'GET') {
-        return json(await db1All(env, `SELECT u.*,
-          (SELECT COUNT(*) FROM users r WHERE r.referred_by = u.referral_code) AS referral_count,
-          (SELECT COUNT(*) FROM users r WHERE r.referred_by = u.referral_code AND r.total_mined > 0) AS active_referral_count
+        return json(await db1All(env, `
+          SELECT u.*,
+            (SELECT COUNT(*) FROM users r WHERE r.referred_by = u.referral_code) AS referral_count,
+            (SELECT COUNT(*) FROM users r WHERE r.referred_by = u.referral_code AND r.total_mined > 0) AS active_referral_count
           FROM users u ORDER BY u.created_at DESC LIMIT 100`));
       }
       if (path === '/api/admin/users/ban' && request.method === 'POST') {
@@ -647,11 +612,10 @@ export async function onRequest({ request, env }) {
         const { id, title, description, icon, task_type, url, ad_url, quiz_question, quiz_answer, verify_code, points_reward, timer_seconds, display_order, is_active } = body;
         if (id) {
           await db1Run(env, `UPDATE tasks SET title=?, description=?, icon=?, task_type=?, url=?, ad_url=?, quiz_question=?, quiz_answer=?, verify_code=?, points_reward=?, timer_seconds=?, display_order=?, is_active=? WHERE id=?`,
-            [title, description||null, icon||'🎯', task_type, url||null, ad_url||null, quiz_question||null, quiz_answer||null, verify_code||null, parseInt(points_reward) || 0, timer_seconds||0, display_order||99, is_active?1:0, id]);
+            [title, description||null, icon||'🎯', task_type, url||null, ad_url||null, quiz_question||null, quiz_answer||null, verify_code||null, parseInt(points_reward)||0, timer_seconds||0, display_order||99, is_active?1:0, id]);
         } else {
-          await db1Run(env, `INSERT INTO tasks (id,title,description,icon,task_type,url,ad_url,quiz_question,quiz_answer,verify_code,points_reward,timer_seconds,display_order,is_active,created_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))`,
-            [crypto.randomUUID(), title, description||null, icon||'🎯', task_type, url||null, ad_url||null, quiz_question||null, quiz_answer||null, verify_code||null, parseInt(points_reward) || 0, timer_seconds||0, display_order||99, is_active?1:0]);
+          await db1Run(env, `INSERT INTO tasks (id,title,description,icon,task_type,url,ad_url,quiz_question,quiz_answer,verify_code,points_reward,timer_seconds,display_order,is_active,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))`,
+            [crypto.randomUUID(), title, description||null, icon||'🎯', task_type, url||null, ad_url||null, quiz_question||null, quiz_answer||null, verify_code||null, parseInt(points_reward)||0, timer_seconds||0, display_order||99, is_active?1:0]);
         }
         return json({ ok: true });
       }
