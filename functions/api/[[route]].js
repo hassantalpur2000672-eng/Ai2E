@@ -655,11 +655,28 @@ export async function onRequest({ request, env }) {
         return json({ ok: true });
       }
       if (path === '/api/admin/mining' && request.method === 'GET') {
-        const sessions = await db2All(env, 'SELECT ms.*, u.username FROM mining_sessions ms LEFT JOIN users u ON ms.user_id = u.id ORDER BY ms.started_at DESC LIMIT 100');
+        const sessions = await db2All(env, 'SELECT * FROM mining_sessions ORDER BY started_at DESC LIMIT 100');
+        if (sessions.length > 0) {
+          const ids = [...new Set(sessions.map(s => s.user_id).filter(Boolean))];
+          const placeholders = ids.map(() => '?').join(',');
+          const users = await db1All(env, `SELECT id, username FROM users WHERE id IN (${placeholders})`, ids);
+          const userMap = {};
+          users.forEach(u => { userMap[u.id] = u.username; });
+          sessions.forEach(s => { s.username = userMap[s.user_id] || null; });
+        }
         return json(sessions);
       }
       if (path === '/api/admin/transactions' && request.method === 'GET') {
-        const txs = await db2All(env, 'SELECT t.*, u.username FROM transactions t LEFT JOIN users u ON t.user_id = u.id ORDER BY t.created_at DESC LIMIT 100');
+        // DB2 has no users table — fetch transactions from DB2, then usernames from DB1 separately
+        const txs = await db2All(env, 'SELECT * FROM transactions ORDER BY created_at DESC LIMIT 100');
+        if (txs.length > 0) {
+          const ids = [...new Set(txs.map(t => t.user_id).filter(Boolean))];
+          const placeholders = ids.map(() => '?').join(',');
+          const users = await db1All(env, `SELECT id, username FROM users WHERE id IN (${placeholders})`, ids);
+          const userMap = {};
+          users.forEach(u => { userMap[u.id] = u.username; });
+          txs.forEach(t => { t.username = userMap[t.user_id] || null; });
+        }
         return json(txs);
       }
     }
