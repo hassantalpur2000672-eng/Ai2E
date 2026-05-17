@@ -525,6 +525,23 @@ export async function onRequest({ request, env }) {
       return json({ success: true, earned: reward });
     }
 
+    // ========== INIT BATCH — settings + tasks ek call mein (DB reads kam) ==========
+    if (path === '/api/init' && request.method === 'GET') {
+      const user = await getUser(request, env);
+      if (!user) return err('Unauthorized', 401);
+      const [settingsRows, tasks, done] = await Promise.all([
+        db1All(env, 'SELECT key, value FROM settings'),
+        db1All(env, 'SELECT * FROM tasks WHERE is_active = 1 ORDER BY display_order'),
+        db1All(env, 'SELECT task_id FROM user_tasks WHERE user_id = ?', [user.id]),
+      ]);
+      const settings = {};
+      settingsRows.forEach(r => settings[r.key] = r.value);
+      return json({
+        settings,
+        tasks: { tasks, done: done.map(d => d.task_id) }
+      });
+    }
+
     // ========== USER ENDPOINTS ==========
     if (path === '/api/leaderboard' && request.method === 'GET') {
       // FIXED: now includes referral_count and active_referral_count for frontend display
